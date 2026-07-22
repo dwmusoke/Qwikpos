@@ -14,6 +14,12 @@ import {
   lowStockProducts,
   offlineQueueCount,
   flushOfflineQueue,
+  loadNotifications,
+  subscribeToNotifications,
+  markNotificationRead,
+  markAllNotificationsRead,
+  escapeHtml,
+  fmtDate,
 } from "./uganda-pos-core.js";
 import { renderDashboard } from "./uganda-pos-view-dashboard.js";
 import { renderPOS, submitSaleToSupabase } from "./uganda-pos-view-pos.js";
@@ -27,6 +33,7 @@ import { renderAccounting } from "./uganda-pos-view-accounting.js";
 import { renderSettings } from "./uganda-pos-view-settings.js";
 import { renderBilling } from "./uganda-pos-view-billing.js";
 import { renderAdmin } from "./uganda-pos-view-admin.js";
+import { renderChat } from "./uganda-pos-view-chat.js";
 import {
   initSignupScreen,
   finishPendingSignupIfAny,
@@ -64,6 +71,7 @@ const ROUTES = {
     feature: "accounting",
   },
   settings: { title: "Settings", render: renderSettings },
+  chat: { title: "Team Chat", render: renderChat },
   billing: {
     title: "Billing",
     render: (root) => renderBilling(root, { paywall: false }),
@@ -269,6 +277,102 @@ function wireConnectivity() {
 }
 
 // ---------------------------------------------------------------------
+// Notifications
+// ---------------------------------------------------------------------
+async function wireNotifications() {
+  if (!STATE.business) return;
+  await loadNotifications();
+  renderNotifBadge();
+
+  const bell = $("notif-bell");
+  const dropdown = $("notif-dropdown");
+  const markAllBtn = $("notif-mark-all");
+
+  bell.addEventListener("click", (e) => {
+    e.stopPropagation();
+    dropdown.classList.toggle("hidden");
+    if (!dropdown.classList.contains("hidden")) renderNotifList();
+  });
+
+  document.addEventListener("click", (e) => {
+    if (!$("notif-wrapper")?.contains(e.target)) {
+      dropdown.classList.add("hidden");
+    }
+  });
+
+  markAllBtn.addEventListener("click", async () => {
+    await markAllNotificationsRead();
+    renderNotifBadge();
+    renderNotifList();
+  });
+
+  subscribeToNotifications((n) => {
+    renderNotifBadge();
+    if (!$("notif-dropdown")?.classList.contains("hidden")) renderNotifList();
+    toast(
+      `${n.title}: ${n.body || ""}`,
+      n.type === "error" ? "error" : "default",
+      4000,
+    );
+  });
+}
+
+function renderNotifBadge() {
+  const badge = $("notif-badge");
+  if (!badge) return;
+  badge.textContent = STATE.unreadCount;
+  badge.classList.toggle("hidden", STATE.unreadCount === 0);
+}
+
+function renderNotifList() {
+  const list = $("notif-list");
+  if (!list) return;
+  if (!STATE.notifications.length) {
+    list.innerHTML = `<div class="empty-state" style="padding:24px">No notifications yet</div>`;
+    return;
+  }
+  const iconMap = {
+    sale: "🧾",
+    stock: "📦",
+    subscription: "💳",
+    chat: "💬",
+    error: "❌",
+    warning: "⚠️",
+    success: "✅",
+    info: "ℹ️",
+  };
+  list.innerHTML = STATE.notifications
+    .slice(0, 30)
+    .map(
+      (n) => `
+    <div class="notif-item ${n.is_read ? "" : "unread"}" data-notif-id="${n.id}" data-route="${n.route || ""}">
+      <div class="notif-icon">${iconMap[n.type] || "ℹ️"}</div>
+      <div class="notif-body">
+        <div class="notif-title">${escapeHtml(n.title)}</div>
+        ${n.body ? `<div class="notif-text">${escapeHtml(n.body)}</div>` : ""}
+        <div class="notif-time">${fmtDate(n.created_at)}</div>
+      </div>
+    </div>
+  `,
+    )
+    .join("");
+
+  list.querySelectorAll(".notif-item").forEach((el) => {
+    el.addEventListener("click", async () => {
+      const id = el.dataset.notifId;
+      const route = el.dataset.route;
+      await markNotificationRead(id);
+      renderNotifBadge();
+      el.classList.remove("unread");
+      if (route) {
+        $("notif-dropdown").classList.add("hidden");
+        navigateTo(route);
+      }
+    });
+  });
+}
+
+// ---------------------------------------------------------------------
 // Auth
 // ---------------------------------------------------------------------
 function showLoginScreen() {
@@ -301,6 +405,7 @@ async function boot() {
   populateUserChip();
   updateBadges();
   wireConnectivity();
+  await wireNotifications();
 
   if (STATE.isSuperadmin && !STATE.business) {
     navigateTo("admin");

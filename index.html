@@ -190,6 +190,11 @@
           <span class="icon">🚚</span> Suppliers
         </button>
 
+        <div class="nav-group-label">Team</div>
+        <button class="nav-link" data-route="chat">
+          <span class="icon">💬</span> Chat
+        </button>
+
         <div class="nav-group-label">Compliance &amp; Insights</div>
         <button class="nav-link" data-route="efris">
           <span class="icon">🏛️</span> EFRIS
@@ -242,6 +247,25 @@
               background: var(--surface);
             "
           ></select>
+          <div class="notif-wrapper" id="notif-wrapper">
+            <button class="icon-btn" id="notif-bell" title="Notifications">
+              🔔
+              <span class="notif-badge hidden" id="notif-badge">0</span>
+            </button>
+            <div class="notif-dropdown hidden" id="notif-dropdown">
+              <div class="notif-header">
+                <span>Notifications</span>
+                <button class="btn btn-sm btn-outline" id="notif-mark-all">
+                  Mark all read
+                </button>
+              </div>
+              <div class="notif-list" id="notif-list">
+                <div class="empty-state" style="padding: 24px">
+                  No notifications yet
+                </div>
+              </div>
+            </div>
+          </div>
           <button class="icon-btn" id="theme-toggle" title="Toggle theme">
             🌙
           </button>

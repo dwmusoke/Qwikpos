@@ -3,13 +3,14 @@
 // carts, drafting sales) when the connection drops — sales sync to Supabase
 // automatically once back online (see app.js -> flushOfflineQueue).
 
-const CACHE_NAME = "uganda-pos-v3";
+const CACHE_NAME = "uganda-pos-v4";
 const APP_SHELL = [
   "./",
   "./index.html",
   "./uganda-pos-styles.css",
   "./uganda-pos-core.js",
   "./uganda-pos-app.js",
+  "./uganda-pos-view-chat.js",
   "./uganda-pos-manifest.json",
   "./uganda-pos-icon.svg",
 ];
@@ -78,5 +79,46 @@ self.addEventListener("fetch", (event) => {
         })
         .catch(() => cached);
     }),
+  );
+});
+
+// Push notification handler
+self.addEventListener("push", (event) => {
+  let data = { title: "Qwickpos", body: "" };
+  try {
+    data = event.data.json();
+  } catch (_) {
+    data.body = event.data?.text() || "";
+  }
+  event.waitUntil(
+    self.registration.showNotification(data.title, {
+      body: data.body,
+      icon: "./uganda-pos-icon.svg",
+      badge: "./uganda-pos-icon.svg",
+      data: data.data || {},
+    }),
+  );
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  event.waitUntil(
+    clients
+      .matchAll({ type: "window", includeUncontrolled: true })
+      .then((clientList) => {
+        for (const client of clientList) {
+          if (client.url.includes(self.location.origin) && "focus" in client) {
+            client.focus();
+            if (event.notification.data?.route) {
+              client.postMessage({
+                type: "NAVIGATE",
+                route: event.notification.data.route,
+              });
+            }
+            return;
+          }
+        }
+        clients.openWindow("./");
+      }),
   );
 });

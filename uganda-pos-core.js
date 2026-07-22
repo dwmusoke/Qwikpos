@@ -45,6 +45,8 @@ export const STATE = {
   subscription: null, // row from subscriptions, joined with its plan
   plan: null, // row from plans (current active/trialing plan)
   isSuperadmin: false,
+  notifications: [],
+  unreadCount: 0,
 };
 
 // ---------------------------------------------------------------------
@@ -353,14 +355,143 @@ export function lowStockProducts() {
 }
 
 // ---------------------------------------------------------------------
-// 6. ROLE GUARD
+// 6b. NOTIFICATIONS
+// ---------------------------------------------------------------------
+let _notifChannel = null;
+
+export async function loadNotifications() {
+  if (!STATE.business || !STATE.appUser) return;
+  const { data } = await supabase
+    .from("notifications")
+    .select("*")
+    .or(
+      `user_id.eq.${STATE.appUser.id},and(user_id.is.null,business_id.eq.${STATE.business.id})`,
+    )
+    .order("created_at", { ascending: false })
+    .limit(50);
+  STATE.notifications = data || [];
+  STATE.unreadCount = STATE.notifications.filter((n) => !n.is_read).length;
+}
+
+export function subscribeToNotifications(onNew) {
+  if (!STATE.business || !STATE.appUser) return;
+  if (_notifChannel) supabase.removeChannel(_notifChannel);
+
+  _notifChannel = supabase
+    .channel(`notifications:${STATE.appUser.id}`)
+    .on(
+      "postgres_changes",
+      {
+        event: "INSERT",
+        schema: "public",
+        table: "notifications",
+        filter: `business_id=eq.${STATE.business.id}`,
+      },
+      (payload) => {
+        const n = payload.new;
+        if (n.user_id && n.user_id !== STATE.appUser.id) return;
+        STATE.notifications.unshift(n);
+        if (!n.is_read) STATE.unreadCount++;
+        if (onNew) onNew(n);
+      },
+    )
+    .subscribe();
+}
+
+export async function markNotificationRead(id) {
+  await supabase.from("notifications").update({ is_read: true }).eq("id", id);
+  const n = STATE.notifications.find((x) => x.id === id);
+  if (n && !n.is_read) {
+    n.is_read = true;
+    STATE.unreadCount = Math.max(0, STATE.unreadCount - 1);
+  }
+}
+
+export async function markAllNotificationsRead() {
+  if (!STATE.business) return;
+  await supabase
+    .from("notifications")
+    .update({ is_read: true })
+    .eq("business_id", STATE.business.id)
+    .is("user_id", null)
+    .eq("is_read", false);
+  await supabase
+    .from("notifications")
+    .update({ is_read: true })
+    .eq("user_id", STATE.appUser.id)
+    .eq("is_read", false);
+  STATE.notifications.forEach((n) => (n.is_read = true));
+  STATE.unreadCount = 0;
+}
+
+export async function createNotification({
+  title,
+  body,
+  type = "info",
+  route = null,
+  userId = null,
+}) {
+  if (!STATE.business) return;
+  await supabase.rpc("insert_notification", {
+    p_business_id: STATE.business.id,
+    p_user_id: userId,
+    p_title: title,
+    p_body: body,
+    p_type: type,
+    p_route: route,
+  });
+}
+
+// ---------------------------------------------------------------------
+// 6c. PUSH NOTIFICATIONS (Web Push API)
+// ---------------------------------------------------------------------
+const VAPID_PUBLIC_KEY = null; // Set your VAPID public key here when ready
+
+export async function registerPushSubscription() {
+  if (
+    !("serviceWorker" in navigator) ||
+    !("PushManager" in window) ||
+    !VAPID_PUBLIC_KEY
+  )
+    return;
+  try {
+    const reg = await navigator.serviceWorker.ready;
+    const sub = await reg.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
+    });
+    const keys = sub.toJSON().keys;
+    await supabase.from("push_subscriptions").upsert(
+      {
+        user_id: STATE.appUser.id,
+        business_id: STATE.business.id,
+        endpoint: sub.endpoint,
+        p256dh: keys.p256dh,
+        auth: keys.auth,
+      },
+      { onConflict: "endpoint" },
+    );
+  } catch (e) {
+    console.warn("Push subscription failed:", e.message);
+  }
+}
+
+function urlBase64ToUint8Array(base64String) {
+  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+  const raw = atob(base64);
+  return Uint8Array.from([...raw].map((c) => c.charCodeAt(0)));
+}
+
+// ---------------------------------------------------------------------
+// 7. ROLE GUARD
 // ---------------------------------------------------------------------
 export function hasRole(...roles) {
   return STATE.appUser && roles.includes(STATE.appUser.role);
 }
 
 // ---------------------------------------------------------------------
-// 7. OFFLINE QUEUE (localStorage-backed — sales made while offline are
+// 8. OFFLINE QUEUE (localStorage-backed — sales made while offline are
 //    queued here and pushed to Supabase once the connection returns)
 // ---------------------------------------------------------------------
 const OFFLINE_KEY = "ugpos_offline_sales";
@@ -420,7 +551,7 @@ export async function flushOfflineQueue(insertSaleFn) {
 }
 
 // ---------------------------------------------------------------------
-// 8. EFRIS (URA E-INVOICING) HELPERS
+// 9. EFRIS (URA E-INVOICING) HELPERS
 //
 // buildEfrisPayload() emits the exact request shape the EFRIS Simplified
 // middleware API expects for a standard invoice (see
