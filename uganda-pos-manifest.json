@@ -1,0 +1,14 @@
+{
+  "name": "Qwickpos — EFRIS Ready",
+  "short_name": "Qwickpos",
+  "description": "Modern multi-currency point of sale with EFRIS (URA) e-invoicing readiness for Ugandan businesses.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0b1220",
+  "theme_color": "#0f6b4a",
+  "icons": [
+    { "src": "uganda-pos-icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

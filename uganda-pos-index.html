@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Qwickpos — EFRIS Ready</title>
+<meta name="description" content="Modern multi-currency point of sale with EFRIS e-invoicing readiness for Ugandan businesses." />
+<meta name="theme-color" content="#0f6b4a" />
+<link rel="manifest" href="./uganda-pos-manifest.json" />
+<link rel="icon" href="./uganda-pos-icon.svg" type="image/svg+xml" />
+<link rel="apple-touch-icon" href="./uganda-pos-icon.svg" />
+<link rel="stylesheet" href="./uganda-pos-styles.css" />
+</head>
+<body>
+
+  <!-- ===================== LOGIN SCREEN ===================== -->
+  <div id="login-screen" class="login-wrap">
+    <div class="login-card">
+      <div class="flag-strip"></div>
+      <div class="login-logo">
+        <img src="./uganda-pos-icon.svg" alt="Qwickpos" />
+        <h1>Qwickpos</h1>
+        <p>Modern multi-currency point of sale, EFRIS-ready for URA e-invoicing.</p>
+      </div>
+
+      <form id="login-form">
+        <div class="field">
+          <label for="login-email">Email</label>
+          <input id="login-email" type="email" autocomplete="username" required placeholder="you@business.com" />
+        </div>
+        <div class="field">
+          <label for="login-password">Password</label>
+          <input id="login-password" type="password" autocomplete="current-password" required placeholder="••••••••" />
+        </div>
+        <button class="btn btn-primary btn-block" type="submit" id="login-submit">Sign In</button>
+        <p id="login-error" class="help-text" style="color:var(--danger); display:none; margin-top:10px;"></p>
+      </form>
+
+      <p class="help-text" style="text-align:center; margin-top:16px;">
+        New business? <a href="#" id="show-signup-link">Start your 14-day free trial</a>
+      </p>
+    </div>
+  </div>
+
+  <!-- ===================== SIGNUP SCREEN ===================== -->
+  <div id="signup-screen" class="login-wrap hidden">
+    <div class="login-card" style="max-width:680px;">
+      <div class="flag-strip"></div>
+      <div class="login-logo">
+        <img src="./uganda-pos-icon.svg" alt="Qwickpos" />
+        <h1>Start your free trial</h1>
+        <p>14 days free. Then pay monthly with Flutterwave — mobile money, card or bank.</p>
+      </div>
+
+      <div id="signup-plans" class="grid-3"></div>
+
+      <form id="signup-form" class="hidden">
+        <input type="hidden" id="signup-plan-code" value="starter" />
+        <div class="field"><label for="signup-business-name">Business Name</label><input id="signup-business-name" required /></div>
+        <div class="field-row">
+          <div class="field"><label for="signup-full-name">Your Full Name</label><input id="signup-full-name" required /></div>
+          <div class="field"><label for="signup-phone">Phone</label><input id="signup-phone" placeholder="+2567xxxxxxxx" /></div>
+        </div>
+        <div class="field-row">
+          <div class="field"><label for="signup-email">Email</label><input id="signup-email" type="email" required /></div>
+          <div class="field"><label for="signup-password">Password</label><input id="signup-password" type="password" required minlength="6" placeholder="At least 6 characters" /></div>
+        </div>
+        <div class="field">
+          <label for="signup-currency">Base Currency</label>
+          <select id="signup-currency">
+            <option value="UGX">UGX — Uganda Shilling</option>
+            <option value="USD">USD — US Dollar</option>
+            <option value="KES">KES — Kenyan Shilling</option>
+          </select>
+        </div>
+        <button class="btn btn-outline btn-block" type="button" id="signup-back-btn" style="margin-bottom:8px;">&larr; Change Plan</button>
+        <button class="btn btn-primary btn-block" type="submit" id="signup-submit">Start 14-Day Free Trial</button>
+        <p id="signup-error" class="help-text" style="color:var(--danger); display:none; margin-top:10px;"></p>
+      </form>
+
+      <p class="help-text" style="text-align:center; margin-top:16px;">
+        Already have an account? <a href="#" id="show-login-link">Sign in</a>
+      </p>
+    </div>
+  </div>
+
+  <!-- ===================== APP SHELL ===================== -->
+  <div id="app-shell" class="app-shell hidden">
+    <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
+
+    <aside class="sidebar" id="sidebar">
+      <div class="brand-row">
+        <img src="./uganda-pos-icon.svg" alt="logo" />
+        <div>
+          <div class="brand-name" id="sidebar-business-name">Qwickpos</div>
+          <div class="brand-sub" id="sidebar-branch-name">Main Branch</div>
+        </div>
+      </div>
+
+      <div class="nav-group-label">Operations</div>
+      <button class="nav-link" data-route="dashboard"><span class="icon">📊</span> Dashboard</button>
+      <button class="nav-link" data-route="pos"><span class="icon">🧾</span> Sell (POS)</button>
+      <button class="nav-link" data-route="quotations"><span class="icon">📄</span> Quotations</button>
+      <button class="nav-link" data-route="inventory"><span class="icon">📦</span> Inventory <span class="nav-badge hidden" id="low-stock-badge">0</span></button>
+      <button class="nav-link" data-route="customers"><span class="icon">👥</span> Customers</button>
+      <button class="nav-link" data-route="suppliers"><span class="icon">🚚</span> Suppliers</button>
+
+      <div class="nav-group-label">Compliance &amp; Insights</div>
+      <button class="nav-link" data-route="efris"><span class="icon">🏛️</span> EFRIS <span class="nav-badge hidden" id="efris-badge">0</span></button>
+      <button class="nav-link" data-route="reports"><span class="icon">📈</span> Reports</button>
+      <button class="nav-link" data-route="accounting"><span class="icon">🧮</span> Accounting</button>
+      <button class="nav-link" data-route="settings" data-role="admin,manager"><span class="icon">⚙️</span> Settings</button>
+      <button class="nav-link" data-route="billing" data-role="admin"><span class="icon">💳</span> Billing</button>
+      <button class="nav-link" data-route="admin" data-superadmin="true"><span class="icon">🛠️</span> Platform Admin</button>
+
+      <div class="sidebar-footer">
+        <div class="offline-pill" id="trial-pill"></div>
+        <div class="offline-pill" id="offline-pill"><span class="dot"></span> Offline — sales will sync</div>
+        <button class="btn btn-outline btn-block btn-sm" id="logout-btn">Log out</button>
+      </div>
+    </aside>
+
+    <div class="main">
+      <header class="topbar">
+        <button class="menu-btn" id="menu-btn">☰</button>
+        <h1 id="page-title">Dashboard</h1>
+        <div class="spacer"></div>
+        <select id="currency-picker" class="hidden" title="Display currency" style="border-radius:999px; border:1px solid var(--border); padding:6px 10px; background:var(--surface);"></select>
+        <button class="icon-btn" id="theme-toggle" title="Toggle theme">🌙</button>
+        <button class="user-chip" id="user-chip">
+          <span class="avatar" id="user-avatar">U</span>
+          <span>
+            <div id="user-name" style="font-size:12.5px; font-weight:600;">User</div>
+            <div class="role" id="user-role">cashier</div>
+          </span>
+        </button>
+      </header>
+
+      <div class="view" id="view-root">
+        <!-- rendered by app.js -->
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== MODAL / TOAST ROOTS ===================== -->
+  <div id="modal-root"></div>
+  <div class="toast-stack" id="toast-stack"></div>
+
+  <script type="module" src="./uganda-pos-app.js"></script>
+</body>
+</html>
