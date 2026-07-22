@@ -3,8 +3,9 @@
 // carts, drafting sales) when the connection drops — sales sync to Supabase
 // automatically once back online (see app.js -> flushOfflineQueue).
 
-const CACHE_NAME = "uganda-pos-v2";
+const CACHE_NAME = "uganda-pos-v3";
 const APP_SHELL = [
+  "./",
   "./index.html",
   "./uganda-pos-styles.css",
   "./uganda-pos-core.js",
@@ -45,6 +46,22 @@ self.addEventListener("fetch", (event) => {
     request.url.includes("/rest/v1/") ||
     request.url.includes("/auth/v1/")
   ) {
+    return;
+  }
+
+  // JS files: network-first to always get latest code after deploys
+  if (request.url.endsWith(".js")) {
+    event.respondWith(
+      fetch(request)
+        .then((response) => {
+          if (response && response.status === 200) {
+            const clone = response.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
+          }
+          return response;
+        })
+        .catch(() => caches.match(request)),
+    );
     return;
   }
 
