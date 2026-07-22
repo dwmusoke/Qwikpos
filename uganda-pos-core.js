@@ -1,19 +1,20 @@
 // =====================================================================
 // QWICKPOS — CORE (config, supabase client, shared state, utilities)
 // =====================================================================
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 // ---------------------------------------------------------------------
 // 1. CONFIG — replace with your own Supabase project credentials.
 //    Supabase Dashboard > Project Settings > API
 // ---------------------------------------------------------------------
-export const SUPABASE_URL = 'https://ixntllvgntshbfocwuur.supabase.co';
-export const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml4bnRsbHZnbnRzaGJmb2N3dXVyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ3MTczMjUsImV4cCI6MjEwMDI5MzMyNX0.-UnMGcxju5wgSol35U9dP8sI4e9qSiAosFGfgeprSaM';
+export const SUPABASE_URL = "https://ixntllvgntshbfocwuur.supabase.co";
+export const SUPABASE_ANON_KEY =
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml4bnRsbHZnbnRzaGJmb2N3dXVyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ3MTczMjUsImV4cCI6MjEwMDI5MzMyNX0.-UnMGcxju5wgSol35U9dP8sI4e9qSiAosFGfgeprSaM";
 
 // Flutterwave PUBLIC key only (safe for the browser) — from Flutterwave
 // Dashboard > Settings > API. Never put your SECRET key here; it belongs
 // only in the edge functions' environment (see uganda-pos-fn-*.ts).
-export const FLW_PUBLIC_KEY = 'FLWPUBK-YOUR-PUBLIC-KEY-X';
+export const FLW_PUBLIC_KEY = "FLWPUBK-YOUR-PUBLIC-KEY-X";
 
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: { persistSession: true, autoRefreshToken: true },
@@ -24,25 +25,25 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
 // ---------------------------------------------------------------------
 export const STATE = {
   session: null,
-  appUser: null,      // row from app_users
-  business: null,      // row from businesses
-  branch: null,        // current branch row
+  appUser: null, // row from app_users
+  business: null, // row from businesses
+  branch: null, // current branch row
   branches: [],
-  currencies: [],      // rows from currencies
-  rates: {},           // code -> rate_to_base (latest)
+  currencies: [], // rows from currencies
+  rates: {}, // code -> rate_to_base (latest)
   categories: [],
   products: [],
-  stockByProduct: {},  // productId -> qty in current branch
+  stockByProduct: {}, // productId -> qty in current branch
   customers: [],
   suppliers: [],
   taxCategories: [],
-  cart: [],             // { productId, name, qty, unitPriceBase, taxCode, discount }
+  cart: [], // { productId, name, qty, unitPriceBase, taxCode, discount }
   cartCustomerId: null,
-  displayCurrency: 'UGX',
-  theme: localStorage.getItem('ugpos_theme') || 'light',
-  route: 'dashboard',
-  subscription: null,   // row from subscriptions, joined with its plan
-  plan: null,            // row from plans (current active/trialing plan)
+  displayCurrency: "UGX",
+  theme: localStorage.getItem("ugpos_theme") || "light",
+  route: "dashboard",
+  subscription: null, // row from subscriptions, joined with its plan
+  plan: null, // row from plans (current active/trialing plan)
   isSuperadmin: false,
 };
 
@@ -51,28 +52,37 @@ export const STATE = {
 // ---------------------------------------------------------------------
 export const $ = (id) => document.getElementById(id);
 export const qs = (sel, root = document) => root.querySelector(sel);
-export const qsa = (sel, root = document) => Array.from(root.querySelectorAll(sel));
+export const qsa = (sel, root = document) =>
+  Array.from(root.querySelectorAll(sel));
 
 export function escapeHtml(str) {
-  if (str === null || str === undefined) return '';
+  if (str === null || str === undefined) return "";
   return String(str)
-    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 }
 
 export function uid() {
-  return (crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(16).slice(2)}`);
+  return crypto.randomUUID
+    ? crypto.randomUUID()
+    : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
 export function debounce(fn, ms = 300) {
   let t;
-  return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), ms); };
+  return (...args) => {
+    clearTimeout(t);
+    t = setTimeout(() => fn(...args), ms);
+  };
 }
 
-export function toast(message, type = 'default', ms = 3200) {
-  const stack = $('toast-stack');
+export function toast(message, type = "default", ms = 3200) {
+  const stack = $("toast-stack");
   if (!stack) return;
-  const el = document.createElement('div');
+  const el = document.createElement("div");
   el.className = `toast ${type}`;
   el.textContent = message;
   stack.appendChild(el);
@@ -80,20 +90,24 @@ export function toast(message, type = 'default', ms = 3200) {
 }
 
 export function openModal(innerHtml, { large = false, onMount } = {}) {
-  const root = $('modal-root');
+  const root = $("modal-root");
   root.innerHTML = `
     <div class="modal-overlay" id="active-modal-overlay">
-      <div class="modal ${large ? 'modal-lg' : ''}">${innerHtml}</div>
+      <div class="modal ${large ? "modal-lg" : ""}">${innerHtml}</div>
     </div>`;
-  const overlay = $('active-modal-overlay');
-  overlay.addEventListener('click', (e) => { if (e.target === overlay) closeModal(); });
-  qsa('[data-close-modal]', root).forEach((b) => b.addEventListener('click', closeModal));
+  const overlay = $("active-modal-overlay");
+  overlay.addEventListener("click", (e) => {
+    if (e.target === overlay) closeModal();
+  });
+  qsa("[data-close-modal]", root).forEach((b) =>
+    b.addEventListener("click", closeModal),
+  );
   if (onMount) onMount(root);
 }
 
 export function closeModal() {
-  const root = $('modal-root');
-  if (root) root.innerHTML = '';
+  const root = $("modal-root");
+  if (root) root.innerHTML = "";
 }
 
 // ---------------------------------------------------------------------
@@ -115,13 +129,18 @@ export function round2(n) {
 }
 
 export function currencyMeta(code) {
-  return STATE.currencies.find((c) => c.code === code) || { symbol: code, decimal_places: 2 };
+  return (
+    STATE.currencies.find((c) => c.code === code) || {
+      symbol: code,
+      decimal_places: 2,
+    }
+  );
 }
 
 export function fmtMoney(amountBase, code = STATE.displayCurrency) {
   const meta = currencyMeta(code);
   const amount = fromBase(amountBase, code);
-  const formatted = amount.toLocaleString('en-UG', {
+  const formatted = amount.toLocaleString("en-UG", {
     minimumFractionDigits: meta.decimal_places,
     maximumFractionDigits: meta.decimal_places,
   });
@@ -130,13 +149,25 @@ export function fmtMoney(amountBase, code = STATE.displayCurrency) {
 
 export function fmtMoneyRaw(amount, code = STATE.displayCurrency) {
   const meta = currencyMeta(code);
-  return `${meta.symbol} ${amount.toLocaleString('en-UG', {
-    minimumFractionDigits: meta.decimal_places, maximumFractionDigits: meta.decimal_places,
+  return `${meta.symbol} ${amount.toLocaleString("en-UG", {
+    minimumFractionDigits: meta.decimal_places,
+    maximumFractionDigits: meta.decimal_places,
   })}`;
 }
 
 export function fmtDate(d) {
-  return new Date(d).toLocaleString('en-UG', { dateStyle: 'medium', timeStyle: 'short' });
+  return new Date(d).toLocaleString("en-UG", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  });
+}
+
+// Sanitize a value for CSV export to prevent formula injection attacks.
+// Prefixes dangerous characters (=, +, -, @, \t, \n) with a single quote.
+export function sanitizeCsvValue(v) {
+  const s = String(v ?? "");
+  if (/^[=+\-@\t\r\n]/.test(s)) return "'" + s;
+  return s;
 }
 
 // ---------------------------------------------------------------------
@@ -149,14 +180,21 @@ export async function loadBootstrapData() {
 
   const uidUser = STATE.session.user.id;
   const { data: appUser, error: appUserErr } = await supabase
-    .from('app_users').select('*').eq('id', uidUser).single();
+    .from("app_users")
+    .select("*")
+    .eq("id", uidUser)
+    .single();
 
   if (appUserErr || !appUser) {
-    toast('Your login is not linked to a business yet. Sign up to create one.', 'error', 6000);
+    toast(
+      "Your login is not linked to a business yet. Sign up to create one.",
+      "error",
+      6000,
+    );
     return false;
   }
   STATE.appUser = appUser;
-  STATE.isSuperadmin = appUser.role === 'superadmin';
+  STATE.isSuperadmin = appUser.role === "superadmin";
 
   // A superadmin with no business_id manages the whole platform from the
   // Admin console instead of a single vendor's dashboard — nothing else
@@ -165,30 +203,58 @@ export async function loadBootstrapData() {
     return true;
   }
 
-  const [{ data: business }, { data: branches }, { data: currencies }, { data: rates },
-    { data: categories }, { data: taxCategories }] = await Promise.all([
-    supabase.from('businesses').select('*').eq('id', appUser.business_id).single(),
-    supabase.from('branches').select('*').eq('business_id', appUser.business_id),
-    supabase.from('currencies').select('*').eq('is_active', true),
-    supabase.from('exchange_rates').select('*').order('effective_at', { ascending: false }),
-    supabase.from('categories').select('*').eq('business_id', appUser.business_id),
-    supabase.from('tax_categories').select('*'),
+  const [
+    { data: business },
+    { data: branches },
+    { data: currencies },
+    { data: rates },
+    { data: categories },
+    { data: taxCategories },
+  ] = await Promise.all([
+    supabase
+      .from("businesses")
+      .select("*")
+      .eq("id", appUser.business_id)
+      .single(),
+    supabase
+      .from("branches")
+      .select("*")
+      .eq("business_id", appUser.business_id),
+    supabase.from("currencies").select("*").eq("is_active", true),
+    supabase
+      .from("exchange_rates")
+      .select("*")
+      .order("effective_at", { ascending: false }),
+    supabase
+      .from("categories")
+      .select("*")
+      .eq("business_id", appUser.business_id),
+    supabase.from("tax_categories").select("*"),
   ]);
 
   STATE.business = business;
   STATE.branches = branches || [];
-  STATE.branch = branches?.find((b) => b.id === appUser.branch_id) || branches?.[0] || null;
+  STATE.branch =
+    branches?.find((b) => b.id === appUser.branch_id) || branches?.[0] || null;
   STATE.currencies = currencies || [];
   STATE.categories = categories || [];
   STATE.taxCategories = taxCategories || [];
-  STATE.displayCurrency = business?.base_currency || 'UGX';
+  STATE.displayCurrency = business?.base_currency || "UGX";
 
   // latest rate per currency
   const latest = {};
-  (rates || []).forEach((r) => { if (!(r.currency_code in latest)) latest[r.currency_code] = Number(r.rate_to_base); });
+  (rates || []).forEach((r) => {
+    if (!(r.currency_code in latest))
+      latest[r.currency_code] = Number(r.rate_to_base);
+  });
   STATE.rates = latest;
 
-  await Promise.all([refreshProducts(), refreshCustomers(), refreshSuppliers(), loadSubscription()]);
+  await Promise.all([
+    refreshProducts(),
+    refreshCustomers(),
+    refreshSuppliers(),
+    loadSubscription(),
+  ]);
   return true;
 }
 
@@ -198,7 +264,10 @@ export async function loadBootstrapData() {
 export async function loadSubscription() {
   if (!STATE.business) return;
   const { data } = await supabase
-    .from('subscriptions').select('*, plans(*)').eq('business_id', STATE.business.id).maybeSingle();
+    .from("subscriptions")
+    .select("*, plans(*)")
+    .eq("business_id", STATE.business.id)
+    .maybeSingle();
   STATE.subscription = data || null;
   STATE.plan = data?.plans || null;
 }
@@ -210,8 +279,10 @@ export function isSubscriptionActive() {
   const sub = STATE.subscription;
   if (!sub) return false;
   const now = new Date();
-  if (sub.status === 'trialing') return !sub.trial_ends_at || new Date(sub.trial_ends_at) > now;
-  if (sub.status === 'active') return !sub.current_period_end || new Date(sub.current_period_end) > now;
+  if (sub.status === "trialing")
+    return !sub.trial_ends_at || new Date(sub.trial_ends_at) > now;
+  if (sub.status === "active")
+    return !sub.current_period_end || new Date(sub.current_period_end) > now;
   return false; // past_due, cancelled, expired
 }
 
@@ -231,27 +302,43 @@ export function hasFeature(key) {
 export async function refreshProducts() {
   if (!STATE.business) return;
   const { data: products } = await supabase
-    .from('products').select('*').eq('business_id', STATE.business.id).eq('is_active', true).order('name');
+    .from("products")
+    .select("*")
+    .eq("business_id", STATE.business.id)
+    .eq("is_active", true)
+    .order("name");
   STATE.products = products || [];
 
   if (STATE.branch) {
     const { data: stock } = await supabase
-      .from('product_stock').select('*').eq('branch_id', STATE.branch.id);
+      .from("product_stock")
+      .select("*")
+      .eq("branch_id", STATE.branch.id);
     const map = {};
-    (stock || []).forEach((s) => { map[s.product_id] = Number(s.quantity); });
+    (stock || []).forEach((s) => {
+      map[s.product_id] = Number(s.quantity);
+    });
     STATE.stockByProduct = map;
   }
 }
 
 export async function refreshCustomers() {
   if (!STATE.business) return;
-  const { data } = await supabase.from('customers').select('*').eq('business_id', STATE.business.id).order('name');
+  const { data } = await supabase
+    .from("customers")
+    .select("*")
+    .eq("business_id", STATE.business.id)
+    .order("name");
   STATE.customers = data || [];
 }
 
 export async function refreshSuppliers() {
   if (!STATE.business) return;
-  const { data } = await supabase.from('suppliers').select('*').eq('business_id', STATE.business.id).order('name');
+  const { data } = await supabase
+    .from("suppliers")
+    .select("*")
+    .eq("business_id", STATE.business.id)
+    .order("name");
   STATE.suppliers = data || [];
 }
 
@@ -260,7 +347,9 @@ export function stockFor(productId) {
 }
 
 export function lowStockProducts() {
-  return STATE.products.filter((p) => stockFor(p.id) <= Number(p.reorder_level ?? 0));
+  return STATE.products.filter(
+    (p) => stockFor(p.id) <= Number(p.reorder_level ?? 0),
+  );
 }
 
 // ---------------------------------------------------------------------
@@ -274,27 +363,50 @@ export function hasRole(...roles) {
 // 7. OFFLINE QUEUE (localStorage-backed — sales made while offline are
 //    queued here and pushed to Supabase once the connection returns)
 // ---------------------------------------------------------------------
-const OFFLINE_KEY = 'ugpos_offline_sales';
+const OFFLINE_KEY = "ugpos_offline_sales";
 
 export function queueOfflineSale(payload) {
-  const list = JSON.parse(localStorage.getItem(OFFLINE_KEY) || '[]');
+  let list = [];
+  try { list = JSON.parse(localStorage.getItem(OFFLINE_KEY) || '[]'); } catch (e) { list = []; }
   list.push(payload);
   localStorage.setItem(OFFLINE_KEY, JSON.stringify(list));
 }
 
 export function offlineQueueCount() {
-  return JSON.parse(localStorage.getItem(OFFLINE_KEY) || '[]').length;
+  try { return JSON.parse(localStorage.getItem(OFFLINE_KEY) || '[]').length; } catch (e) { return 0; }
+}
+
+export function offlineQueueCount() {
+  return JSON.parse(localStorage.getItem(OFFLINE_KEY) || "[]").length;
 }
 
 export async function flushOfflineQueue(insertSaleFn) {
   const list = JSON.parse(localStorage.getItem(OFFLINE_KEY) || '[]');
   if (!list.length) return;
   const remaining = [];
+  let synced = 0;
   for (const payload of list) {
-    try { await insertSaleFn(payload); } catch (e) { remaining.push(payload); }
+    try {
+      await insertSaleFn(payload);
+      synced++;
+    } catch (e) {
+      console.warn('Offline sale sync failed, will retry:', e.message || e);
+      remaining.push(payload);
+    }
   }
   localStorage.setItem(OFFLINE_KEY, JSON.stringify(remaining));
-  if (remaining.length === 0) toast('Offline sales synced successfully.', 'success');
+  if (remaining.length === 0 && synced > 0) {
+    toast(`Offline sales synced successfully (${synced} sale${synced > 1 ? 's' : ''}).`, 'success');
+  } else if (remaining.length > 0 && synced > 0) {
+    toast(`${synced} of ${list.length} offline sales synced. ${remaining.length} will retry.`, 'default', 5000);
+  } else if (remaining.length > 0) {
+    toast(`Could not sync ${remaining.length} offline sale(s) — will retry when online.`, 'error', 5000);
+  }
+}
+  }
+  localStorage.setItem(OFFLINE_KEY, JSON.stringify(remaining));
+  if (remaining.length === 0)
+    toast("Offline sales synced successfully.", "success");
 }
 
 // ---------------------------------------------------------------------
@@ -318,40 +430,53 @@ export async function flushOfflineQueue(insertSaleFn) {
 //     Invoices" doc link above for those payload shapes if you need them.
 // ---------------------------------------------------------------------
 
-const EFRIS_TAX_CODE = { STD: '01', ZERO: '02', EXEMPT: '03', DEEMED: '04' };
-const EFRIS_TAX_RATE = { STD: '0.18', ZERO: '0', EXEMPT: '-', DEEMED: '0.18' };
+const EFRIS_TAX_CODE = { STD: "01", ZERO: "02", EXEMPT: "03", DEEMED: "04" };
+const EFRIS_TAX_RATE = { STD: "0.18", ZERO: "0", EXEMPT: "-", DEEMED: "0.18" };
 
 const PAYMENT_MODE_CODE = {
-  credit: '101', cash: '102', mobile_money: '105', card: '106', bank: '107',
+  credit: "101",
+  cash: "102",
+  mobile_money: "105",
+  card: "106",
+  bank: "107",
 };
 
 function efrisNow() {
   const d = new Date();
-  const pad = (n) => String(n).padStart(2, '0');
+  const pad = (n) => String(n).padStart(2, "0");
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
 }
 
-export function buildEfrisPayload({ sale, items, business, customer, payments = [], operator }) {
+export function buildEfrisPayload({
+  sale,
+  items,
+  business,
+  customer,
+  payments = [],
+  operator,
+}) {
   const goodsDetails = items.map((it, idx) => {
     const product = STATE.products.find((p) => p.id === it.product_id);
-    const taxCode = EFRIS_TAX_CODE[it.tax_category_code] || '01';
-    const taxRate = EFRIS_TAX_RATE[it.tax_category_code] ?? '0.18';
+    const taxCode = EFRIS_TAX_CODE[it.tax_category_code] || "01";
+    const taxRate = EFRIS_TAX_RATE[it.tax_category_code] ?? "0.18";
     const qty = Number(it.quantity) || 0;
-    const effectiveUnitPrice = qty ? round2(Number(it.line_total) / qty) : Number(it.unit_price);
+    const effectiveUnitPrice = qty
+      ? round2(Number(it.line_total) / qty)
+      : Number(it.unit_price);
     return {
       item: it.product_name,
       itemCode: product?.sku || product?.barcode || it.product_id,
       qty: String(qty),
-      unitOfMeasure: product?.efris_measure_unit || '101',
+      unitOfMeasure: product?.efris_measure_unit || "101",
       unitPrice: String(effectiveUnitPrice),
       total: String(it.line_total),
       taxRate,
-      tax: taxRate === '-' ? '0' : String(it.vat_amount),
+      tax: taxRate === "-" ? "0" : String(it.vat_amount),
       orderNumber: String(idx),
-      discountFlag: '2',
-      deemedFlag: '2',
-      exciseFlag: '2',
-      goodsCategoryId: product?.efris_commodity_category_id || '',
+      discountFlag: "2",
+      deemedFlag: "2",
+      exciseFlag: "2",
+      goodsCategoryId: product?.efris_commodity_category_id || "",
       _taxCode: taxCode, // internal only, stripped before sending — used to group taxDetails below
     };
   });
@@ -360,8 +485,9 @@ export function buildEfrisPayload({ sale, items, business, customer, payments = 
   goodsDetails.forEach((g) => {
     const key = g._taxCode;
     const gross = Number(g.total);
-    const tax = g.taxRate === '-' ? 0 : Number(g.tax);
-    if (!taxGroups[key]) taxGroups[key] = { taxRate: g.taxRate, gross: 0, tax: 0 };
+    const tax = g.taxRate === "-" ? 0 : Number(g.tax);
+    if (!taxGroups[key])
+      taxGroups[key] = { taxRate: g.taxRate, gross: 0, tax: 0 };
     taxGroups[key].gross += gross;
     taxGroups[key].tax += tax;
   });
@@ -379,7 +505,7 @@ export function buildEfrisPayload({ sale, items, business, customer, payments = 
   const grossAmount = taxDetails.reduce((a, t) => a + Number(t.grossAmount), 0);
 
   const payWay = payments.map((p, idx) => ({
-    paymentMode: PAYMENT_MODE_CODE[p.method] || '102',
+    paymentMode: PAYMENT_MODE_CODE[p.method] || "102",
     paymentAmount: String(p.amount),
     orderNumber: String.fromCharCode(97 + idx), // 'a', 'b', 'c'...
   }));
@@ -387,27 +513,36 @@ export function buildEfrisPayload({ sale, items, business, customer, payments = 
   return {
     invoice: {
       sellerDetails: {
-        tin: business?.tin || '',
-        legalName: business?.name || '',
-        businessName: business?.name || '',
-        emailAddress: business?.email || '',
-        referenceNo: sale.sale_number || '',
-        isCheckReferenceNo: '0',
+        tin: business?.tin || "",
+        legalName: business?.name || "",
+        businessName: business?.name || "",
+        emailAddress: business?.email || "",
+        referenceNo: sale.sale_number || "",
+        isCheckReferenceNo: "0",
       },
       basicInformation: {
-        invoiceNo: '',
-        antifakeCode: '',
-        deviceNo: business?.efris_device_no || (business?.tin ? `${business.tin}_01` : ''),
+        invoiceNo: "",
+        antifakeCode: "",
+        deviceNo:
+          business?.efris_device_no ||
+          (business?.tin ? `${business.tin}_01` : ""),
         issuedDate: efrisNow(),
-        operator: operator || 'Cashier',
-        currency: sale.currency_code || 'UGX',
-        invoiceType: '1',
-        invoiceKind: '1',
-        dataSource: '103',
+        operator: operator || "Cashier",
+        currency: sale.currency_code || "UGX",
+        invoiceType: "1",
+        invoiceKind: "1",
+        dataSource: "103",
       },
       buyerDetails: customer?.tin
-        ? { buyerType: '0', buyerLegalName: customer?.name || 'Customer', buyerTin: customer.tin }
-        : { buyerType: '1', buyerLegalName: customer?.name || 'Walk-in Customer' },
+        ? {
+            buyerType: "0",
+            buyerLegalName: customer?.name || "Customer",
+            buyerTin: customer.tin,
+          }
+        : {
+            buyerType: "1",
+            buyerLegalName: customer?.name || "Walk-in Customer",
+          },
       goodsDetails: goodsDetails.map(({ _taxCode, ...g }) => g),
       taxDetails,
       summary: {
@@ -415,10 +550,18 @@ export function buildEfrisPayload({ sale, items, business, customer, payments = 
         taxAmount: taxAmount.toFixed(2),
         grossAmount: grossAmount.toFixed(2),
         itemCount: String(goodsDetails.length),
-        modeCode: '1',
-        remarks: 'Thank you for your business',
+        modeCode: "1",
+        remarks: "Thank you for your business",
       },
-      payWay: payWay.length ? payWay : [{ paymentMode: '102', paymentAmount: grossAmount.toFixed(2), orderNumber: 'a' }],
+      payWay: payWay.length
+        ? payWay
+        : [
+            {
+              paymentMode: "102",
+              paymentAmount: grossAmount.toFixed(2),
+              orderNumber: "a",
+            },
+          ],
     },
   };
 }

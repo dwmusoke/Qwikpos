@@ -144,8 +144,17 @@ begin
 end;
 $$;
 
+-- Helper: is the current user an admin or manager of their business?
+create or replace function is_admin_or_manager() returns boolean
+language sql security definer stable as $$
+  select exists (
+    select 1 from app_users where id = auth.uid() and role in ('admin', 'manager') and is_active = true
+  );
+$$;
+
 grant execute on function create_business_and_owner(text, text, text, text, text) to authenticated;
 grant execute on function is_superadmin() to authenticated, anon;
+grant execute on function is_admin_or_manager() to authenticated;
 
 -- ---------------------------------------------------------------------
 -- 6. RLS — plans (public pricing page, even before login)
@@ -204,8 +213,18 @@ create policy business_isolation_app_users on app_users
 
 drop policy if exists business_update_app_users on app_users;
 create policy business_update_app_users on app_users
-  for update using (business_id = auth_business_id() or is_superadmin())
-  with check (business_id = auth_business_id() or is_superadmin());
+  for update using (
+    (business_id = auth_business_id() and exists (
+      select 1 from app_users where id = auth.uid() and role in ('admin', 'manager')
+    ))
+    or is_superadmin()
+  )
+  with check (
+    (business_id = auth_business_id() and exists (
+      select 1 from app_users where id = auth.uid() and role in ('admin', 'manager')
+    ))
+    or is_superadmin()
+  );
 
 drop policy if exists business_isolation_products on products;
 create policy business_isolation_products on products

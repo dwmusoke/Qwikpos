@@ -99,8 +99,23 @@ alter table expenses enable row level security;
 
 drop policy if exists business_isolation_expenses on expenses;
 create policy business_isolation_expenses on expenses
-  for all using (business_id = auth_business_id() or is_superadmin())
+  for select using (business_id = auth_business_id() or is_superadmin());
+
+drop policy if exists business_insert_expenses on expenses;
+create policy business_insert_expenses on expenses
+  for insert with check (business_id = auth_business_id() or is_superadmin());
+
+drop policy if exists business_update_expenses on expenses;
+create policy business_update_expenses on expenses
+  for update using (business_id = auth_business_id() or is_superadmin())
   with check (business_id = auth_business_id() or is_superadmin());
+
+drop policy if exists business_delete_expenses on expenses;
+create policy business_delete_expenses on expenses
+  for delete using (
+    (business_id = auth_business_id() and is_admin_or_manager())
+    or is_superadmin()
+  );
 
 -- ---------------------------------------------------------------------
 -- 5. DAILY SUMMARY (SMS / WhatsApp)

@@ -44,43 +44,70 @@
 // where daily_summary_channel = 'whatsapp'; buildMessage() doesn't need
 // to change either way.
 // =====================================================================
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-cron-secret',
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type, x-cron-secret",
 };
 
-const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
-const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-const AT_USERNAME = Deno.env.get('AT_USERNAME') ?? '';
-const AT_API_KEY = Deno.env.get('AT_API_KEY') ?? '';
-const CRON_SECRET = Deno.env.get('CRON_SECRET') ?? '';
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+const AT_USERNAME = Deno.env.get("AT_USERNAME") ?? "";
+const AT_API_KEY = Deno.env.get("AT_API_KEY") ?? "";
+const CRON_SECRET = Deno.env.get("CRON_SECRET") ?? "";
 
 const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
 Deno.serve(async (req) => {
-  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
+  if (req.method === "OPTIONS")
+    return new Response("ok", { headers: corsHeaders });
 
-  if (CRON_SECRET && req.headers.get('x-cron-secret') !== CRON_SECRET) {
-    return json({ success: false, error: 'Unauthorized' }, 401);
+  // CRON_SECRET is mandatory — fail closed if not set to prevent unauthorized triggering
+  if (!CRON_SECRET) {
+    console.error(
+      "CRON_SECRET is not configured — daily-summary cannot run safely",
+    );
+    return json(
+      { success: false, error: "Server misconfiguration: CRON_SECRET not set" },
+      500,
+    );
+  }
+  if (req.headers.get("x-cron-secret") !== CRON_SECRET) {
+    return json({ success: false, error: "Unauthorized" }, 401);
   }
 
   try {
-    const { data: businesses } = await admin.from('businesses').select('*').eq('daily_summary_enabled', true);
+    const { data: businesses } = await admin
+      .from("businesses")
+      .select("*")
+      .eq("daily_summary_enabled", true);
     const results: unknown[] = [];
 
     for (const business of businesses || []) {
       if (!business.daily_summary_phone) continue;
 
-      const summary = await buildSummary(business.id, business.base_currency || 'UGX');
+      const summary = await buildSummary(
+        business.id,
+        business.base_currency || "UGX",
+      );
       const message = buildMessage(business.name, summary);
 
-      const sendResult = business.daily_summary_channel === 'whatsapp'
-        ? { success: false, note: 'WhatsApp channel selected but not wired up yet — see the comment block at the top of this file for how to add Twilio/Africa\'s Talking WhatsApp.' }
-        : await sendSms(business.daily_summary_phone, message);
+      const sendResult =
+        business.daily_summary_channel === "whatsapp"
+          ? {
+              success: false,
+              note: "WhatsApp channel selected but not wired up yet — see the comment block at the top of this file for how to add Twilio/Africa's Talking WhatsApp.",
+            }
+          : await sendSms(business.daily_summary_phone, message);
 
-      results.push({ business: business.name, phone: business.daily_summary_phone, channel: business.daily_summary_channel, ...sendResult });
+      results.push({
+        business: business.name,
+        phone: business.daily_summary_phone,
+        channel: business.daily_summary_channel,
+        ...sendResult,
+      });
     }
 
     return json({ success: true, processed: results.length, results });
@@ -92,67 +119,131 @@ Deno.serve(async (req) => {
 
 async function buildSummary(businessId: string, baseCurrency: string) {
   const now = new Date();
-  const yStart = new Date(now); yStart.setDate(yStart.getDate() - 1); yStart.setHours(0, 0, 0, 0);
-  const yEnd = new Date(now); yEnd.setDate(yEnd.getDate() - 1); yEnd.setHours(23, 59, 59, 999);
+  const yStart = new Date(now);
+  yStart.setDate(yStart.getDate() - 1);
+  yStart.setHours(0, 0, 0, 0);
+  const yEnd = new Date(now);
+  yEnd.setDate(yEnd.getDate() - 1);
+  yEnd.setHours(23, 59, 59, 999);
 
-  const { data: sales } = await admin.from('sales').select('*, sale_items(*)')
-    .eq('business_id', businessId).neq('sale_type', 'quotation').neq('status', 'voided')
-    .gte('created_at', yStart.toISOString()).lte('created_at', yEnd.toISOString());
+  const { data: sales } = await admin
+    .from("sales")
+    .select("*, sale_items(*)")
+    .eq("business_id", businessId)
+    .neq("sale_type", "quotation")
+    .neq("status", "voided")
+    .gte("created_at", yStart.toISOString())
+    .lte("created_at", yEnd.toISOString());
 
   const rows = sales || [];
-  const totalSales = rows.reduce((a, s) => a + Number(s.grand_total_base || 0), 0);
+  const totalSales = rows.reduce(
+    (a, s) => a + Number(s.grand_total_base || 0),
+    0,
+  );
   const txnCount = rows.length;
 
   const productTally: Record<string, number> = {};
-  rows.forEach((s) => (s.sale_items || []).forEach((it: any) => {
-    productTally[it.product_name] = (productTally[it.product_name] || 0) + Number(it.quantity || 0);
-  }));
-  const topProduct = Object.entries(productTally).sort((a, b) => b[1] - a[1])[0];
+  rows.forEach((s) =>
+    (s.sale_items || []).forEach((it: any) => {
+      productTally[it.product_name] =
+        (productTally[it.product_name] || 0) + Number(it.quantity || 0);
+    }),
+  );
+  const topProduct = Object.entries(productTally).sort(
+    (a, b) => b[1] - a[1],
+  )[0];
 
-  const { data: products } = await admin.from('products').select('id, reorder_level').eq('business_id', businessId).eq('is_active', true);
+  const { data: products } = await admin
+    .from("products")
+    .select("id, reorder_level")
+    .eq("business_id", businessId)
+    .eq("is_active", true);
   const productIds = (products || []).map((p: any) => p.id);
   const { data: stock } = productIds.length
-    ? await admin.from('product_stock').select('product_id, quantity').in('product_id', productIds)
+    ? await admin
+        .from("product_stock")
+        .select("product_id, quantity")
+        .in("product_id", productIds)
     : { data: [] };
   const stockByProduct: Record<string, number> = {};
-  (stock || []).forEach((s: any) => { stockByProduct[s.product_id] = (stockByProduct[s.product_id] || 0) + Number(s.quantity || 0); });
-  const lowStockCount = (products || []).filter((p: any) => (stockByProduct[p.id] || 0) <= Number(p.reorder_level || 0)).length;
+  (stock || []).forEach((s: any) => {
+    stockByProduct[s.product_id] =
+      (stockByProduct[s.product_id] || 0) + Number(s.quantity || 0);
+  });
+  const lowStockCount = (products || []).filter(
+    (p: any) => (stockByProduct[p.id] || 0) <= Number(p.reorder_level || 0),
+  ).length;
 
-  return { totalSales, txnCount, topProduct, lowStockCount, baseCurrency, date: yStart.toISOString().slice(0, 10) };
+  return {
+    totalSales,
+    txnCount,
+    topProduct,
+    lowStockCount,
+    baseCurrency,
+    date: yStart.toISOString().slice(0, 10),
+  };
 }
 
-function buildMessage(businessName: string, s: { totalSales: number; txnCount: number; topProduct?: [string, number]; lowStockCount: number; baseCurrency: string; date: string }) {
-  const money = (n: number) => `${s.baseCurrency} ${Math.round(n).toLocaleString('en-UG')}`;
+function buildMessage(
+  businessName: string,
+  s: {
+    totalSales: number;
+    txnCount: number;
+    topProduct?: [string, number];
+    lowStockCount: number;
+    baseCurrency: string;
+    date: string;
+  },
+) {
+  const money = (n: number) =>
+    `${s.baseCurrency} ${Math.round(n).toLocaleString("en-UG")}`;
   const lines = [
     `${businessName} — ${s.date} summary`,
     `Sales: ${money(s.totalSales)} (${s.txnCount} txns)`,
   ];
-  if (s.topProduct) lines.push(`Top seller: ${s.topProduct[0]} (${s.topProduct[1]})`);
-  if (s.lowStockCount > 0) lines.push(`⚠ ${s.lowStockCount} product(s) low on stock`);
-  lines.push('— Qwickpos');
-  return lines.join('\n');
+  if (s.topProduct)
+    lines.push(`Top seller: ${s.topProduct[0]} (${s.topProduct[1]})`);
+  if (s.lowStockCount > 0)
+    lines.push(`⚠ ${s.lowStockCount} product(s) low on stock`);
+  lines.push("— Qwickpos");
+  return lines.join("\n");
 }
 
 async function sendSms(phone: string, message: string) {
   if (!AT_USERNAME || !AT_API_KEY) {
-    return { success: false, note: "Africa's Talking credentials not configured (AT_USERNAME / AT_API_KEY secrets)." };
+    return {
+      success: false,
+      note: "Africa's Talking credentials not configured (AT_USERNAME / AT_API_KEY secrets).",
+    };
   }
-  const body = new URLSearchParams({ username: AT_USERNAME, to: phone, message });
-  const res = await fetch('https://api.africastalking.com/version1/messaging', {
-    method: 'POST',
+  const body = new URLSearchParams({
+    username: AT_USERNAME,
+    to: phone,
+    message,
+  });
+  const res = await fetch("https://api.africastalking.com/version1/messaging", {
+    method: "POST",
     headers: {
       apiKey: AT_API_KEY,
-      'Content-Type': 'application/x-www-form-urlencoded',
-      Accept: 'application/json',
+      "Content-Type": "application/x-www-form-urlencoded",
+      Accept: "application/json",
     },
     body: body.toString(),
   });
   const data = await res.json().catch(() => null);
   const recipient = data?.SMSMessageData?.Recipients?.[0];
-  const ok = recipient?.status === 'Success';
-  return { success: ok, providerStatus: recipient?.status || 'Unknown', cost: recipient?.cost, raw: ok ? undefined : data };
+  const ok = recipient?.status === "Success";
+  return {
+    success: ok,
+    providerStatus: recipient?.status || "Unknown",
+    cost: recipient?.cost,
+    raw: ok ? undefined : data,
+  };
 }
 
 function json(body: unknown, status = 200) {
-  return new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
 }
