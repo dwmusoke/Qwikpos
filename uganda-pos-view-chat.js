@@ -4,9 +4,11 @@
 import {
   supabase,
   STATE,
+  $,
   escapeHtml,
   toast,
   createNotification,
+  fmtDate,
 } from "./uganda-pos-core.js";
 
 let _chatChannel = null;
@@ -384,8 +386,4 @@ async function startDM(otherUserId) {
   await openConversation(conv.id);
   const conversations = await loadConversations();
   renderConversationList(conversations);
-}
-
-function $(id) {
-  return document.getElementById(id);
 }

@@ -34,6 +34,7 @@ import { renderSettings } from "./uganda-pos-view-settings.js";
 import { renderBilling } from "./uganda-pos-view-billing.js";
 import { renderAdmin } from "./uganda-pos-view-admin.js";
 import { renderChat } from "./uganda-pos-view-chat.js";
+import { renderNotifications } from "./uganda-pos-view-notifications.js";
 import {
   initSignupScreen,
   finishPendingSignupIfAny,
@@ -72,6 +73,7 @@ const ROUTES = {
   },
   settings: { title: "Settings", render: renderSettings },
   chat: { title: "Team Chat", render: renderChat },
+  notifications: { title: "Notifications", render: renderNotifications },
   billing: {
     title: "Billing",
     render: (root) => renderBilling(root, { paywall: false }),
@@ -245,6 +247,13 @@ function updateBadges() {
   lowBadge.textContent = low;
   lowBadge.classList.toggle("hidden", low === 0);
 
+  // Notification sidebar badge
+  const notifBadge = $("notif-sidebar-badge");
+  if (notifBadge) {
+    notifBadge.textContent = STATE.unreadCount || 0;
+    notifBadge.classList.toggle("hidden", !STATE.unreadCount);
+  }
+
   supabase
     .from("efris_invoices")
     .select("id", { count: "exact", head: true })
@@ -308,6 +317,7 @@ async function wireNotifications() {
 
   subscribeToNotifications((n) => {
     renderNotifBadge();
+    renderSidebarNotifBadge();
     if (!$("notif-dropdown")?.classList.contains("hidden")) renderNotifList();
     toast(
       `${n.title}: ${n.body || ""}`,
@@ -315,6 +325,20 @@ async function wireNotifications() {
       4000,
     );
   });
+}
+
+function renderNotifBadge() {
+  const badge = $("notif-badge");
+  if (!badge) return;
+  badge.textContent = STATE.unreadCount;
+  badge.classList.toggle("hidden", STATE.unreadCount === 0);
+}
+
+function renderSidebarNotifBadge() {
+  const badge = $("notif-sidebar-badge");
+  if (!badge) return;
+  badge.textContent = STATE.unreadCount || 0;
+  badge.classList.toggle("hidden", !STATE.unreadCount);
 }
 
 function renderNotifBadge() {
