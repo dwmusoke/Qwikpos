@@ -74,7 +74,7 @@ function renderTable() {
   }
 
   if (!list.length) {
-    const colSpan = efrisOn ? 9 : 8;
+    const colSpan = STATE.business.efris_live_enabled ? 9 : 8;
     tbody.innerHTML = `<tr><td colspan="${colSpan}"><div class="empty-state">No products yet. Click "Add Product" to get started.</div></td></tr>`;
     return;
   }

@@ -218,17 +218,10 @@ export async function renderReports(root) {
   }
 
   function exportReport() {
-    if (!lastSales.length) { $('run-report-btn').click(); return; }
-    const header = ['Invoice', 'Date', 'Currency', 'Subtotal', 'Discount', 'VAT', 'Total (base)', 'Status'];
-    const rows = lastSales.map((s) => [s.sale_number, s.created_at, s.currency_code, s.subtotal, s.discount_total, s.vat_total, s.grand_total_base, s.payment_status]);
-    const csv = [header, ...rows].map((r) => r.map((v) => `"${sanitizeCsvValue(v).replace(/"/g, '""')}"`).join(',')).join('\n');
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url; a.download = `sales-report-${$('rep-from').value}-to-${$('rep-to').value}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-  }
+    if (!lastSales.length) {
+      $("run-report-btn").click();
+      return;
+    }
     const header = [
       "Invoice",
       "Date",
@@ -251,7 +244,7 @@ export async function renderReports(root) {
     ]);
     const csv = [header, ...rows]
       .map((r) =>
-        r.map((v) => `"${String(v ?? "").replace(/"/g, '""')}"`).join(","),
+        r.map((v) => `"${sanitizeCsvValue(v).replace(/"/g, '""')}"`).join(","),
       )
       .join("\n");
     const blob = new Blob([csv], { type: "text/csv" });
