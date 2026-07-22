@@ -373,6 +373,40 @@ function renderNotifList() {
 }
 
 // ---------------------------------------------------------------------
+// Impersonation
+// ---------------------------------------------------------------------
+function wireImpersonation() {
+  const banner = $("impersonate-banner");
+  const nameEl = $("impersonate-name");
+  const stopBtn = $("impersonate-stop");
+
+  if (window._impersonating && STATE._impersonate) {
+    banner.classList.remove("hidden");
+    nameEl.textContent = STATE._impersonate.targetUserId
+      ? `${STATE.appUser.full_name} (${STATE.business?.name || ""})`
+      : "";
+  }
+
+  stopBtn?.addEventListener("click", async () => {
+    const imp = STATE._impersonate;
+    if (!imp) return;
+
+    // Restore original state
+    STATE.appUser = imp.originalUser;
+    STATE.business = imp.originalBusiness;
+    STATE.branch = imp.originalBranch;
+    STATE._impersonate = null;
+    window._impersonating = false;
+
+    // Reload full bootstrap data
+    await loadBootstrapData();
+    banner.classList.add("hidden");
+    toast("Returned to Platform Admin", "success");
+    navigateTo("admin");
+  });
+}
+
+// ---------------------------------------------------------------------
 // Auth
 // ---------------------------------------------------------------------
 function showLoginScreen() {
@@ -406,6 +440,7 @@ async function boot() {
   updateBadges();
   wireConnectivity();
   await wireNotifications();
+  wireImpersonation();
 
   if (STATE.isSuperadmin && !STATE.business) {
     navigateTo("admin");
