@@ -37,8 +37,10 @@ export async function renderInventory(root) {
       <button class="admin-tab ${invTab === "products" ? "active" : ""}" data-tab="products">Products</button>
       <button class="admin-tab ${invTab === "transfers" ? "active" : ""}" data-tab="transfers">Transfers</button>
       <button class="admin-tab ${invTab === "stockcount" ? "active" : ""}" data-tab="stockcount">Stock Count</button>
-      <button class="admin-tab ${invTab === "movements" ? "active" : ""}" data-tab="movements">Movement History</button>
+      <button class="admin-tab ${invTab === "movements" ? "active" : ""}" data-tab="movements">History</button>
       <button class="admin-tab ${invTab === "purchase" ? "active" : ""}" data-tab="purchase">Purchase Orders</button>
+      <button class="admin-tab ${invTab === "production" ? "active" : ""}" data-tab="production">Production</button>
+      <button class="admin-tab ${invTab === "valuation" ? "active" : ""}" data-tab="valuation">Valuation</button>
     </div>
 
     <div id="inv-tab-content"></div>
@@ -61,6 +63,8 @@ export async function renderInventory(root) {
     else if (invTab === "stockcount") renderStockCountTab(el);
     else if (invTab === "movements") renderMovementsTab(el);
     else if (invTab === "purchase") renderPurchaseTab(el);
+    else if (invTab === "production") renderProductionTab(el);
+    else if (invTab === "valuation") renderValuationTab(el);
   }
 
   renderInvTab();
@@ -1455,4 +1459,583 @@ function printBarcodeLabels(items) {
   };
   script.onerror = () => toast("Could not load the barcode library", "error");
   win.document.body.appendChild(script);
+}
+
+// ---------------------------------------------------------------------
+// PRODUCTION TAB (BOM / Assemble / Disassemble)
+// ---------------------------------------------------------------------
+async function renderProductionTab(el) {
+  const { data: boms } = await supabase
+    .from("bom")
+    .select(
+      "*, finished:products!bom_finished_product_id_fkey(name, id), items:bom_items(*, component:products(name, id))",
+    )
+    .eq("business_id", STATE.business.id)
+    .eq("is_active", true);
+
+  el.innerHTML = `
+    <div class="flex gap" style="margin-bottom:14px">
+      <button class="btn btn-primary" id="new-bom-btn">+ New Recipe (BOM)</button>
+    </div>
+    ${(boms || []).length ? "" : `<div class="card"><div class="empty-state">No production recipes yet. Create a BOM to define how finished products are assembled from components.</div></div>`}
+    <div id="bom-list">${(boms || [])
+      .map(
+        (bom) => `
+      <div class="card" style="margin-bottom:12px">
+        <div class="flex between" style="margin-bottom:8px">
+          <div>
+            <b>${escapeHtml(bom.name || bom.finished?.name || "Unnamed")}</b>
+            <span class="text-muted" style="margin-left:8px;font-size:12px">→ ${escapeHtml(bom.finished?.name || "—")} (yield: ${bom.yield_qty})</span>
+          </div>
+          <div class="flex gap">
+            <button class="btn btn-sm btn-primary" data-assemble="${bom.id}">⚙️ Assemble</button>
+            <button class="btn btn-sm btn-outline" data-disassemble="${bom.id}">↩️ Disassemble</button>
+            <button class="btn btn-sm btn-danger" data-del-bom="${bom.id}">&times;</button>
+          </div>
+        </div>
+        <table style="font-size:12px">
+          <thead><tr><th>Component</th><th>Qty per unit</th><th>Available Stock</th></tr></thead>
+          <tbody>
+            ${(bom.items || [])
+              .map((it) => {
+                const avail = stockFor(it.component_product_id);
+                return `<tr>
+                <td>${escapeHtml(it.component?.name || "—")}</td>
+                <td>${it.quantity}</td>
+                <td><span class="badge ${avail < it.quantity ? "badge-red" : "badge-green"}">${avail}</span></td>
+              </tr>`;
+              })
+              .join("")}
+          </tbody>
+        </table>
+      </div>
+    `,
+      )
+      .join("")}</div>
+  `;
+
+  $("new-bom-btn")?.addEventListener("click", () => openBOMModal());
+
+  qsa("[data-assemble]", el).forEach((btn) =>
+    btn.addEventListener("click", () => assembleProduct(btn.dataset.assemble)),
+  );
+  qsa("[data-disassemble]", el).forEach((btn) =>
+    btn.addEventListener("click", () =>
+      disassembleProduct(btn.dataset.disassemble),
+    ),
+  );
+  qsa("[data-del-bom]", el).forEach((btn) =>
+    btn.addEventListener("click", async () => {
+      if (!confirm("Delete this recipe?")) return;
+      await supabase.from("bom").delete().eq("id", btn.dataset.delBom);
+      toast("Recipe deleted", "success");
+      renderProductionTab(el);
+    }),
+  );
+}
+
+function openBOMModal() {
+  openModal(
+    `
+    <div class="modal-title-row"><h3>New Production Recipe (BOM)</h3></div>
+    <div class="field"><label>Recipe Name</label><input id="bom-name" placeholder="e.g. Gift Basket" /></div>
+    <div class="field"><label>Finished Product *</label>
+      <select id="bom-finished"><option value="">Select product…</option>${STATE.products.map((p) => `<option value="${p.id}">${escapeHtml(p.name)}</option>`).join("")}</select>
+    </div>
+    <div class="field"><label>Yield Quantity</label><input type="number" step="0.01" id="bom-yield" value="1" min="0.01" /><p class="help-text">How many units of the finished product one build produces</p></div>
+    <div style="margin:14px 0;font-weight:700">Components (ingredients)</div>
+    <div id="bom-components"></div>
+    <button class="btn btn-sm btn-outline" id="bom-add-comp">+ Add Component</button>
+    <div class="flex gap" style="margin-top:14px;">
+      <button class="btn btn-outline btn-block" data-close-modal>Cancel</button>
+      <button class="btn btn-primary btn-block" id="bom-save">Save Recipe</button>
+    </div>
+  `,
+    {
+      large: true,
+      onMount: () => {
+        let components = [];
+        const renderComps = () => {
+          $("bom-components").innerHTML = components
+            .map(
+              (c, i) => `
+          <div class="field-row" style="margin-bottom:8px">
+            <div class="field"><select data-comp-prod="${i}" style="width:100%;padding:6px 8px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text)">
+              <option value="">Component…</option>
+              ${STATE.products.map((p) => `<option value="${p.id}" ${c.productId === p.id ? "selected" : ""}>${escapeHtml(p.name)} (stock: ${stockFor(p.id)})</option>`).join("")}
+            </select></div>
+            <div class="field"><input type="number" step="0.01" data-comp-qty="${i}" placeholder="Qty needed" value="${c.qty || 1}" style="width:100px;padding:6px 8px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text)" /></div>
+            <button class="btn btn-sm btn-danger" data-comp-remove="${i}">&times;</button>
+          </div>
+        `,
+            )
+            .join("");
+          qsa("[data-comp-prod]", $("bom-components")).forEach((sel, i) =>
+            sel.addEventListener("change", () => {
+              components[i].productId = sel.value;
+            }),
+          );
+          qsa("[data-comp-qty]", $("bom-components")).forEach((inp, i) =>
+            inp.addEventListener("input", () => {
+              components[i].qty = parseFloat(inp.value) || 0;
+            }),
+          );
+          qsa("[data-comp-remove]", $("bom-components")).forEach((btn, i) =>
+            btn.addEventListener("click", () => {
+              components.splice(i, 1);
+              renderComps();
+            }),
+          );
+        };
+
+        $("bom-add-comp").addEventListener("click", () => {
+          components.push({ productId: "", qty: 1 });
+          renderComps();
+        });
+
+        $("bom-save").addEventListener("click", async () => {
+          const finishedId = $("bom-finished").value;
+          if (!finishedId) {
+            toast("Select a finished product", "error");
+            return;
+          }
+          if (!components.length || !components.some((c) => c.productId)) {
+            toast("Add at least one component", "error");
+            return;
+          }
+
+          const { data: bom, error } = await supabase
+            .from("bom")
+            .insert({
+              business_id: STATE.business.id,
+              finished_product_id: finishedId,
+              name: $("bom-name").value.trim() || null,
+              yield_qty: parseFloat($("bom-yield").value) || 1,
+            })
+            .select()
+            .single();
+
+          if (error) {
+            toast("Failed: " + error.message, "error");
+            return;
+          }
+
+          for (const c of components) {
+            if (!c.productId) continue;
+            await supabase.from("bom_items").insert({
+              bom_id: bom.id,
+              component_product_id: c.productId,
+              quantity: c.qty,
+            });
+          }
+
+          toast("Recipe saved", "success");
+          closeModal();
+          renderProductionTab($("inv-tab-content"));
+        });
+      },
+    },
+  );
+}
+
+async function assembleProduct(bomId) {
+  const qty = prompt("How many units to assemble?", "1");
+  if (!qty || isNaN(parseFloat(qty)) || parseFloat(qty) <= 0) return;
+  const assembleQty = parseFloat(qty);
+
+  const { data: bom } = await supabase
+    .from("bom")
+    .select("*, items:bom_items(*, component:products(name))")
+    .eq("id", bomId)
+    .single();
+
+  if (!bom) {
+    toast("Recipe not found", "error");
+    return;
+  }
+
+  // Check component stock
+  for (const item of bom.items) {
+    const needed = item.quantity * assembleQty;
+    const avail = stockFor(item.component_product_id);
+    if (avail < needed) {
+      toast(
+        `Insufficient ${item.component?.name || "component"}: need ${needed}, have ${avail}`,
+        "error",
+      );
+      return;
+    }
+  }
+
+  // Deduct components
+  for (const item of bom.items) {
+    const needed = item.quantity * assembleQty;
+    const { data: stock } = await supabase
+      .from("product_stock")
+      .select("quantity")
+      .eq("product_id", item.component_product_id)
+      .eq("branch_id", STATE.branch.id)
+      .single();
+    const current = Number(stock?.quantity || 0);
+
+    await supabase.from("product_stock").upsert(
+      {
+        product_id: item.component_product_id,
+        branch_id: STATE.branch.id,
+        quantity: current - needed,
+      },
+      { onConflict: "product_id,branch_id" },
+    );
+
+    await supabase.from("stock_movements").insert({
+      business_id: STATE.business.id,
+      branch_id: STATE.branch.id,
+      product_id: item.component_product_id,
+      type: "out",
+      quantity: needed,
+      notes: `Production: assembled ${assembleQty}x ${bom.name || bom.finished_product_id}`,
+      created_by: STATE.appUser.id,
+    });
+  }
+
+  // Add finished product
+  const finishedQty = assembleQty * (bom.yield_qty || 1);
+  const { data: finStock } = await supabase
+    .from("product_stock")
+    .select("quantity")
+    .eq("product_id", bom.finished_product_id)
+    .eq("branch_id", STATE.branch.id)
+    .single();
+
+  await supabase.from("product_stock").upsert(
+    {
+      product_id: bom.finished_product_id,
+      branch_id: STATE.branch.id,
+      quantity: Number(finStock?.quantity || 0) + finishedQty,
+    },
+    { onConflict: "product_id,branch_id" },
+  );
+
+  await supabase.from("stock_movements").insert({
+    business_id: STATE.business.id,
+    branch_id: STATE.branch.id,
+    product_id: bom.finished_product_id,
+    type: "in",
+    quantity: finishedQty,
+    notes: `Production: assembled ${assembleQty}x from ${bom.name || "recipe"}`,
+    created_by: STATE.appUser.id,
+  });
+
+  await supabase.from("production_logs").insert({
+    business_id: STATE.business.id,
+    branch_id: STATE.branch.id,
+    bom_id: bom.id,
+    finished_product_id: bom.finished_product_id,
+    action: "assemble",
+    quantity: assembleQty,
+    notes: `Assembled ${assembleQty} units`,
+    created_by: STATE.appUser.id,
+  });
+
+  toast(`Assembled ${finishedQty} units`, "success");
+  await refreshProducts();
+  renderProductionTab($("inv-tab-content"));
+}
+
+async function disassembleProduct(bomId) {
+  const qty = prompt("How many units to disassemble?", "1");
+  if (!qty || isNaN(parseFloat(qty)) || parseFloat(qty) <= 0) return;
+  const disassembleQty = parseFloat(qty);
+
+  const { data: bom } = await supabase
+    .from("bom")
+    .select("*, items:bom_items(*, component:products(name))")
+    .eq("id", bomId)
+    .single();
+
+  if (!bom) {
+    toast("Recipe not found", "error");
+    return;
+  }
+
+  // Check finished product stock
+  const finishedStock = stockFor(bom.finished_product_id);
+  if (finishedStock < disassembleQty) {
+    toast(
+      `Insufficient finished product: need ${disassembleQty}, have ${finishedStock}`,
+      "error",
+    );
+    return;
+  }
+
+  // Deduct finished product
+  await supabase.from("product_stock").upsert(
+    {
+      product_id: bom.finished_product_id,
+      branch_id: STATE.branch.id,
+      quantity: finishedStock - disassembleQty,
+    },
+    { onConflict: "product_id,branch_id" },
+  );
+
+  await supabase.from("stock_movements").insert({
+    business_id: STATE.business.id,
+    branch_id: STATE.branch.id,
+    product_id: bom.finished_product_id,
+    type: "out",
+    quantity: disassembleQty,
+    notes: `Disassembled ${disassembleQty}x ${bom.name || "recipe"}`,
+    created_by: STATE.appUser.id,
+  });
+
+  // Return components
+  for (const item of bom.items) {
+    const returned = item.quantity * disassembleQty;
+    const { data: stock } = await supabase
+      .from("product_stock")
+      .select("quantity")
+      .eq("product_id", item.component_product_id)
+      .eq("branch_id", STATE.branch.id)
+      .single();
+
+    await supabase.from("product_stock").upsert(
+      {
+        product_id: item.component_product_id,
+        branch_id: STATE.branch.id,
+        quantity: Number(stock?.quantity || 0) + returned,
+      },
+      { onConflict: "product_id,branch_id" },
+    );
+
+    await supabase.from("stock_movements").insert({
+      business_id: STATE.business.id,
+      branch_id: STATE.branch.id,
+      product_id: item.component_product_id,
+      type: "in",
+      quantity: returned,
+      notes: `Disassembled ${disassembleQty}x ${bom.name || "recipe"}`,
+      created_by: STATE.appUser.id,
+    });
+  }
+
+  await supabase.from("production_logs").insert({
+    business_id: STATE.business.id,
+    branch_id: STATE.branch.id,
+    bom_id: bom.id,
+    finished_product_id: bom.finished_product_id,
+    action: "disassemble",
+    quantity: disassembleQty,
+    notes: `Disassembled ${disassembleQty} units`,
+    created_by: STATE.appUser.id,
+  });
+
+  toast(
+    `Disassembled ${disassembleQty} units — components returned`,
+    "success",
+  );
+  await refreshProducts();
+  renderProductionTab($("inv-tab-content"));
+}
+
+// ---------------------------------------------------------------------
+// VALUATION TAB
+// ---------------------------------------------------------------------
+async function renderValuationTab(el) {
+  // Calculate current inventory value
+  let totalCostValue = 0;
+  let totalRetailValue = 0;
+  let totalItems = 0;
+
+  const productValues = STATE.products
+    .map((p) => {
+      const qty = stockFor(p.id);
+      const costVal = qty * Number(p.cost_price || 0);
+      const retailVal = qty * Number(p.selling_price || 0);
+      totalCostValue += costVal;
+      totalRetailValue += retailVal;
+      totalItems += qty;
+      return { ...p, qty, costVal, retailVal };
+    })
+    .filter((p) => p.qty > 0)
+    .sort((a, b) => b.costVal - a.costVal);
+
+  // Category breakdown
+  const catBreakdown = {};
+  productValues.forEach((p) => {
+    const catName =
+      STATE.categories.find((c) => c.id === p.category_id)?.name ||
+      "Uncategorized";
+    if (!catBreakdown[catName])
+      catBreakdown[catName] = { items: 0, costVal: 0, retailVal: 0 };
+    catBreakdown[catName].items += p.qty;
+    catBreakdown[catName].costVal += p.costVal;
+    catBreakdown[catName].retailVal += p.retailVal;
+  });
+
+  const marginPct =
+    totalRetailValue > 0
+      ? (
+          ((totalRetailValue - totalCostValue) / totalRetailValue) *
+          100
+        ).toFixed(1)
+      : 0;
+
+  el.innerHTML = `
+    <div class="kpi-grid">
+      <div class="kpi-card"><div class="label">Total Items in Stock</div><div class="value">${totalItems.toLocaleString("en-UG")}</div></div>
+      <div class="kpi-card"><div class="label">Cost Value (at cost price)</div><div class="value">${fmtMoney(totalCostValue)}</div></div>
+      <div class="kpi-card"><div class="label">Retail Value (at selling price)</div><div class="value">${fmtMoney(totalRetailValue)}</div></div>
+      <div class="kpi-card"><div class="label">Potential Margin</div><div class="value">${marginPct}%</div></div>
+    </div>
+
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-title">Value by Category</div>
+        <div class="table-wrap" style="max-height:340px;overflow-y:auto">
+          <table>
+            <thead><tr><th>Category</th><th>Items</th><th>Cost Value</th><th>Retail Value</th></tr></thead>
+            <tbody>
+              ${
+                Object.entries(catBreakdown)
+                  .sort((a, b) => b[1].costVal - a[1].costVal)
+                  .map(
+                    ([cat, v]) => `
+                <tr>
+                  <td><b>${escapeHtml(cat)}</b></td>
+                  <td>${v.items.toLocaleString("en-UG")}</td>
+                  <td>${fmtMoney(v.costVal)}</td>
+                  <td>${fmtMoney(v.retailVal)}</td>
+                </tr>
+              `,
+                  )
+                  .join("") ||
+                '<tr><td colspan="4"><div class="empty-state">No stock</div></td></tr>'
+              }
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Top 20 Products by Cost Value</div>
+        <div class="table-wrap" style="max-height:340px;overflow-y:auto">
+          <table>
+            <thead><tr><th>Product</th><th>Stock</th><th>Cost</th><th>Value</th></tr></thead>
+            <tbody>
+              ${
+                productValues
+                  .slice(0, 20)
+                  .map(
+                    (p) => `
+                <tr>
+                  <td><b>${escapeHtml(p.name)}</b><br/><span class="text-muted" style="font-size:11px">${escapeHtml(p.sku || "")}</span></td>
+                  <td>${p.qty}</td>
+                  <td>${fmtMoney(p.cost_price)}</td>
+                  <td><b>${fmtMoney(p.costVal)}</b></td>
+                </tr>
+              `,
+                  )
+                  .join("") ||
+                '<tr><td colspan="4"><div class="empty-state">No stock</div></td></tr>'
+              }
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:16px">
+      <div class="card-title">
+        <span>Full Inventory Valuation</span>
+        <button class="btn btn-sm btn-outline" id="val-export-btn">📥 Export CSV</button>
+      </div>
+      <div class="table-wrap" style="max-height:400px;overflow-y:auto">
+        <table>
+          <thead><tr><th>Product</th><th>SKU</th><th>Category</th><th>Stock</th><th>Cost Price</th><th>Selling Price</th><th>Cost Value</th><th>Retail Value</th><th>Margin</th></tr></thead>
+          <tbody>
+            ${
+              productValues
+                .map((p) => {
+                  const margin =
+                    p.retailVal > 0
+                      ? (
+                          ((p.retailVal - p.costVal) / p.retailVal) *
+                          100
+                        ).toFixed(1)
+                      : 0;
+                  const catName =
+                    STATE.categories.find((c) => c.id === p.category_id)
+                      ?.name || "—";
+                  return `
+                <tr>
+                  <td>${escapeHtml(p.name)}</td>
+                  <td>${escapeHtml(p.sku || "—")}</td>
+                  <td>${escapeHtml(catName)}</td>
+                  <td>${p.qty}</td>
+                  <td>${fmtMoney(p.cost_price)}</td>
+                  <td>${fmtMoney(p.selling_price)}</td>
+                  <td>${fmtMoney(p.costVal)}</td>
+                  <td>${fmtMoney(p.retailVal)}</td>
+                  <td><span class="badge badge-green">${margin}%</span></td>
+                </tr>`;
+                })
+                .join("") ||
+              '<tr><td colspan="9"><div class="empty-state">No stock</div></td></tr>'
+            }
+          </tbody>
+          <tfoot>
+            <tr style="font-weight:700;border-top:2px solid var(--text)">
+              <td colspan="3">Total</td>
+              <td>${totalItems.toLocaleString("en-UG")}</td>
+              <td></td><td></td>
+              <td>${fmtMoney(totalCostValue)}</td>
+              <td>${fmtMoney(totalRetailValue)}</td>
+              <td><span class="badge badge-green">${marginPct}%</span></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>
+  `;
+
+  $("val-export-btn")?.addEventListener("click", () => {
+    const rows = [
+      [
+        "Product",
+        "SKU",
+        "Category",
+        "Stock",
+        "Cost Price",
+        "Selling Price",
+        "Cost Value",
+        "Retail Value",
+        "Margin %",
+      ],
+    ];
+    productValues.forEach((p) => {
+      const margin =
+        p.retailVal > 0
+          ? (((p.retailVal - p.costVal) / p.retailVal) * 100).toFixed(1)
+          : 0;
+      const catName =
+        STATE.categories.find((c) => c.id === p.category_id)?.name || "";
+      rows.push([
+        p.name,
+        p.sku || "",
+        catName,
+        p.qty,
+        p.cost_price,
+        p.selling_price,
+        p.costVal.toFixed(2),
+        p.retailVal.toFixed(2),
+        margin,
+      ]);
+    });
+    const csv = rows.map((r) => r.map((v) => `"${v}"`).join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `inventory-valuation-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+  });
 }
