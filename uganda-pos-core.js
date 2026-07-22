@@ -367,21 +367,25 @@ const OFFLINE_KEY = "ugpos_offline_sales";
 
 export function queueOfflineSale(payload) {
   let list = [];
-  try { list = JSON.parse(localStorage.getItem(OFFLINE_KEY) || '[]'); } catch (e) { list = []; }
+  try {
+    list = JSON.parse(localStorage.getItem(OFFLINE_KEY) || "[]");
+  } catch (e) {
+    list = [];
+  }
   list.push(payload);
   localStorage.setItem(OFFLINE_KEY, JSON.stringify(list));
 }
 
 export function offlineQueueCount() {
-  try { return JSON.parse(localStorage.getItem(OFFLINE_KEY) || '[]').length; } catch (e) { return 0; }
-}
-
-export function offlineQueueCount() {
-  return JSON.parse(localStorage.getItem(OFFLINE_KEY) || "[]").length;
+  try {
+    return JSON.parse(localStorage.getItem(OFFLINE_KEY) || "[]").length;
+  } catch (e) {
+    return 0;
+  }
 }
 
 export async function flushOfflineQueue(insertSaleFn) {
-  const list = JSON.parse(localStorage.getItem(OFFLINE_KEY) || '[]');
+  const list = JSON.parse(localStorage.getItem(OFFLINE_KEY) || "[]");
   if (!list.length) return;
   const remaining = [];
   let synced = 0;
@@ -390,23 +394,29 @@ export async function flushOfflineQueue(insertSaleFn) {
       await insertSaleFn(payload);
       synced++;
     } catch (e) {
-      console.warn('Offline sale sync failed, will retry:', e.message || e);
+      console.warn("Offline sale sync failed, will retry:", e.message || e);
       remaining.push(payload);
     }
   }
   localStorage.setItem(OFFLINE_KEY, JSON.stringify(remaining));
   if (remaining.length === 0 && synced > 0) {
-    toast(`Offline sales synced successfully (${synced} sale${synced > 1 ? 's' : ''}).`, 'success');
+    toast(
+      `Offline sales synced successfully (${synced} sale${synced > 1 ? "s" : ""}).`,
+      "success",
+    );
   } else if (remaining.length > 0 && synced > 0) {
-    toast(`${synced} of ${list.length} offline sales synced. ${remaining.length} will retry.`, 'default', 5000);
+    toast(
+      `${synced} of ${list.length} offline sales synced. ${remaining.length} will retry.`,
+      "default",
+      5000,
+    );
   } else if (remaining.length > 0) {
-    toast(`Could not sync ${remaining.length} offline sale(s) — will retry when online.`, 'error', 5000);
+    toast(
+      `Could not sync ${remaining.length} offline sale(s) — will retry when online.`,
+      "error",
+      5000,
+    );
   }
-}
-  }
-  localStorage.setItem(OFFLINE_KEY, JSON.stringify(remaining));
-  if (remaining.length === 0)
-    toast("Offline sales synced successfully.", "success");
 }
 
 // ---------------------------------------------------------------------
