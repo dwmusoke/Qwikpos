@@ -456,6 +456,10 @@ async function boot() {
   }
 
   if (!ok) {
+    console.warn(
+      "boot(): loadBootstrapData returned false — showing login screen. Session exists:",
+      !!STATE.session,
+    );
     showLoginScreen();
     return;
   }
@@ -542,9 +546,11 @@ $("login-form").addEventListener("submit", async (e) => {
   if (!$("login-screen").classList.contains("hidden")) {
     btn.disabled = false;
     btn.textContent = "Sign In";
-    if (!errEl.textContent) {
-      errEl.textContent =
-        "Login succeeded but could not load your account. Please check your email was confirmed and try again.";
+    if (!errEl.textContent || errEl.textContent === "") {
+      errEl.innerHTML =
+        "Login succeeded but could not load your account.<br><br>" +
+        "Possible fix: <b>Run schema SQL files</b> (v1–v8) in the Supabase SQL Editor to ensure all tables and RLS policies exist.<br><br>" +
+        "If this is a new account, make sure <b>email confirmation is disabled</b> in Supabase Auth settings.";
       errEl.style.display = "block";
     }
   }

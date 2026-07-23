@@ -175,18 +175,42 @@ export async function loadBootstrapData() {
   if (!STATE.session) return false;
 
   const uidUser = STATE.session.user.id;
-  const { data: appUser, error: appUserErr } = await supabase
-    .from("app_users")
-    .select("*")
-    .eq("id", uidUser)
-    .single();
 
-  if (appUserErr || !appUser) {
-    toast(
-      "Your login is not linked to a business yet. Sign up to create one.",
-      "error",
-      6000,
+  // Try to load app_user via the security-definer RPC (bypasses RLS).
+  // If the RPC doesn't exist yet (schema not updated), fall back to a
+  // direct query with maybeSingle() and the fixed policy.
+  let appUser = null;
+  let appUserErr = null;
+
+  try {
+    const { data: raw, error: rpcErr } = await supabase.rpc("get_my_app_user");
+    if (rpcErr) throw rpcErr;
+    if (raw)
+      appUser =
+        typeof raw === "object" && !Array.isArray(raw) ? raw : JSON.parse(raw);
+  } catch (rpcErr) {
+    console.warn(
+      "get_my_app_user RPC failed, falling back to direct query:",
+      rpcErr.message,
     );
+    // Fallback: direct query — works with schema v8's fixed policy
+    const result = await supabase
+      .from("app_users")
+      .select("*")
+      .eq("id", uidUser)
+      .maybeSingle();
+    appUser = result.data;
+    appUserErr = result.error;
+  }
+
+  if (!appUser) {
+    console.warn(
+      "App user not found for auth id:",
+      uidUser,
+      "error:",
+      appUserErr?.message,
+    );
+    console.warn("Auth user email:", STATE.session?.user?.email);
     return false;
   }
   STATE.appUser = appUser;
