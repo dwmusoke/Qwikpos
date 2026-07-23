@@ -184,7 +184,40 @@ export { receiptHtml } from "./uganda-pos-view-pos.js";
 export { printHtml as posPrintHtml } from "./uganda-pos-view-pos.js";
 
 // ---------------------------------------------------------------------
-// 5. DATA LOADERS
+// 5. PAGINATION HELPER
+// ---------------------------------------------------------------------
+export function makePaginationState(pageSize = 50) {
+  return { page: 0, pageSize, hasMore: true, loading: false };
+}
+
+export function paginationHtml(pState) {
+  const total = pState.total || 0;
+  const from = pState.page * pState.pageSize + 1;
+  const to = Math.min((pState.page + 1) * pState.pageSize, total);
+  return `
+    <div class="pagination-bar">
+      <span class="text-muted" style="font-size:12px;">${from}-${to} of ${total}</span>
+      <div class="flex gap" style="align-items:center;">
+        <button class="btn btn-ghost btn-sm" data-page="prev" ${pState.page === 0 ? "disabled" : ""}>← Prev</button>
+        <span class="text-muted" style="font-size:12px;">Page ${pState.page + 1}</span>
+        <button class="btn btn-ghost btn-sm" data-page="next" ${!pState.hasMore ? "disabled" : ""}>Next →</button>
+      </div>
+    </div>
+  `;
+}
+
+export function wirePagination(pState, loadFn) {
+  qsa("[data-page]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      if (pState.loading) return;
+      if (btn.dataset.page === "next" && pState.hasMore) { pState.page++; loadFn(); }
+      else if (btn.dataset.page === "prev" && pState.page > 0) { pState.page--; loadFn(); }
+    });
+  });
+}
+
+// ---------------------------------------------------------------------
+// 6. DATA LOADERS
 // ---------------------------------------------------------------------
 export async function loadBootstrapData() {
   const { data: authData } = await supabase.auth.getSession();

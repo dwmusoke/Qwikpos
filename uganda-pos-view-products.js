@@ -5,6 +5,7 @@
 import {
   supabase, STATE, $, qsa, escapeHtml, toast, openModal, closeModal,
   fmtMoney, refreshProducts, stockFor, sanitizeCsvValue,
+  makePaginationState, paginationHtml, wirePagination,
 } from './uganda-pos-core.js';
 import { logAuditAction } from './uganda-pos-view-audit.js';
 
@@ -72,10 +73,11 @@ async function renderProductListTab(body) {
 
   let searchTerm = '';
   let catFilter = '';
+  const pState = makePaginationState(25);
   renderRows();
 
-  $('pl-search').addEventListener('input', (e) => { searchTerm = e.target.value.toLowerCase(); renderRows(); });
-  $('pl-cat').addEventListener('change', (e) => { catFilter = e.target.value; renderRows(); });
+  $('pl-search').addEventListener('input', (e) => { searchTerm = e.target.value.toLowerCase(); pState.page = 0; renderRows(); });
+  $('pl-cat').addEventListener('change', (e) => { catFilter = e.target.value; pState.page = 0; renderRows(); });
   $('pl-add-btn').addEventListener('click', () => openProductModal());
   $('pl-import-btn')?.addEventListener('click', () => openImportModal());
   $('pl-labels-btn')?.addEventListener('click', () => { activeTab = 'labels'; renderTab(); });
@@ -85,8 +87,14 @@ async function renderProductListTab(body) {
     if (searchTerm) list = list.filter((p) => p.name.toLowerCase().includes(searchTerm) || (p.sku || '').toLowerCase().includes(searchTerm) || (p.barcode || '').toLowerCase().includes(searchTerm));
     if (catFilter) list = list.filter((p) => p.category_id === catFilter);
 
+    pState.total = list.length;
+    pState.hasMore = (pState.page + 1) * pState.pageSize < list.length;
+    const page = list.slice(pState.page * pState.pageSize, (pState.page + 1) * pState.pageSize);
+
+    const tableWrap = document.querySelector('#pl-tbody').closest('.table-wrap');
+
     const tbody = $('pl-tbody');
-    tbody.innerHTML = list.length ? list.map((p) => {
+    tbody.innerHTML = page.length ? page.map((p) => {
       const cat = STATE.categories.find((c) => c.id === p.category_id);
       const brand = (STATE._brands || []).find((b) => b.id === p.brand_id);
       const stock = stockFor(p.id);
@@ -111,6 +119,11 @@ async function renderProductListTab(body) {
     qsa('[data-edit]', tbody).forEach((b) => b.addEventListener('click', () => openProductModal(b.dataset.edit)));
     qsa('[data-stock]', tbody).forEach((b) => b.addEventListener('click', () => openStockModal(b.dataset.stock)));
     qsa('[data-label]', tbody).forEach((b) => b.addEventListener('click', () => openSingleLabelModal(b.dataset.label)));
+
+    let pagBar = tableWrap.querySelector('.pagination-bar');
+    if (!pagBar) { pagBar = document.createElement('div'); tableWrap.after(pagBar); }
+    pagBar.outerHTML = paginationHtml(pState);
+    wirePagination(pState, renderRows);
   }
 }
 

@@ -5,6 +5,7 @@
 import {
   supabase, STATE, $, qsa, escapeHtml, toast, openModal, closeModal,
   fmtMoney, fmtDate, sanitizeCsvValue, refreshProducts, stockFor,
+  makePaginationState, paginationHtml, wirePagination,
 } from './uganda-pos-core.js';
 
 let activeTab = 'list';
@@ -58,7 +59,8 @@ async function renderSalesListTab(body) {
     <div id="sl-output"><div class="empty-state">Loading…</div></div>`;
 
   let lastSales = [];
-  $('sl-run').addEventListener('click', () => load());
+  const sState = makePaginationState(25);
+  $('sl-run').addEventListener('click', () => { sState.page = 0; load(); });
   $('sl-export').addEventListener('click', () => exportSales());
   await load();
 
@@ -79,6 +81,10 @@ async function renderSalesListTab(body) {
     const { data: sales } = await query;
     lastSales = sales || [];
 
+    sState.total = lastSales.length;
+    sState.hasMore = (sState.page + 1) * sState.pageSize < lastSales.length;
+    const pageSales = lastSales.slice(sState.page * sState.pageSize, (sState.page + 1) * sState.pageSize);
+
     const total = lastSales.reduce((a, s) => a + Number(s.grand_total_base || 0), 0);
     const vat = lastSales.reduce((a, s) => a + Number(s.vat_total || 0) * Number(s.exchange_rate || 1), 0);
     const paid = lastSales.filter((s) => s.payment_status === 'paid').length;
@@ -97,7 +103,7 @@ async function renderSalesListTab(body) {
         <div class="table-wrap" style="max-height:500px;overflow-y:auto;">
           <table><thead><tr><th>Invoice</th><th>Date</th><th>Customer</th><th>Cashier</th><th>Items</th><th>Total</th><th>Paid</th><th>Status</th><th></th></tr></thead>
           <tbody>
-            ${lastSales.map((s) => {
+            ${pageSales.map((s) => {
               const items = s.sale_items || [];
               return `<tr>
                 <td><b>${escapeHtml(s.sale_number)}</b></td>
@@ -116,10 +122,12 @@ async function renderSalesListTab(body) {
             ${!lastSales.length ? '<tr><td colspan="9"><div class="empty-state">No sales in this range.</div></td></tr>' : ''}
           </tbody></table>
         </div>
+        ${lastSales.length ? paginationHtml(sState) : ''}
       </div>`;
 
     qsa('[data-view-sale]', body).forEach((btn) => btn.addEventListener('click', () => viewSale(btn.dataset.viewSale)));
     qsa('[data-return-sale]', body).forEach((btn) => btn.addEventListener('click', () => initiateReturn(btn.dataset.returnSale)));
+    if (lastSales.length) wirePagination(sState, load);
   }
 
   function exportSales() {
