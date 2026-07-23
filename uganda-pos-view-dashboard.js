@@ -252,5 +252,44 @@ export async function renderDashboard(root) {
     </div>`
         : ""
     }
+
+    ${(() => {
+      const expiring = STATE.products.filter(
+        (p) =>
+          p.expiry_date &&
+          (new Date(p.expiry_date) - new Date()) / (1000 * 60 * 60 * 24) <=
+            30 &&
+          new Date(p.expiry_date) > new Date(),
+      );
+      const expired = STATE.products.filter(
+        (p) => p.expiry_date && new Date(p.expiry_date) < new Date(),
+      );
+      if (!expiring.length && !expired.length) return "";
+      return `
+    <div class="card">
+      <div class="card-title">📅 Expiry Alerts</div>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Product</th><th>Expiry Date</th><th>Status</th><th>Stock</th></tr></thead>
+        <tbody>
+          ${expired
+            .slice(0, 5)
+            .map(
+              (p) =>
+                `<tr><td>${escapeHtml(p.name)}</td><td>${escapeHtml(p.expiry_date)}</td><td><span class="badge badge-red">EXPIRED</span></td><td>${STATE.stockByProduct[p.id] || 0}</td></tr>`,
+            )
+            .join("")}
+          ${expiring
+            .slice(0, 5)
+            .map((p) => {
+              const days = Math.ceil(
+                (new Date(p.expiry_date) - new Date()) / (1000 * 60 * 60 * 24),
+              );
+              return `<tr><td>${escapeHtml(p.name)}</td><td>${escapeHtml(p.expiry_date)}</td><td><span class="badge badge-yellow">${days}d left</span></td><td>${STATE.stockByProduct[p.id] || 0}</td></tr>`;
+            })
+            .join("")}
+        </tbody>
+      </table></div>
+    </div>`;
+    })()}
   `;
 }

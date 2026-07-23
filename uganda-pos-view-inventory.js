@@ -136,12 +136,17 @@ function renderProductTable() {
       const cat = STATE.categories.find((c) => c.id === p.category_id);
       const stock = stockFor(p.id);
       const low = stock <= Number(p.reorder_level || 0);
+      const expiringSoon =
+        p.expiry_date &&
+        (new Date(p.expiry_date) - new Date()) / (1000 * 60 * 60 * 24) <= 30 &&
+        new Date(p.expiry_date) > new Date();
+      const expired = p.expiry_date && new Date(p.expiry_date) < new Date();
       return `
       <tr>
         <td>
           <div style="display:flex;align-items:center;gap:10px">
             ${p.image_url ? `<img src="${escapeHtml(p.image_url)}" alt="" style="width:36px;height:36px;border-radius:6px;object-fit:cover" />` : `<div style="width:36px;height:36px;border-radius:6px;background:var(--surface-2);display:flex;align-items:center;justify-content:center;font-size:16px">📦</div>`}
-            <div><b>${escapeHtml(p.name)}</b><br/><span class="text-muted" style="font-size:11.5px;">SKU: ${escapeHtml(p.sku || "—")} · Barcode: ${escapeHtml(p.barcode || "—")}</span></div>
+            <div><b>${escapeHtml(p.name)}</b>${expired ? ' <span class="badge badge-red" style="font-size:10px;">EXPIRED</span>' : expiringSoon ? ' <span class="badge badge-yellow" style="font-size:10px;">EXPIRING SOON</span>' : ""}<br/><span class="text-muted" style="font-size:11.5px;">SKU: ${escapeHtml(p.sku || "—")} · Barcode: ${escapeHtml(p.barcode || "—")}</span></div>
           </div>
         </td>
         <td>${escapeHtml(cat?.name || "—")}</td>

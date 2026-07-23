@@ -132,7 +132,15 @@ export async function renderPOS(root) {
     posSearchTerm = e.target.value.toLowerCase();
     renderProductGrid();
   });
-  $("pos-scan-btn").addEventListener("click", () => $("pos-search").focus());
+  $("pos-scan-btn").addEventListener("click", () => {
+    // Try native BarcodeDetector API first (Chrome, Edge on Android/desktop)
+    if ("BarcodeDetector" in window) {
+      openCameraScanner();
+      return;
+    }
+    // Fallback: just focus the search input for hardware scanners
+    $("pos-search").focus();
+  });
   qsa("#pos-categories .chip").forEach((chip) =>
     chip.addEventListener("click", () => {
       posActiveCategory = chip.dataset.cat;
@@ -828,6 +836,91 @@ export function receiptHtml(sale, opts = {}) {
       ${footNote ? `<div class="center">${escapeHtml(footNote)}</div>` : ""}
       <div class="center">Thank you for your business!</div>
     </div>`;
+}
+
+// Camera barcode scanner using native BarcodeDetector API
+async function openCameraScanner() {
+  let stream;
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({
+      video: {
+        facingMode: "environment",
+        width: { ideal: 1280 },
+        height: { ideal: 720 },
+      },
+    });
+  } catch (e) {
+    toast("Camera access denied or unavailable", "error");
+    return;
+  }
+
+  const overlay = document.createElement("div");
+  overlay.id = "barcode-scanner-overlay";
+  overlay.style.cssText =
+    "position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.85);display:flex;flex-direction:column;align-items:center;justify-content:center;";
+  overlay.innerHTML = `
+    <video id="scanner-video" autoplay playsinline style="max-width:90%;max-height:70vh;border-radius:12px;border:2px solid #0f6b4a;"></video>
+    <div style="color:white;margin-top:16px;font-size:14px;">Point camera at barcode…</div>
+    <button id="scanner-close" style="margin-top:12px;padding:8px 24px;border:none;border-radius:8px;background:#d64545;color:white;font-size:14px;cursor:pointer;">Cancel</button>
+  `;
+  document.body.appendChild(overlay);
+
+  const video = document.getElementById("scanner-video");
+  video.srcObject = stream;
+  await video.play();
+
+  const detector = new BarcodeDetector({
+    formats: [
+      "ean_13",
+      "ean_8",
+      "upc_a",
+      "upc_e",
+      "code_128",
+      "code_39",
+      "qr_code",
+      "codabar",
+      "itf",
+    ],
+  });
+  let scanning = true;
+
+  async function scan() {
+    if (!scanning) return;
+    try {
+      const barcodes = await detector.detect(video);
+      if (barcodes.length > 0) {
+        const value = barcodes[0].rawValue;
+        scanning = false;
+        closeScanner();
+        // Auto-add matched product to cart or search
+        const searchEl = $("pos-search");
+        if (searchEl) {
+          searchEl.value = value;
+          searchEl.dispatchEvent(new Event("input"));
+        }
+        // If exactly one product matches its barcode, add it directly
+        const matched = STATE.products.filter(
+          (p) => p.barcode === value && (STATE.stockByProduct[p.id] || 0) > 0,
+        );
+        if (matched.length === 1) {
+          addToCart(matched[0].id);
+          toast(`Added: ${matched[0].name}`, "success", 2000);
+        }
+        return;
+      }
+    } catch (_) {}
+    requestAnimationFrame(scan);
+  }
+  scan();
+
+  function closeScanner() {
+    scanning = false;
+    stream.getTracks().forEach((t) => t.stop());
+    overlay.remove();
+  }
+  document
+    .getElementById("scanner-close")
+    ?.addEventListener("click", closeScanner);
 }
 
 export function printHtml(innerHtml, title = "Document") {
