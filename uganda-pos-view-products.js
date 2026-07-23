@@ -526,6 +526,13 @@ async function renderVariantsTab(body) {
   const { data: variants } = await supabase.from('product_variants').select('*, product:products(name)').eq('business_id', STATE.business.id).order('created_at', { ascending: false });
   const vList = variants || [];
 
+  let stockMap = {};
+  if (vList.length) {
+    const ids = vList.filter(v => v.id).map(v => v.id);
+    const { data: stockRows } = await supabase.from('variant_stock').select('variant_id, quantity').in('variant_id', ids).eq('branch_id', STATE.branch?.id);
+    (stockRows || []).forEach(r => { stockMap[r.variant_id] = r.quantity || 0; });
+  }
+
   body.innerHTML = `
     <div class="card">
       <div class="card-title" style="justify-content:space-between;">
@@ -536,7 +543,7 @@ async function renderVariantsTab(body) {
         <table><thead><tr><th>Product</th><th>Variant Name</th><th>SKU</th><th>Barcode</th><th>Cost</th><th>Price</th><th>Stock</th><th></th></tr></thead>
         <tbody>
           ${vList.length ? vList.map((v) => {
-            const stock = v.id ? (await supabase.from('variant_stock').select('quantity').eq('variant_id', v.id).eq('branch_id', STATE.branch?.id).maybeSingle()).data?.quantity || 0 : 0;
+            const stock = stockMap[v.id] || 0;
             return `<tr>
               <td>${escapeHtml(v.product?.name || '—')}</td>
               <td><b>${escapeHtml(v.name)}</b></td>
@@ -547,11 +554,12 @@ async function renderVariantsTab(body) {
               <td>${stock}</td>
               <td class="flex gap">
                 <button class="btn btn-ghost btn-sm" data-edit-variant="${v.id}">Edit</button>
-                <button class="btn btn-ghost btn-sm" data-del-variant="${v.id}" style="color:var(--danger);">Delete</button>
-              </td></tr>`;
-          }).join('') : '<tr><td colspan="8"><div class="empty-state">No variants yet. Create variants to track different sizes, colors, or options for your products.</div></td></tr>'}
-        </tbody></table>
-      </div>
+                <button class="btn btn-sm btn-ghost" style="color:var(--danger)" data-delete-variant="${v.id}">Del</button>
+              </td>
+            </tr>`;
+          }).join("") : `<tr><td colspan="8" class="empty-state">No variants yet</td></tr>`}
+        </tbody>
+      </table>
     </div>`;
 
   $('add-variant-btn').addEventListener('click', () => openVariantModal());
