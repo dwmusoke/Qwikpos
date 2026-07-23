@@ -21,30 +21,30 @@ export async function renderAdmin(root) {
   root.innerHTML = `<div class="empty-state">Loading platform data…</div>`;
 
   let businesses, subs, users, plans, payments, branches, salesCount, products;
+  let rpcError = null;
   try {
-    ([
-      { data: businesses },
-      { data: subs },
-      { data: users },
-      { data: plans },
-      { data: payments },
-      { data: branches },
-      { data: salesCount },
-      { data: products },
-    ] = await Promise.all([
-      supabase.from("businesses").select("*").order("created_at", { ascending: false }),
-      supabase.from("subscriptions").select("*, plans(name, code, price_ugx)"),
-      supabase.from("app_users").select("id, business_id, full_name, role, is_active, phone, created_at"),
+    const [bizRes, subRes, userRes, planRes, payRes, branchRes, salesRes, prodRes] = await Promise.all([
+      supabase.rpc("admin_get_businesses"),
+      supabase.rpc("admin_get_subscriptions"),
+      supabase.rpc("admin_get_users"),
       supabase.from("plans").select("*").order("sort_order"),
-      supabase.from("subscription_payments").select("*, plans(name)").order("created_at", { ascending: false }).limit(50),
-      supabase.from("branches").select("*"),
-      supabase.from("sales").select("id, grand_total_base, created_at, status, sale_type"),
-      supabase.from("products").select("id, business_id, is_active"),
-    ]));
+      supabase.rpc("admin_get_payments"),
+      supabase.rpc("admin_get_branches"),
+      supabase.rpc("admin_get_sales_summary"),
+      supabase.rpc("admin_get_products_summary"),
+    ]);
+    if (bizRes.error) throw bizRes.error;
+    businesses = bizRes.data || [];
+    subs = subRes.data || [];
+    users = userRes.data || [];
+    plans = planRes.data || [];
+    payments = payRes.data || [];
+    branches = branchRes.data || [];
+    salesCount = salesRes.data || [];
+    products = prodRes.data || [];
   } catch (e) {
-    console.error("Admin data load failed:", e);
-    root.innerHTML = `<div class="empty-state"><span class="big-icon">🔒</span><h3 style="margin:12px 0 8px;font-size:18px;">Access Denied</h3><p style="color:var(--text-muted);max-width:360px;margin:0 auto 16px;line-height:1.6;">Your supadmin role may not be fully set up. Ensure your app_users row has <b>role = 'superadmin'</b> and <b>is_active = true</b>.</p><p style="color:var(--text-muted);font-size:12px;">SQL: <code>UPDATE app_users SET role = 'superadmin' WHERE id = '${STATE.session?.user?.id || "your-auth-uid"}'</code></p></div>`;
-    return;
+    console.error("Admin RPC error:", e);
+    rpcError = e.message || e.toString();
   }
 
   const subByBusiness = {};
@@ -110,54 +110,28 @@ export async function renderAdmin(root) {
 
   function renderTabContent() {
     const el = $("admin-tab-content");
+    if (rpcError) {
+      el.innerHTML = `<div class="empty-state" style="padding:40px 24px;"><span class="big-icon" style="font-size:48px;display:block;margin-bottom:16px;">🔒</span><h3 style="margin:0 0 8px;font-size:18px;font-weight:700;">Superadmin Access Required</h3><p style="color:var(--text-muted);max-width:420px;margin:0 auto 16px;line-height:1.6;">Run this SQL in Supabase SQL Editor to enable platform admin access:</p><pre style="background:var(--surface-2);padding:14px;border-radius:8px;font-size:12px;max-width:500px;margin:0 auto;text-align:left;overflow-x:auto;white-space:pre-wrap;">UPDATE app_users SET role = 'superadmin', is_active = true WHERE id = '${STATE.session?.user?.id || "your-auth-uid"}';</pre><p class="help-text" style="margin-top:14px;">Then re-run schema v8.sql to create the admin RPC functions.</p></div>`;
+      return;
+    }
     if (_activeTab === "overview")
       renderOverview(el, {
-        businesses,
-        subs,
-        users,
-        plans,
-        payments,
-        branches,
-        salesCount,
-        products,
-        totalSales,
-        totalRevenue,
-        totalProducts,
-        totalUsers,
-        activeCount,
-        trialCount,
-        mrr,
-        now,
-        businessById,
-        usersByBusiness,
-        branchesByBusiness,
-        subByBusiness,
+        businesses, subs, users, plans, payments, branches,
+        salesCount, products, totalSales, totalRevenue, totalProducts,
+        totalUsers, activeCount, trialCount, mrr, now,
+        businessById, usersByBusiness, branchesByBusiness, subByBusiness,
       });
     else if (_activeTab === "vendors")
       renderVendors(el, {
-        businesses,
-        subs,
-        users,
-        branches,
-        plans,
-        businessById,
-        usersByBusiness,
-        branchesByBusiness,
-        subByBusiness,
-        now,
+        businesses, subs, users, branches, plans,
+        businessById, usersByBusiness, branchesByBusiness, subByBusiness, now,
       });
     else if (_activeTab === "users")
       renderUsers(el, { users, businesses, businessById });
     else if (_activeTab === "branches")
       renderBranches(el, { branches, businesses, businessById });
     else if (_activeTab === "plans")
-      renderPlans(el, {
-        plans,
-        payments,
-        businesses,
-        businessById,
-        subByBusiness,
-      });
+      renderPlans(el, { plans, payments, businesses, businessById, subByBusiness });
     else if (_activeTab === "roles") renderRoles(el);
   }
 

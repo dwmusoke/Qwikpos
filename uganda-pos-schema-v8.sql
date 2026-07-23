@@ -23,9 +23,10 @@ create policy business_update_app_users on app_users
   with check (business_id = auth_business_id() OR id = auth.uid());
 
 -- ---------------------------------------------------------------------
--- 2. SECURITY-DEFINER HELPER
+-- 2. SECURITY-DEFINER HELPERS
 --    get_my_app_user() - app can always fetch the current user's app_users row
 -- ---------------------------------------------------------------------
+drop function if exists get_my_app_user();
 create or replace function get_my_app_user()
 returns jsonb
 language sql security definer stable as $$
@@ -33,9 +34,116 @@ language sql security definer stable as $$
 $$;
 
 -- ---------------------------------------------------------------------
--- 3. SELF-SERVE SIGNUP (security definer — creates the tenant + owner
+-- 3. SUPERADMIN PLATFORM HELPERS (bypass RLS — superadmin-only)
+-- ---------------------------------------------------------------------
+drop function if exists admin_get_businesses();
+create or replace function admin_get_businesses()
+returns jsonb
+language plpgsql security definer stable as $$
+begin
+  if not exists (select 1 from app_users where id = auth.uid() and role = 'superadmin' and is_active = true) then
+    raise exception 'Not authorized';
+  end if;
+  return (select jsonb_agg(to_jsonb(b.*)) from businesses b);
+end;
+$$;
+
+drop function if exists admin_get_users();
+create or replace function admin_get_users()
+returns jsonb
+language plpgsql security definer stable as $$
+begin
+  if not exists (select 1 from app_users where id = auth.uid() and role = 'superadmin' and is_active = true) then
+    raise exception 'Not authorized';
+  end if;
+  return (select jsonb_agg(to_jsonb(u.*)) from app_users u);
+end;
+$$;
+
+drop function if exists admin_get_subscriptions();
+create or replace function admin_get_subscriptions()
+returns jsonb
+language plpgsql security definer stable as $$
+begin
+  if not exists (select 1 from app_users where id = auth.uid() and role = 'superadmin' and is_active = true) then
+    raise exception 'Not authorized';
+  end if;
+  return (select jsonb_agg(jsonb_build_object(
+    'id', s.id, 'business_id', s.business_id, 'plan_id', s.plan_id,
+    'status', s.status, 'trial_ends_at', s.trial_ends_at,
+    'current_period_end', s.current_period_end, 'current_period_start', s.current_period_start,
+    'auto_renew', s.auto_renew, 'created_at', s.created_at, 'updated_at', s.updated_at,
+    'plans', (select to_jsonb(p.*) from plans p where p.id = s.plan_id)
+  )) from subscriptions s);
+end;
+$$;
+
+drop function if exists admin_get_payments();
+create or replace function admin_get_payments()
+returns jsonb
+language plpgsql security definer stable as $$
+begin
+  if not exists (select 1 from app_users where id = auth.uid() and role = 'superadmin' and is_active = true) then
+    raise exception 'Not authorized';
+  end if;
+  return (select jsonb_agg(jsonb_build_object(
+    'id', p.id, 'business_id', p.business_id, 'plan_id', p.plan_id,
+    'amount', p.amount, 'currency', p.currency, 'status', p.status,
+    'flw_tx_ref', p.flw_tx_ref, 'created_at', p.created_at,
+    'plans', (select to_jsonb(pl.*) from plans pl where pl.id = p.plan_id)
+  )) from subscription_payments p order by p.created_at desc limit 50);
+end;
+$$;
+
+drop function if exists admin_get_branches();
+create or replace function admin_get_branches()
+returns jsonb
+language plpgsql security definer stable as $$
+begin
+  if not exists (select 1 from app_users where id = auth.uid() and role = 'superadmin' and is_active = true) then
+    raise exception 'Not authorized';
+  end if;
+  return (select jsonb_agg(to_jsonb(b.*)) from branches b);
+end;
+$$;
+
+drop function if exists admin_get_sales_summary();
+create or replace function admin_get_sales_summary()
+returns jsonb
+language plpgsql security definer stable as $$
+begin
+  if not exists (select 1 from app_users where id = auth.uid() and role = 'superadmin' and is_active = true) then
+    raise exception 'Not authorized';
+  end if;
+  return (select jsonb_agg(to_jsonb(s.*)) from sales s);
+end;
+$$;
+
+drop function if exists admin_get_products_summary();
+create or replace function admin_get_products_summary()
+returns jsonb
+language plpgsql security definer stable as $$
+begin
+  if not exists (select 1 from app_users where id = auth.uid() and role = 'superadmin' and is_active = true) then
+    raise exception 'Not authorized';
+  end if;
+  return (select jsonb_agg(to_jsonb(p.*)) from products p);
+end;
+$$;
+
+grant execute on function admin_get_businesses() to authenticated;
+grant execute on function admin_get_users() to authenticated;
+grant execute on function admin_get_subscriptions() to authenticated;
+grant execute on function admin_get_payments() to authenticated;
+grant execute on function admin_get_branches() to authenticated;
+grant execute on function admin_get_sales_summary() to authenticated;
+grant execute on function admin_get_products_summary() to authenticated;
+
+-- ---------------------------------------------------------------------
+-- 4. SELF-SERVE SIGNUP (security definer — creates the tenant + owner
 --    in one call, right after supabase.auth.signUp() on the client)
 -- ---------------------------------------------------------------------
+drop function if exists create_business_and_owner(text, text, text, text, text);
 create or replace function create_business_and_owner(
   p_business_name text,
   p_full_name text,
