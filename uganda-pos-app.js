@@ -125,9 +125,10 @@ async function navigateTo(route) {
   if (!ROUTES[route])
     route = STATE.isSuperadmin && !STATE.business ? "admin" : "dashboard";
 
-  // Superadmins with no vendor business of their own can only see the admin console.
-  if (STATE.isSuperadmin && !STATE.business && route !== "admin")
+  // Superadmin without business context: redirect to admin (impersonation will set business)
+  if (STATE.isSuperadmin && !STATE.business && route !== "admin") {
     route = "admin";
+  }
 
   // Everyone else needs an active trial/subscription for anything but Billing.
   if (!STATE.isSuperadmin && route !== "billing" && !isSubscriptionActive()) {
@@ -189,12 +190,6 @@ function wireShell() {
       return;
     }
 
-    // A superadmin with no vendor business of their own only needs the admin console.
-    if (STATE.isSuperadmin && !STATE.business && route !== "admin") {
-      link.style.display = "none";
-      return;
-    }
-
     const def = ROUTES[route];
     if (def?.feature && !hasFeature(def.feature)) {
       link.classList.add("nav-link-locked");
@@ -203,11 +198,6 @@ function wireShell() {
 
     link.addEventListener("click", () => navigateTo(route));
   });
-
-  // Superadmin with no business: hide nav group labels (all links hidden anyway)
-  if (STATE.isSuperadmin && !STATE.business) {
-    qsa(".nav-group-label").forEach((el) => (el.style.display = "none"));
-  }
 
   $("menu-btn").addEventListener("click", () => {
     $("sidebar").classList.add("open");
