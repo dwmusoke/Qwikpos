@@ -466,6 +466,25 @@ function showLoginScreen() {
   $("app-shell").classList.add("hidden");
 }
 
+function showSignupScreen() {
+  $("signup-screen").classList.remove("hidden");
+  $("login-screen").classList.add("hidden");
+  $("reset-screen").classList.add("hidden");
+  $("create-business-screen").classList.add("hidden");
+  $("app-shell").classList.add("hidden");
+}
+
+function handleLandingHash() {
+  const hash = window.location.hash;
+  if (hash === "#signup") {
+    showSignupScreen();
+    window.history.replaceState(null, "", window.location.pathname);
+  } else if (hash === "#login") {
+    showLoginScreen();
+    window.history.replaceState(null, "", window.location.pathname);
+  }
+}
+
 function showCreateBusinessScreen() {
   $("login-screen").classList.add("hidden");
   $("signup-screen").classList.add("hidden");
@@ -594,6 +613,7 @@ async function boot() {
       !!STATE.session,
     );
     showLoginScreen();
+    handleLandingHash();
     return;
   }
 
@@ -829,7 +849,10 @@ if (hash && hash.includes("type=recovery")) {
     }
   });
 } else {
-  window.history.replaceState(null, "", window.location.pathname);
+  const landingHash = window.location.hash;
+  if (landingHash !== "#signup" && landingHash !== "#login") {
+    window.history.replaceState(null, "", window.location.pathname);
+  }
 }
 
 initSignupScreen();
@@ -837,6 +860,7 @@ initCreateBusinessScreen();
 boot().catch((err) => {
   console.error("Auto-boot failed:", err);
   showLoginScreen();
+  handleLandingHash();
 });
 
 window.__qwickposReady && window.__qwickposReady();
