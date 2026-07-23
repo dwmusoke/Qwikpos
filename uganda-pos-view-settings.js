@@ -349,7 +349,30 @@ export async function renderSettings(root) {
       toast("Logo updated successfully", "success");
       document.querySelector(".brand-row img")?.setAttribute("src", logoUrl);
     } catch (e) {
-      logoProgress.textContent = "Upload failed. Check Supabase Storage 'logos' bucket exists and is public.";
+      // Try to create the bucket automatically
+      if (e.message?.includes("Bucket not found")) {
+        try {
+          await supabase.storage.createBucket("logos", { public: true });
+          logoProgress.textContent = "Retrying upload…";
+          const retry = await supabase.storage.from("logos").upload(fileName, file, { upsert: true, contentType: file.type });
+          if (retry.error) throw retry.error;
+          const { data: urlData } = supabase.storage.from("logos").getPublicUrl(fileName);
+          const logoUrl = urlData.publicUrl;
+          await supabase.from("businesses").update({ logo_url: logoUrl }).eq("id", STATE.business.id);
+          STATE.business.logo_url = logoUrl;
+          logoProgress.textContent = "Logo uploaded!";
+          setTimeout(() => { logoProgress.style.display = "none"; }, 2000);
+          logoRemoveBtn.style.display = "";
+          toast("Logo uploaded (bucket auto-created)", "success");
+          document.querySelector(".brand-row img")?.setAttribute("src", logoUrl);
+          return;
+        } catch (e2) {
+          logoProgress.textContent = "";
+          toast("Go to Supabase Dashboard → Storage → Create a public 'logos' bucket.", "error", 6000);
+          return;
+        }
+      }
+      logoProgress.textContent = "";
       toast("Upload failed: " + e.message, "error");
     }
   });
