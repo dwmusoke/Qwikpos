@@ -310,7 +310,7 @@ export async function loadBootstrapData() {
         .from("businesses")
         .select("*")
         .eq("id", appUser.business_id)
-        .single(),
+        .maybeSingle(),
       supabase
         .from("branches")
         .select("*")
@@ -333,8 +333,11 @@ export async function loadBootstrapData() {
     ]);
   } catch (e) {
     console.error("Bootstrap query failed:", e);
-    toast("Failed to load business data — please refresh.", "error", 8000);
-    return false;
+    // If .single() threw PGRST116 (no rows), the business was deleted.
+    // Allow proceeding — STATE.business stays null and navigateTo
+    // will show "No Business Context" with an impersonate prompt.
+    if (e?.code === "PGRST116") { business = null; }
+    else { toast("Failed to load business data — please refresh.", "error", 8000); return false; }
   }
 
   STATE.business = business;

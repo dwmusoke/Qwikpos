@@ -126,10 +126,7 @@ async function navigateTo(route) {
   if (!ROUTES[route])
     route = STATE.isSuperadmin && !STATE.business ? "admin" : "dashboard";
 
-  // Superadmin without business context: redirect to admin (impersonation will set business)
-  if (STATE.isSuperadmin && !STATE.business && route !== "admin") {
-    route = "admin";
-  }
+  // Superadmin without business: let them navigate freely (sections show empty states)
 
   // Everyone else needs an active trial/subscription for anything but Billing.
   if (!STATE.isSuperadmin && route !== "billing" && !isSubscriptionActive()) {
@@ -158,8 +155,8 @@ async function navigateTo(route) {
       await ROUTES[route].render(root);
     }
   } catch (e) {
-    console.error(e);
-    root.innerHTML = `<div class="empty-state">Something went wrong loading this page. Check the console for details.</div>`;
+    console.error("Render failed for", route, e);
+    root.innerHTML = `<div class="empty-state"><span class="big-icon" style="font-size:48px;display:block;margin-bottom:12px;">⚠️</span><h3 style="margin:0 0 8px;font-size:17px;font-weight:700;">Page Error</h3><p style="color:var(--text-muted);max-width:380px;margin:0 auto;line-height:1.5;font-size:13px;">${escapeHtml(e.message || "Something went wrong")}</p></div>`;
   }
   try {
     translatePage();
