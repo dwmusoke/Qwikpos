@@ -22,6 +22,7 @@ export async function renderCustomers(root) {
     <div class="view-header">
       <div><h2>Customers</h2><p class="sub">${STATE.customers.length} customers on file</p></div>
       <button class="btn btn-primary" id="add-customer-btn">+ Add Customer</button>
+      <button class="btn btn-outline" id="import-customers-btn">📥 Import CSV</button>
     </div>
     <div class="table-wrap">
       <table>
@@ -32,6 +33,7 @@ export async function renderCustomers(root) {
   `;
   renderTable();
   $("add-customer-btn").addEventListener("click", () => openCustomerModal());
+  $("import-customers-btn")?.addEventListener("click", () => openCustomerImportModal());
 }
 
 function renderTable() {
@@ -197,4 +199,62 @@ async function openStatementModal(customerId) {
       printHtml(stmtHtml, `Statement — ${c.name}`);
     });
   }
+}
+
+function openCustomerImportModal() {
+  const csvSample = 'name,phone,email,address,opening_balance\n' +
+    'John Mukasa,+256772123456,john@example.com,Kampala Rd 12,0\n' +
+    'Sarah Nabatanzi,+256701234567,sarah@example.com,Entebbe Rd 45,50000\n' +
+    'Peter Okello,+256751234567,peter@example.com,Gulu Town,0';
+  openModal(`
+    <div class="modal-title-row"><h3>Import Customers from CSV</h3></div>
+    <p class="help-text" style="margin-bottom:12px;">Download the sample template to see the expected format, then upload your file.</p>
+    <div class="flex gap" style="margin-bottom:14px;">
+      <button class="btn btn-outline" id="cust-dl-sample">📄 Download Sample CSV</button>
+    </div>
+    <div class="field"><label>CSV File</label><input type="file" id="cust-import-file" accept=".csv" /></div>
+    <div class="field"><label>Default Balance (if not in CSV)</label><input type="number" id="cust-default-balance" value="0" /></div>
+    <button class="btn btn-primary btn-block" id="cust-import-run" style="margin-top:14px;">Import</button>
+  `, { onMount: () => {
+    $('cust-dl-sample').addEventListener('click', () => {
+      const blob = new Blob([csvSample], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = 'qwickpos-customer-import-sample.csv'; a.click();
+      URL.revokeObjectURL(url);
+    });
+    $('cust-import-run').addEventListener('click', async () => {
+      const file = $('cust-import-file').files[0];
+      if (!file) { toast('Select a CSV file', 'error'); return; }
+      const text = await file.text();
+      const lines = text.split('\n').filter((l) => l.trim());
+      if (lines.length < 2) { toast('CSV is empty', 'error'); return; }
+      const headers = lines[0].split(',').map((h) => h.trim().toLowerCase());
+      const nameIdx = headers.indexOf('name');
+      if (nameIdx < 0) { toast('CSV must have a name column', 'error'); return; }
+      const phoneIdx = headers.indexOf('phone');
+      const emailIdx = headers.indexOf('email');
+      const addressIdx = headers.indexOf('address');
+      const balanceIdx = headers.indexOf('opening_balance');
+      const defaultBalance = parseFloat($('cust-default-balance').value) || 0;
+      let count = 0;
+      for (let i = 1; i < lines.length; i++) {
+        const cols = lines[i].split(',');
+        const name = cols[nameIdx]?.trim();
+        if (!name) continue;
+        const { error } = await supabase.from('customers').insert({
+          business_id: STATE.business.id, name,
+          phone: cols[phoneIdx]?.trim() || null,
+          email: cols[emailIdx]?.trim() || null,
+          address: cols[addressIdx]?.trim() || null,
+          balance: parseFloat(cols[balanceIdx]) || defaultBalance,
+        });
+        if (!error) count++;
+      }
+      toast(`Imported ${count} customers`, 'success');
+      await refreshCustomers();
+      closeModal();
+      renderTable();
+    });
+  }});
 }

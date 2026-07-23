@@ -785,10 +785,27 @@ function openSingleLabelModal(productId) {
 function openImportModal() {
   openModal(`
     <div class="modal-title-row"><h3>Import Products from CSV</h3></div>
-    <p class="help-text" style="margin-bottom:12px;">CSV columns: <b>name</b> (required), <b>sku</b>, <b>barcode</b>, <b>category</b>, <b>brand</b>, <b>unit</b>, <b>cost_price</b>, <b>selling_price</b> (required), <b>wholesale_price</b>, <b>reorder_level</b>, <b>tax_category</b>, <b>stock</b></p>
+    <p class="help-text" style="margin-bottom:12px;">Download the sample template to see the expected format, then upload your file.</p>
+    <div class="flex gap" style="margin-bottom:14px;">
+      <button class="btn btn-outline" id="download-sample-btn">📄 Download Sample CSV</button>
+    </div>
     <div class="field"><label>CSV File</label><input type="file" id="import-file" accept=".csv" /></div>
     <button class="btn btn-primary btn-block" id="import-run" style="margin-top:14px;">Import</button>
   `, { onMount: () => {
+    $('download-sample-btn').addEventListener('click', () => {
+      const csv = 'name,sku,barcode,category,brand,unit,cost_price,selling_price,wholesale_price,reorder_level,tax_category,stock\n' +
+        'Milk Fresh 1L,MILK-001,8901234567890,Dairy,FreshCo,pc,3500,5000,4500,10,STD,50\n' +
+        'Bread White Loaf,BREAD-001,,Bakery,NiceBake,pc,2500,4000,3500,5,ZERO,30\n' +
+        'Sugar 1kg,SUGAR-001,9876543210987,Grocery,BestBrand,kg,3000,4500,4000,8,STD,100\n' +
+        'Cooking Oil 2L,OIL-001,,Grocery,SunOil,litre,7000,10000,9000,5,STD,40\n' +
+        'Mineral Water 500ml,WATER-001,5678901234567,Beverages,AquaPure,bottle,500,1000,800,15,EXEMPT,200';
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = 'qwickpos-product-import-sample.csv'; a.click();
+      URL.revokeObjectURL(url);
+    });
+    $('import-run').addEventListener('click', async () => {
     $('import-run').addEventListener('click', async () => {
       const file = $('import-file').files[0];
       if (!file) { toast('Select a CSV file', 'error'); return; }
