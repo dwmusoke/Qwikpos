@@ -20,36 +20,32 @@ let _activeTab = "overview";
 export async function renderAdmin(root) {
   root.innerHTML = `<div class="empty-state">Loading platform data…</div>`;
 
-  const [
-    { data: businesses },
-    { data: subs },
-    { data: users },
-    { data: plans },
-    { data: payments },
-    { data: branches },
-    { data: salesCount },
-    { data: products },
-  ] = await Promise.all([
-    supabase
-      .from("businesses")
-      .select("*")
-      .order("created_at", { ascending: false }),
-    supabase.from("subscriptions").select("*, plans(name, code, price_ugx)"),
-    supabase
-      .from("app_users")
-      .select("id, business_id, full_name, role, is_active, phone, created_at"),
-    supabase.from("plans").select("*").order("sort_order"),
-    supabase
-      .from("subscription_payments")
-      .select("*, plans(name)")
-      .order("created_at", { ascending: false })
-      .limit(50),
-    supabase.from("branches").select("*"),
-    supabase
-      .from("sales")
-      .select("id, grand_total_base, created_at, status, sale_type"),
-    supabase.from("products").select("id, business_id, is_active"),
-  ]);
+  let businesses, subs, users, plans, payments, branches, salesCount, products;
+  try {
+    ([
+      { data: businesses },
+      { data: subs },
+      { data: users },
+      { data: plans },
+      { data: payments },
+      { data: branches },
+      { data: salesCount },
+      { data: products },
+    ] = await Promise.all([
+      supabase.from("businesses").select("*").order("created_at", { ascending: false }),
+      supabase.from("subscriptions").select("*, plans(name, code, price_ugx)"),
+      supabase.from("app_users").select("id, business_id, full_name, role, is_active, phone, created_at"),
+      supabase.from("plans").select("*").order("sort_order"),
+      supabase.from("subscription_payments").select("*, plans(name)").order("created_at", { ascending: false }).limit(50),
+      supabase.from("branches").select("*"),
+      supabase.from("sales").select("id, grand_total_base, created_at, status, sale_type"),
+      supabase.from("products").select("id, business_id, is_active"),
+    ]));
+  } catch (e) {
+    console.error("Admin data load failed:", e);
+    root.innerHTML = `<div class="empty-state"><span class="big-icon">🔒</span><h3 style="margin:12px 0 8px;font-size:18px;">Access Denied</h3><p style="color:var(--text-muted);max-width:360px;margin:0 auto 16px;line-height:1.6;">Your supadmin role may not be fully set up. Ensure your app_users row has <b>role = 'superadmin'</b> and <b>is_active = true</b>.</p><p style="color:var(--text-muted);font-size:12px;">SQL: <code>UPDATE app_users SET role = 'superadmin' WHERE id = '${STATE.session?.user?.id || "your-auth-uid"}'</code></p></div>`;
+    return;
+  }
 
   const subByBusiness = {};
   (subs || []).forEach((s) => {
