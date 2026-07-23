@@ -6,6 +6,7 @@ import {
   supabase, STATE, $, qsa, escapeHtml, toast, openModal, closeModal,
   fmtMoney, fmtDate, sanitizeCsvValue, refreshProducts, stockFor,
   makePaginationState, paginationHtml, wirePagination,
+  printHtml, receiptHtml,
 } from './uganda-pos-core.js';
 
 let activeTab = 'list';
@@ -158,8 +159,36 @@ async function renderSalesListTab(body) {
       <div class="summary-row" style="font-weight:700;border-top:2px solid var(--border);padding-top:8px;margin-top:8px;"><span>Total</span><span>${fmtMoney(sale.grand_total_base)}</span></div>
       <div class="card-title" style="margin-top:12px;">Payments</div>
       ${(sale.payments || []).map((p) => `<div class="summary-row"><span style="text-transform:capitalize;">${escapeHtml(p.method)}</span><span>${fmtMoney(p.amount_base)}</span></div>`).join('')}
-      <button class="btn btn-outline btn-block" data-close-modal style="margin-top:14px;">Close</button>
-    `, { large: true });
+      <div class="flex gap" style="margin-top:14px;flex-wrap:wrap;">
+        <button class="btn btn-outline" data-print-receipt="${sale.id}">🖨️ Print Receipt</button>
+        <button class="btn btn-outline" data-download-csv="${sale.id}">📥 Download CSV</button>
+        <button class="btn btn-outline" data-close-modal>Close</button>
+      </div>
+    `, {
+      large: true,
+      onMount: () => {
+        const printBtn = document.querySelector("[data-print-receipt]");
+        printBtn?.addEventListener("click", () => {
+          const lines = (sale.sale_items || []).map((it) => ({ name: it.product_name, qty: it.quantity, price: it.unit_price, total: it.line_total }));
+          const receipt = receiptHtml({
+            business: STATE.business, customer: sale.customer, saleNumber: sale.sale_number,
+            date: sale.created_at, items: lines, total: sale.grand_total_base,
+            payments: sale.payments,
+          });
+          printHtml(receipt, `Receipt ${sale.sale_number}`);
+        });
+        const csvBtn = document.querySelector("[data-download-csv]");
+        csvBtn?.addEventListener("click", () => {
+          const rows = (sale.sale_items || []).map((it) => [it.product_name, it.quantity, it.unit_price, it.line_total]);
+          const csv = [["Product", "Qty", "Unit Price", "Total"], ...rows]
+            .map((r) => r.map((v) => `"${sanitizeCsvValue(v).replace(/"/g, '""')}"`).join(",")).join("\n");
+          const blob = new Blob([csv], { type: "text/csv" });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a"); a.href = url; a.download = `sale-${sale.sale_number}.csv`; a.click();
+          URL.revokeObjectURL(url);
+        });
+      },
+    });
   }
 }
 

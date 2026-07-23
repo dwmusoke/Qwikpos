@@ -9,7 +9,7 @@
 // links the original quotation to it via converted_sale_id.
 // =====================================================================
 import {
-  supabase, STATE, $, qsa, escapeHtml, toast, openModal, closeModal, uid, fmtMoneyRaw,
+  supabase, STATE, $, qsa, escapeHtml, toast, openModal, closeModal, uid, fmtMoneyRaw, fmtMoney,
 } from './uganda-pos-core.js';
 import { submitSaleToSupabase, printableModal } from './uganda-pos-view-pos.js';
 
@@ -85,6 +85,7 @@ export async function renderQuotations(root) {
         <td>${statusBadge(b, convertedMap[q.converted_sale_id])}</td>
         <td>${new Date(q.created_at).toLocaleDateString('en-UG')}</td>
         <td class="flex gap">
+          <button class="btn btn-outline btn-sm" data-view="${q.id}">View</button>
           <button class="btn btn-outline btn-sm" data-print="${q.id}">Print</button>
           ${b === 'open' ? `<button class="btn btn-primary btn-sm" data-convert="${q.id}">Convert to Sale</button>` : ''}
           ${b === 'open' ? `<button class="btn btn-ghost btn-sm" data-void="${q.id}">Void</button>` : ''}
@@ -92,6 +93,22 @@ export async function renderQuotations(root) {
       </tr>`;
     }).join('');
 
+    qsa('[data-view]', tbody).forEach((b) => b.addEventListener('click', () => {
+      const q = quotations.find((x) => x.id === b.dataset.view);
+      if (!q) return;
+      openModal(`
+        <div class="modal-title-row"><h3>Quotation — ${escapeHtml(q.sale_number)}</h3></div>
+        <div class="summary-row"><span>Customer</span><span>${escapeHtml(q.customers?.name || 'Walk-in')}</span></div>
+        <div class="summary-row"><span>Amount</span><span>${fmtMoney(q.grand_total_base)}</span></div>
+        <div class="summary-row"><span>Status</span><span>${statusBadge(bucket(q))}</span></div>
+        <div class="summary-row"><span>Date</span><span>${new Date(q.created_at).toLocaleDateString('en-UG')}</span></div>
+        ${q.quote_expires_at ? `<div class="summary-row"><span>Valid Until</span><span>${escapeHtml(q.quote_expires_at)}</span></div>` : ''}
+        <div class="card-title" style="margin-top:12px;">Items</div>
+        <div class="table-wrap"><table><thead><tr><th>Product</th><th>Qty</th><th>Price</th><th>Total</th></tr></thead>
+          <tbody>${(q.sale_items || []).map((it) => `<tr><td>${escapeHtml(it.product_name)}</td><td>${it.quantity}</td><td>${fmtMoney(it.unit_price)}</td><td>${fmtMoney(it.line_total)}</td></tr>`).join('')}</tbody></table></div>
+        <button class="btn btn-outline btn-block" data-close-modal style="margin-top:14px;">Close</button>
+      `, { large: true });
+    }));
     qsa('[data-print]', tbody).forEach((b) => b.addEventListener('click', () => printQuotation(b.dataset.print)));
     qsa('[data-convert]', tbody).forEach((b) => b.addEventListener('click', () => openConvertModal(quotations.find((q) => q.id === b.dataset.convert))));
     qsa('[data-void]', tbody).forEach((b) => b.addEventListener('click', () => voidQuotation(b.dataset.void, root)));
