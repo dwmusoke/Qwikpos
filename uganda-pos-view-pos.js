@@ -26,7 +26,7 @@ import {
 import { logAuditAction } from "./uganda-pos-view-audit.js";
 import { getReceiptTemplate } from "./uganda-pos-view-templates.js";
 
-let posSaleCurrency = STATE.displayCurrency;
+let posSaleCurrency = "UGX";
 let posDiscountInput = 0;
 let posSearchTerm = "";
 let posActiveCategory = "all";
