@@ -272,7 +272,9 @@ export async function showCreateBusinessScreen() {
     freshBtn.disabled = true;
     freshBtn.textContent = "Creating…";
 
-    const { error } = await supabase.rpc("create_business_and_owner", {
+    // Try RPC first (schema v1-v8)
+    let rpcFailed = false;
+    const { error: rpcErr } = await supabase.rpc("create_business_and_owner", {
       p_business_name: businessName,
       p_full_name: fullName,
       p_phone: phone,
@@ -280,17 +282,90 @@ export async function showCreateBusinessScreen() {
       p_plan_code: "starter",
     });
 
+    if (rpcErr) {
+      rpcFailed = true;
+      console.warn(
+        "create_business_and_owner RPC failed, using fallback:",
+        rpcErr.message,
+      );
+    }
+
+    // Fallback: direct inserts if RPC failed or doesn't exist
+    if (rpcFailed) {
+      try {
+        const { data: plan } = await supabase
+          .from("plans")
+          .select("*")
+          .eq("code", "starter")
+          .eq("is_active", true)
+          .single();
+
+        if (!plan) throw new Error("Starter plan not found");
+
+        // Create business
+        const { data: business, error: bizErr } = await supabase
+          .from("businesses")
+          .insert({
+            name: businessName,
+            base_currency: currency,
+            primary_phone: phone || null,
+          })
+          .select()
+          .single();
+
+        if (bizErr) throw bizErr;
+
+        // Create default branch
+        const { data: branch, error: branchErr } = await supabase
+          .from("branches")
+          .insert({ business_id: business.id, name: "Main Branch" })
+          .select()
+          .single();
+
+        if (branchErr) throw branchErr;
+
+        // Link current auth user to the business as admin
+        const { error: userErr } = await supabase.from("app_users").insert({
+          id: STATE.session.user.id,
+          business_id: business.id,
+          branch_id: branch.id,
+          full_name: fullName,
+          phone: phone || null,
+          role: "admin",
+          is_active: true,
+        });
+
+        if (userErr) throw userErr;
+
+        // Create subscription (14-day trial)
+        const trialEnds = new Date();
+        trialEnds.setDate(trialEnds.getDate() + 14);
+        const { error: subErr } = await supabase.from("subscriptions").insert({
+          business_id: business.id,
+          plan_id: plan.id,
+          status: "trialing",
+          trial_ends_at: trialEnds.toISOString(),
+          current_period_end: trialEnds.toISOString(),
+        });
+
+        if (subErr) throw subErr;
+      } catch (fallbackErr) {
+        freshBtn.disabled = false;
+        freshBtn.textContent = "Create Business & Start Trial";
+        freshErr.textContent =
+          fallbackErr.message || "Failed to create business";
+        freshErr.style.display = "block";
+        console.error("Fallback create business failed:", fallbackErr);
+        return;
+      }
+    }
+
     freshBtn.disabled = false;
     freshBtn.textContent = "Create Business & Start Trial";
 
-    if (error) {
-      freshErr.textContent = error.message;
-      freshErr.style.display = "block";
-    } else {
-      freshErr.style.display = "none";
-      // Business created — reload bootstrap
-      createCard.classList.add("hidden");
-      await boot();
-    }
+    freshErr.style.display = "none";
+    // Business created — reload bootstrap
+    createCard.classList.add("hidden");
+    await boot();
   });
 }
