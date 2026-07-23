@@ -849,14 +849,11 @@ if (hash && hash.includes("type=recovery")) {
     }
   });
 } else {
-  const landingHash = window.location.hash;
-  if (landingHash !== "#signup" && landingHash !== "#login") {
+  const h = window.location.hash;
+  if (h !== "#signup" && h !== "#login") {
     window.history.replaceState(null, "", window.location.pathname);
   }
 }
-
-initSignupScreen();
-initCreateBusinessScreen();
 
 const landingHash = window.location.hash;
 if (landingHash === "#signup" || landingHash === "#login") {
@@ -864,11 +861,12 @@ if (landingHash === "#signup" || landingHash === "#login") {
   else showLoginScreen();
   window.history.replaceState(null, "", window.location.pathname);
   const splash = document.getElementById("splash-screen");
-  if (splash) {
-    splash.classList.add("fade-out");
-    setTimeout(() => splash.remove(), 400);
-  }
+  if (splash) splash.remove();
+  initSignupScreen().catch((e) => console.error("initSignupScreen:", e));
+  initCreateBusinessScreen();
 } else {
+  initSignupScreen().catch((e) => console.error("initSignupScreen:", e));
+  initCreateBusinessScreen();
   boot().catch((err) => {
     console.error("Auto-boot failed:", err);
     showLoginScreen();
