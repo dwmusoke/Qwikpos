@@ -1334,3 +1334,19 @@ tbody tr:hover {
   flex-shrink: 0;
   margin-top: 6px;
 }
+
+/* ---------- Accessibility: Focus Visible ---------- */
+:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+}
+
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+a:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px rgba(15, 107, 74, 0.15);
+}

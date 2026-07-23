@@ -14,6 +14,7 @@ export const SUPABASE_ANON_KEY =
 // Flutterwave PUBLIC key only (safe for the browser) — from Flutterwave
 // Dashboard > Settings > API. Never put your SECRET key here; it belongs
 // only in the edge functions' environment (see uganda-pos-fn-*.ts).
+// TODO: Replace with your actual Flutterwave public key
 export const FLW_PUBLIC_KEY = "FLWPUBK-YOUR-PUBLIC-KEY-X";
 
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
@@ -53,7 +54,6 @@ export const STATE = {
 // 3. DOM / UI UTILITIES
 // ---------------------------------------------------------------------
 export const $ = (id) => document.getElementById(id);
-export const qs = (sel, root = document) => root.querySelector(sel);
 export const qsa = (sel, root = document) =>
   Array.from(root.querySelectorAll(sel));
 
@@ -71,14 +71,6 @@ export function uid() {
   return crypto.randomUUID
     ? crypto.randomUUID()
     : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-}
-
-export function debounce(fn, ms = 300) {
-  let t;
-  return (...args) => {
-    clearTimeout(t);
-    t = setTimeout(() => fn(...args), ms);
-  };
 }
 
 export function toast(message, type = "default", ms = 3200) {

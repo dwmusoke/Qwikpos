@@ -138,7 +138,12 @@ function renderProductTable() {
       const low = stock <= Number(p.reorder_level || 0);
       return `
       <tr>
-        <td><b>${escapeHtml(p.name)}</b><br/><span class="text-muted" style="font-size:11.5px;">SKU: ${escapeHtml(p.sku || "—")} · Barcode: ${escapeHtml(p.barcode || "—")}</span></td>
+        <td>
+          <div style="display:flex;align-items:center;gap:10px">
+            ${p.image_url ? `<img src="${escapeHtml(p.image_url)}" alt="" style="width:36px;height:36px;border-radius:6px;object-fit:cover" />` : `<div style="width:36px;height:36px;border-radius:6px;background:var(--surface-2);display:flex;align-items:center;justify-content:center;font-size:16px">📦</div>`}
+            <div><b>${escapeHtml(p.name)}</b><br/><span class="text-muted" style="font-size:11.5px;">SKU: ${escapeHtml(p.sku || "—")} · Barcode: ${escapeHtml(p.barcode || "—")}</span></div>
+          </div>
+        </td>
         <td>${escapeHtml(cat?.name || "—")}</td>
         <td>${fmtMoney(p.cost_price)}</td>
         <td>${fmtMoney(p.selling_price)}</td>
@@ -225,6 +230,16 @@ function openProductModal(productId) {
       <div class="field"><label>Expiry Date</label><input type="date" id="pf-expiry" value="${p.expiry_date || ""}" /></div>
     </div>
     <div class="field"><label>Initial Stock (this branch)</label><input type="number" step="1" id="pf-stock" value="${editing ? "" : "0"}" ${editing ? "disabled" : ""} placeholder="${editing ? "Use Stock button to adjust" : "0"}" /></div>
+    <div class="field">
+      <label>Product Image</label>
+      <div class="product-image-upload" id="pf-image-wrap">
+        <div class="product-image-preview" id="pf-image-preview">
+          ${p.image_url ? `<img src="${escapeHtml(p.image_url)}" alt="Product" />` : `<span class="product-image-placeholder">📷<br>Click to upload</span>`}
+        </div>
+        <input type="file" id="pf-image-file" accept="image/*" style="display:none" />
+        <p class="help-text">JPG, PNG or WebP. Max 2MB. Recommended: 400×400px</p>
+      </div>
+    </div>
     ${
       STATE.business.efris_live_enabled
         ? `
@@ -241,6 +256,27 @@ function openProductModal(productId) {
   `,
     {
       onMount: () => {
+        // Image upload preview
+        let pendingImageFile = null;
+        const preview = $("pf-image-preview");
+        const fileInput = $("pf-image-file");
+
+        preview?.addEventListener("click", () => fileInput?.click());
+        fileInput?.addEventListener("change", (e) => {
+          const file = e.target.files[0];
+          if (!file) return;
+          if (file.size > 2 * 1024 * 1024) {
+            toast("Image must be under 2MB", "error");
+            return;
+          }
+          pendingImageFile = file;
+          const reader = new FileReader();
+          reader.onload = (ev) => {
+            preview.innerHTML = `<img src="${ev.target.result}" alt="Preview" />`;
+          };
+          reader.readAsDataURL(file);
+        });
+
         $("save-product-btn").addEventListener("click", async () => {
           const name = $("pf-name").value.trim();
           const price = parseFloat($("pf-price").value);
@@ -286,6 +322,24 @@ function openProductModal(productId) {
           if (error) {
             toast("Save failed: " + error.message, "error");
             return;
+          }
+
+          // Upload image if selected
+          if (pendingImageFile && saved) {
+            const ext = pendingImageFile.name.split(".").pop() || "jpg";
+            const path = `${STATE.business.id}/${saved.id}.${ext}`;
+            const { error: uploadErr } = await supabase.storage
+              .from("product-images")
+              .upload(path, pendingImageFile, { upsert: true });
+            if (!uploadErr) {
+              const { data: urlData } = supabase.storage
+                .from("product-images")
+                .getPublicUrl(path);
+              await supabase
+                .from("products")
+                .update({ image_url: urlData.publicUrl })
+                .eq("id", saved.id);
+            }
           }
 
           // Set initial stock for new products

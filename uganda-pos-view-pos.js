@@ -186,7 +186,7 @@ function renderProductGrid() {
       const low = stock <= Number(p.reorder_level || 0);
       return `
       <button class="product-card" data-id="${p.id}">
-        <div class="product-emoji">${escapeHtml(categoryIcon(p.category_id))}</div>
+        ${p.image_url ? `<div class="product-card-img"><img src="${escapeHtml(p.image_url)}" alt="" /></div>` : `<div class="product-emoji">${escapeHtml(categoryIcon(p.category_id))}</div>`}
         <div class="pname">${escapeHtml(p.name)}</div>
         <div class="pprice">${fmtMoneyRaw(fromBase(p.selling_price, posSaleCurrency), posSaleCurrency)}</div>
         <div class="pstock ${low ? "low" : ""}">${stock} ${escapeHtml(p.unit || "pc")} in stock</div>
