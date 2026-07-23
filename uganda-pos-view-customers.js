@@ -197,3 +197,4 @@ async function openStatementModal(customerId) {
       printHtml(stmtHtml, `Statement — ${c.name}`);
     });
   }
+}
