@@ -266,7 +266,14 @@ async function openProductModal(productId) {
           const ext = pendingImageFile.name.split('.').pop() || 'jpg';
           const path = `${STATE.business.id}/${saved.id}.${ext}`;
           const { error: uploadErr } = await supabase.storage.from('product-images').upload(path, pendingImageFile, { upsert: true });
-          if (!uploadErr) {
+          if (uploadErr?.message?.includes("Bucket not found")) {
+            await supabase.storage.createBucket("product-images", { public: true });
+            const retry = await supabase.storage.from('product-images').upload(path, pendingImageFile, { upsert: true });
+            if (!retry.error) {
+              const { data: urlData } = supabase.storage.from('product-images').getPublicUrl(path);
+              await supabase.from('products').update({ image_url: urlData.publicUrl }).eq('id', saved.id);
+            }
+          } else if (!uploadErr) {
             const { data: urlData } = supabase.storage.from('product-images').getPublicUrl(path);
             await supabase.from('products').update({ image_url: urlData.publicUrl }).eq('id', saved.id);
           }
@@ -277,7 +284,7 @@ async function openProductModal(productId) {
           const initStock = parseFloat($('pf-stock').value) || 0;
           if (initStock > 0) {
             await supabase.from('product_stock').upsert({ product_id: saved.id, branch_id: STATE.branch.id, quantity: initStock });
-            await supabase.from('stock_movements').insert({ business_id: STATE.business.id, branch_id: STATE.branch.id, product_id: saved.id, type: 'in', quantity: initStock, note: 'Initial stock' });
+            await supabase.from('stock_movements').insert({ business_id: STATE.business.id, branch_id: STATE.branch.id, product_id: saved.id, type: 'in', quantity: initStock, notes: 'Initial stock' });
           }
         }
 
@@ -759,8 +766,11 @@ function openStockModal(productId) {
       else if (type === 'out' || type === 'damaged') newQty = Math.max(0, stock - qty);
       else newQty = qty;
 
-      await supabase.from('product_stock').upsert({ product_id: productId, branch_id: STATE.branch.id, quantity: newQty });
-      await supabase.from('stock_movements').insert({ business_id: STATE.business.id, branch_id: STATE.branch.id, product_id: productId, type, quantity: qty, note: note || null });
+      if (!STATE.branch?.id) { toast('No branch selected. Ensure your account has a business.', 'error'); return; }
+      const { error: upsertErr } = await supabase.from('product_stock').upsert({ product_id: productId, branch_id: STATE.branch.id, quantity: newQty });
+      if (upsertErr) { toast('Stock error: ' + upsertErr.message, 'error'); return; }
+      const { error: movErr } = await supabase.from('stock_movements').insert({ business_id: STATE.business.id, branch_id: STATE.branch.id, product_id: productId, type, quantity: qty, notes: note || null });
+      if (movErr) { toast('Movement error: ' + movErr.message, 'error'); return; }
       STATE.stockByProduct[productId] = newQty;
       toast('Stock updated', 'success'); closeModal(); renderTab();
     });
