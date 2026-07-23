@@ -2,7 +2,7 @@
   "name": "Qwickpos — EFRIS Ready",
   "short_name": "Qwickpos",
   "description": "Modern multi-currency point of sale with EFRIS (URA) e-invoicing readiness for Ugandan businesses.",
-  "start_url": "/",
+  "start_url": "/app.html",
   "scope": "/",
   "display": "standalone",
   "orientation": "any",

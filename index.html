@@ -2,578 +2,148 @@
 <html lang="en" data-theme="light">
   <head>
     <meta charset="UTF-8" />
-    <meta
-      name="viewport"
-      content="width=device-width, initial-scale=1, viewport-fit=cover"
-    />
-    <title>Qwickpos — EFRIS Ready</title>
-    <meta
-      name="description"
-      content="Modern multi-currency point of sale with EFRIS e-invoicing readiness for Ugandan businesses."
-    />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Qwickpos — Modern POS & ERP for Uganda</title>
+    <meta name="description" content="All-in-one point of sale, inventory, accounting, HRM, and EFRIS e-invoicing for Ugandan businesses. Start your 14-day free trial." />
     <meta name="theme-color" content="#0f6b4a" />
-    <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
-      rel="stylesheet"
-    />
-    <!-- Open Graph / Social Media -->
-    <meta property="og:type" content="website" />
-    <meta property="og:url" content="https://qwickpos.netlify.app/" />
-    <meta property="og:title" content="Qwickpos — Modern POS for Uganda" />
-    <meta
-      property="og:description"
-      content="Multi-currency point of sale with EFRIS e-invoicing readiness for Ugandan businesses. Manage sales, inventory, customers, and suppliers with ease."
-    />
-    <meta
-      property="og:image"
-      content="https://qwickpos.netlify.app/uganda-pos-icon.svg"
-    />
-    <meta property="og:site_name" content="Qwickpos" />
-    <!-- Twitter Card -->
-    <meta name="twitter:card" content="summary" />
-    <meta name="twitter:title" content="Qwickpos — Modern POS for Uganda" />
-    <meta
-      name="twitter:description"
-      content="Multi-currency point of sale with EFRIS e-invoicing readiness for Ugandan businesses."
-    />
-    <meta
-      name="twitter:image"
-      content="https://qwickpos.netlify.app/uganda-pos-icon.svg"
-    />
-    <link rel="manifest" href="./uganda-pos-manifest.json" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
     <link rel="icon" href="./uganda-pos-icon.svg" type="image/svg+xml" />
-    <link rel="apple-touch-icon" href="./uganda-pos-icon.svg" />
     <link rel="stylesheet" href="./uganda-pos-styles.css" />
   </head>
   <body>
-    <!-- ===================== SPLASH SCREEN ===================== -->
-    <div id="splash-screen" class="splash-screen">
-      <div class="splash-content">
-        <img src="./uganda-pos-icon.svg" alt="Qwickpos" class="splash-logo" />
-        <div class="splash-name">Qwickpos</div>
-        <div class="splash-spinner"></div>
-        <div class="splash-tag">EFRIS-Ready POS for Uganda</div>
+    <!-- ===================== NAVBAR ===================== -->
+    <nav class="landing-nav">
+      <a href="./" class="landing-nav-brand">
+        <img src="./uganda-pos-icon.svg" alt="Qwickpos" />
+        <span>Qwickpos</span>
+      </a>
+      <div class="landing-nav-links">
+        <a href="#features">Features</a>
+        <a href="#pricing">Pricing</a>
+        <a href="./app.html#login">Sign In</a>
+        <a href="./app.html#signup" class="btn btn-primary btn-sm">Free Trial</a>
       </div>
-    </div>
+    </nav>
 
-    <!-- ===================== LOGIN SCREEN ===================== -->
-    <div id="login-screen" class="login-wrap">
-      <div class="login-card">
-        <div class="flag-strip"></div>
-        <div class="login-logo">
-          <img src="./uganda-pos-icon.svg" alt="Qwickpos" />
-          <h1>Qwickpos</h1>
-          <p>
-            Modern multi-currency point of sale, EFRIS-ready for URA
-            e-invoicing.
-          </p>
+    <!-- ===================== HERO ===================== -->
+    <section class="landing-hero">
+      <div class="landing-hero-content">
+        <img src="./uganda-pos-icon.svg" alt="Qwickpos" />
+        <h1>Run your entire business<br>on <span class="accent">Qwickpos</span></h1>
+        <p>Modern multi-currency point of sale with EFRIS e-invoicing, inventory management, accounting, HRM, and more — built for Ugandan businesses.</p>
+        <div class="landing-cta-row">
+          <a href="./app.html#signup" class="btn btn-primary">Start 14-Day Free Trial</a>
+          <a href="./app.html#login" class="btn btn-outline" style="color:#fff;border-color:rgba(255,255,255,0.3);">Sign In</a>
         </div>
-
-        <form id="login-form">
-          <div class="field">
-            <label for="login-email">Email</label>
-            <input
-              id="login-email"
-              type="email"
-              autocomplete="username"
-              required
-              placeholder="you@business.com"
-            />
-          </div>
-          <div class="field">
-            <label for="login-password">Password</label>
-            <input
-              id="login-password"
-              type="password"
-              autocomplete="current-password"
-              required
-              placeholder="••••••••"
-            />
-          </div>
-          <button
-            class="btn btn-primary btn-block"
-            type="submit"
-            id="login-submit"
-          >
-            Sign In
-          </button>
-          <p
-            id="login-error"
-            class="help-text"
-            style="color: var(--danger); display: none; margin-top: 10px"
-          ></p>
-        </form>
-
-        <p class="help-text" style="text-align: center; margin-top: 10px">
-          <a href="#" id="show-forgot-link" style="color: var(--primary)"
-            >Forgot password?</a
-          >
-        </p>
-
-        <p class="help-text" style="text-align: center; margin-top: 16px">
-          New business?
-          <a href="#" id="show-signup-link">Start your 14-day free trial</a>
-        </p>
-      </div>
-    </div>
-
-    <!-- ===================== SIGNUP SCREEN ===================== -->
-    <div id="signup-screen" class="login-wrap hidden">
-      <div class="login-card" style="max-width: 680px">
-        <div class="flag-strip"></div>
-        <div class="login-logo">
-          <img src="./uganda-pos-icon.svg" alt="Qwickpos" />
-          <h1>Start your free trial</h1>
-          <p>
-            14 days free. Then pay monthly with Flutterwave — mobile money, card
-            or bank.
-          </p>
-        </div>
-
-        <div id="signup-plans" class="grid-3"></div>
-
-        <form id="signup-form" class="hidden">
-          <input type="hidden" id="signup-plan-code" value="starter" />
-          <div class="field">
-            <label for="signup-business-name">Business Name</label
-            ><input id="signup-business-name" required />
-          </div>
-          <div class="field-row">
-            <div class="field">
-              <label for="signup-full-name">Your Full Name</label
-              ><input id="signup-full-name" required />
-            </div>
-            <div class="field">
-              <label for="signup-phone">Phone</label
-              ><input id="signup-phone" placeholder="+2567xxxxxxxx" />
-            </div>
-          </div>
-          <div class="field-row">
-            <div class="field">
-              <label for="signup-email">Email</label
-              ><input id="signup-email" type="email" required />
-            </div>
-            <div class="field">
-              <label for="signup-password">Password</label
-              ><input
-                id="signup-password"
-                type="password"
-                required
-                minlength="8"
-                placeholder="At least 8 characters with a letter and number"
-              />
-            </div>
-          </div>
-          <div class="field">
-            <label for="signup-currency">Base Currency</label>
-            <select id="signup-currency">
-              <option value="UGX">UGX — Uganda Shilling</option>
-              <option value="USD">USD — US Dollar</option>
-              <option value="KES">KES — Kenyan Shilling</option>
-            </select>
-          </div>
-          <button
-            class="btn btn-outline btn-block"
-            type="button"
-            id="signup-back-btn"
-            style="margin-bottom: 8px"
-          >
-            &larr; Change Plan
-          </button>
-          <button
-            class="btn btn-primary btn-block"
-            type="submit"
-            id="signup-submit"
-          >
-            Start 14-Day Free Trial
-          </button>
-          <p
-            id="signup-error"
-            class="help-text"
-            style="color: var(--danger); display: none; margin-top: 10px"
-          ></p>
-        </form>
-
-        <p class="help-text" style="text-align: center; margin-top: 16px">
-          Already have an account? <a href="#" id="show-login-link">Sign in</a>
-        </p>
-      </div>
-    </div>
-
-    <!-- ===================== RESET PASSWORD SCREEN ===================== -->
-    <div id="reset-screen" class="login-wrap hidden">
-      <div class="login-card">
-        <div class="flag-strip"></div>
-        <div class="login-logo">
-          <img src="./uganda-pos-icon.svg" alt="Qwickpos" />
-          <h1>Reset Password</h1>
-          <p>Enter your email and we'll send you a reset link.</p>
-        </div>
-
-        <form id="reset-form">
-          <div class="field">
-            <label for="reset-email">Email</label>
-            <input
-              id="reset-email"
-              type="email"
-              autocomplete="email"
-              required
-              placeholder="you@business.com"
-            />
-          </div>
-          <button
-            class="btn btn-primary btn-block"
-            type="submit"
-            id="reset-submit"
-          >
-            Send Reset Link
-          </button>
-          <p
-            id="reset-error"
-            class="help-text"
-            style="color: var(--danger); display: none; margin-top: 10px"
-          ></p>
-          <p
-            id="reset-success"
-            class="help-text"
-            style="color: var(--success); display: none; margin-top: 10px"
-          ></p>
-        </form>
-
-        <p class="help-text" style="text-align: center; margin-top: 16px">
-          <a href="#" id="show-login-from-reset" style="color: var(--primary)"
-            >← Back to Sign In</a
-          >
-        </p>
-      </div>
-    </div>
-
-    <!-- ===================== CREATE BUSINESS SCREEN ===================== -->
-    <div id="create-business-screen" class="login-wrap hidden">
-      <div class="login-card" style="max-width: 520px">
-        <div class="flag-strip"></div>
-        <div class="login-logo">
-          <img src="./uganda-pos-icon.svg" alt="Qwickpos" />
-          <h1>Welcome to Qwickpos</h1>
-          <p>Create your business to start your 14-day free trial.</p>
-        </div>
-
-        <form id="create-business-form">
-          <div class="field">
-            <label for="cb-business-name">Business Name</label>
-            <input
-              id="cb-business-name"
-              type="text"
-              required
-              placeholder="e.g. John's Supermarket"
-              autocomplete="organization"
-            />
-          </div>
-          <div class="field">
-            <label for="cb-full-name">Your Full Name</label>
-            <input
-              id="cb-full-name"
-              type="text"
-              required
-              placeholder="e.g. John Musoke"
-              autocomplete="name"
-            />
-          </div>
-          <div class="field">
-            <label for="cb-phone">Phone (optional)</label>
-            <input
-              id="cb-phone"
-              type="tel"
-              placeholder="+256 7xx xxx xxx"
-              autocomplete="tel"
-            />
-          </div>
-          <div class="field">
-            <label for="cb-currency">Base Currency</label>
-            <select id="cb-currency">
-              <option value="UGX">UGX — Uganda Shilling</option>
-              <option value="USD">USD — US Dollar</option>
-              <option value="KES">KES — Kenyan Shilling</option>
-            </select>
-          </div>
-          <button
-            class="btn btn-primary btn-block"
-            type="submit"
-            id="cb-submit"
-          >
-            Create Business & Start Trial
-          </button>
-          <p
-            id="cb-error"
-            class="help-text"
-            style="color: var(--danger); display: none; margin-top: 10px"
-          ></p>
-        </form>
-      </div>
-    </div>
-
-    <!-- ===================== APP SHELL ===================== -->
-    <div id="app-shell" class="app-shell hidden">
-      <div class="impersonate-banner hidden" id="impersonate-banner">
-        <span>👁 Impersonating: <span id="impersonate-name"></span></span>
-        <button id="impersonate-stop">Exit Impersonation</button>
-      </div>
-      <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
-
-      <aside class="sidebar" id="sidebar">
-        <div class="brand-row">
-          <img src="./uganda-pos-icon.svg" alt="logo" />
-          <div>
-            <div class="brand-name" id="sidebar-business-name">Qwickpos</div>
-            <div class="brand-sub" id="sidebar-branch-name">Main Branch</div>
-          </div>
-        </div>
-
-        <div class="nav-group-label">Operations</div>
-        <button class="nav-link" data-route="dashboard">
-          <span class="icon">📊</span>
-          <span data-i18n="nav.dashboard">Dashboard</span>
-        </button>
-        <button class="nav-link" data-route="pos">
-          <span class="icon">🧾</span>
-          <span data-i18n="nav.pos">Sell (POS)</span>
-        </button>
-        <button class="nav-link" data-route="quotations">
-          <span class="icon">📄</span>
-          <span data-i18n="nav.quotations">Quotations</span>
-        </button>
-        <button class="nav-link" data-route="products">
-          <span class="icon">🏷️</span>
-          <span data-i18n="nav.products">Products</span>
-        </button>
-        <button class="nav-link" data-route="inventory">
-          <span class="icon">📦</span>
-          <span data-i18n="nav.inventory">Inventory</span>
-          <span class="nav-badge hidden" id="low-stock-badge">0</span>
-        </button>
-        <button class="nav-link" data-route="sales">
-          <span class="icon">💰</span> <span data-i18n="nav.sales">Sales</span>
-        </button>
-        <button class="nav-link" data-route="orders">
-          <span class="icon">📦</span> Orders
-        </button>
-        <button class="nav-link" data-route="purchases">
-          <span class="icon">🛒</span>
-          <span data-i18n="nav.purchases">Purchases</span>
-        </button>
-        <button class="nav-link" data-route="customers">
-          <span class="icon">👥</span>
-          <span data-i18n="nav.customers">Customers</span>
-        </button>
-        <button class="nav-link" data-route="suppliers">
-          <span class="icon">🚚</span>
-          <span data-i18n="nav.suppliers">Suppliers</span>
-        </button>
-        <button class="nav-link" data-route="coupons">
-          <span class="icon">🎟️</span> Coupons
-        </button>
-
-        <div class="nav-group-label">Team &amp; Communication</div>
-        <button class="nav-link" data-route="chat">
-          <span class="icon">💬</span> <span data-i18n="nav.chat">Chat</span>
-          <span class="nav-badge hidden" id="chat-badge">0</span>
-        </button>
-        <button class="nav-link" data-route="notifications">
-          <span class="icon">🔔</span>
-          <span data-i18n="nav.notifications">Notifications</span>
-          <span class="nav-badge hidden" id="notif-sidebar-badge">0</span>
-        </button>
-        <button class="nav-link" data-route="notifications_center">
-          <span class="icon">✉️</span>
-          <span data-i18n="nav.email_sms">Email &amp; SMS</span>
-        </button>
-
-        <div class="nav-group-label">Sales &amp; CRM</div>
-        <button class="nav-link" data-route="leads">
-          <span class="icon">💼</span>
-          <span data-i18n="nav.leads">Lead Management</span>
-        </button>
-        <button class="nav-link" data-route="deliveries">
-          <span class="icon">🚚</span>
-          <span data-i18n="nav.deliveries">Deliveries</span>
-        </button>
-
-        <div class="nav-group-label">People</div>
-        <button class="nav-link" data-route="hrm">
-          <span class="icon">👥</span> <span data-i18n="nav.hrm">HRM</span>
-        </button>
-
-        <div class="nav-group-label">Compliance &amp; Insights</div>
-        <button class="nav-link" data-route="audit">
-          <span class="icon">📋</span>
-          <span data-i18n="nav.audit">Audit Logs</span>
-        </button>
-        <button class="nav-link" data-route="efris">
-          <span class="icon">🏛️</span> <span data-i18n="nav.efris">EFRIS</span>
-          <span class="nav-badge hidden" id="efris-badge">0</span>
-        </button>
-        <button class="nav-link" data-route="reports">
-          <span class="icon">📈</span>
-          <span data-i18n="nav.reports">Reports</span>
-        </button>
-        <button class="nav-link" data-route="accounting">
-          <span class="icon">🧮</span>
-          <span data-i18n="nav.accounting">Accounting</span>
-        </button>
-        <button
-          class="nav-link"
-          data-route="settings"
-          data-role="admin,manager"
-        >
-          <span class="icon">⚙️</span>
-          <span data-i18n="nav.settings">Settings</span>
-        </button>
-        <button class="nav-link" data-route="templates">
-          <span class="icon">🧾</span> Templates
-        </button>
-        <button class="nav-link" data-route="backup">
-          <span class="icon">💾</span> Backup
-        </button>
-        <button class="nav-link" data-route="billing" data-role="admin">
-          <span class="icon">💳</span>
-          <span data-i18n="nav.billing">Billing</span>
-        </button>
-        <button class="nav-link" data-route="profile">
-          <span class="icon">👤</span> My Profile
-        </button>
-        <button class="nav-link" data-route="admin" data-superadmin="true">
-          <span class="icon">🛠️</span>
-          <span data-i18n="nav.admin">Platform Admin</span>
-        </button>
-
-        <div class="sidebar-footer">
-          <div class="offline-pill" id="trial-pill"></div>
-          <div class="offline-pill" id="offline-pill">
-            <span class="dot"></span> Offline — sales will sync
-          </div>
-          <button class="btn btn-outline btn-block btn-sm" id="logout-btn">
-            Log out
-          </button>
-        </div>
-      </aside>
-
-      <div class="main">
-        <header class="topbar">
-          <button class="menu-btn" id="menu-btn">☰</button>
-          <h1 id="page-title">Dashboard</h1>
-          <div class="spacer"></div>
-          <select
-            id="currency-picker"
-            class="hidden"
-            title="Display currency"
-            style="
-              border-radius: 999px;
-              border: 1px solid var(--border);
-              padding: 6px 10px;
-              background: var(--surface);
-            "
-          ></select>
-          <select
-            id="lang-picker"
-            title="Language"
-            style="
-              border-radius: 999px;
-              border: 1px solid var(--border);
-              padding: 6px 10px;
-              background: var(--surface);
-              font-size: 13px;
-            "
-          >
-            <option value="en">EN</option>
-            <option value="lg">LG</option>
-          </select>
-          <div class="notif-wrapper" id="notif-wrapper">
-            <button class="icon-btn" id="notif-bell" title="Notifications">
-              🔔
-              <span class="notif-badge hidden" id="notif-badge">0</span>
-            </button>
-            <div class="notif-dropdown hidden" id="notif-dropdown">
-              <div class="notif-header">
-                <span>Notifications</span>
-                <button class="btn btn-sm btn-outline" id="notif-mark-all">
-                  Mark all read
-                </button>
-              </div>
-              <div class="notif-list" id="notif-list">
-                <div class="empty-state" style="padding: 24px">
-                  No notifications yet
-                </div>
-              </div>
-            </div>
-          </div>
-          <button class="icon-btn" id="theme-toggle" title="Toggle theme">
-            🌙
-          </button>
-          <button class="user-chip" id="user-chip">
-            <span class="avatar" id="user-avatar">U</span>
-            <span>
-              <div id="user-name" style="font-size: 12.5px; font-weight: 600">
-                User
-              </div>
-              <div class="role" id="user-role">cashier</div>
-            </span>
-          </button>
-        </header>
-
-        <div class="view" id="view-root">
-          <!-- rendered by app.js -->
+        <div style="margin-top:28px;display:flex;gap:24px;justify-content:center;flex-wrap:wrap;color:rgba(255,255,255,0.5);font-size:13px;">
+          <span>✅ No credit card required</span>
+          <span>✅ EFRIS-ready</span>
+          <span>✅ Works offline</span>
         </div>
       </div>
-    </div>
+    </section>
 
-    <!-- ===================== MODAL / TOAST ROOTS ===================== -->
-    <div id="modal-root"></div>
-    <div class="toast-stack" id="toast-stack"></div>
+    <!-- ===================== FEATURES ===================== -->
+    <section class="landing-features" id="features">
+      <h2>Everything you need to run your business</h2>
+      <div class="landing-feature-grid">
+        <div class="landing-feature">
+          <div class="lf-icon" style="background:var(--brand-light);color:var(--brand);">🧾</div>
+          <h3>Point of Sale</h3>
+          <p>Fast, touch-friendly checkout with multi-currency support, barcode scanning, and offline mode.</p>
+        </div>
+        <div class="landing-feature">
+          <div class="lf-icon" style="background:#dbeafe;color:#2563eb;">📦</div>
+          <h3>Inventory Management</h3>
+          <p>Real-time stock tracking, variants, transfers, stock counts, purchase orders, and low-stock alerts.</p>
+        </div>
+        <div class="landing-feature">
+          <div class="lf-icon" style="background:#f3e8ff;color:#9333ea;">🏛️</div>
+          <h3>EFRIS E-Invoicing</h3>
+          <p>URA-compliant e-invoicing with automatic fiscal invoice generation and submission.</p>
+        </div>
+        <div class="landing-feature">
+          <div class="lf-icon" style="background:#ccfbf1;color:#0d9488;">🧮</div>
+          <h3>Accounting</h3>
+          <p>General ledger, journal entries, trial balance, P&L, and balance sheet with CSV exports.</p>
+        </div>
+        <div class="landing-feature">
+          <div class="lf-icon" style="background:#ffedd5;color:#ea580c;">👥</div>
+          <h3>HRM & Payroll</h3>
+          <p>Employee management, departments, attendance tracking, leave management, and payroll.</p>
+        </div>
+        <div class="landing-feature">
+          <div class="lf-icon" style="background:#fee2e2;color:#dc2626;">📈</div>
+          <h3>Reports & Analytics</h3>
+          <p>Sales, purchases, tax, and expense reports with dashboard KPIs and data visualizations.</p>
+        </div>
+        <div class="landing-feature">
+          <div class="lf-icon" style="background:#e0e7ff;color:#4f46e5;">💬</div>
+          <h3>Team Chat & Notifications</h3>
+          <p>Built-in team messaging, real-time notifications, and push notification support.</p>
+        </div>
+        <div class="landing-feature">
+          <div class="lf-icon" style="background:#dcfce7;color:#16a34a;">💳</div>
+          <h3>Subscriptions & Billing</h3>
+          <p>Multi-vendor SaaS with Flutterwave payments, 14-day trials, and tiered pricing plans.</p>
+        </div>
+        <div class="landing-feature">
+          <div class="lf-icon" style="background:#fff7ed;color:#b8860b;">🔌</div>
+          <h3>Offline Mode</h3>
+          <p>Keep selling even without internet. Sales automatically sync when you reconnect.</p>
+        </div>
+      </div>
+    </section>
 
-    <!-- Inline guard: prevents native form submit + catches module errors -->
-    <script>
-      (function () {
-        "use strict";
-        var loaded = false;
-        window.addEventListener("error", function (e) {
-          if (loaded) return;
-          var el = document.getElementById("login-error");
-          if (el) {
-            el.innerHTML =
-              "<b>App failed to load:</b><br>" +
-              (e.message || "Unknown error") +
-              (e.filename
-                ? "<br><small>in " + e.filename.split("/").pop() + ":" + e.lineno + "</small>"
-                : "");
-            el.style.display = "block";
-          }
-          console.error("FATAL:", e.message, e.filename, e.lineno);
-        });
-        window.addEventListener("unhandledrejection", function (e) {
-          console.error("Unhandled rejection:", e.reason);
-        });
-        document.addEventListener("DOMContentLoaded", function () {
-          var form = document.getElementById("login-form");
-          if (form)
-            form.addEventListener("submit", function (e) {
-              if (!loaded) {
-                e.preventDefault();
-                var el = document.getElementById("login-error");
-                if (el && !el.textContent) {
-                  el.innerHTML =
-                    "<b>App still loading or failed to load.</b><br>" +
-                    "If this persists, press <b>Ctrl+Shift+R</b> to hard refresh, or clear your browser cache.";
-                  el.style.display = "block";
-                }
-              }
-            });
-        });
-        window.__qwickposReady = function () { loaded = true; };
-      })();
-    </script>
-    <script type="module" src="./uganda-pos-app.js"></script>
+    <!-- ===================== PRICING ===================== -->
+    <section class="landing-pricing" id="pricing">
+      <h2>Simple, transparent pricing</h2>
+      <div class="landing-pricing-grid">
+        <div class="landing-pricing-card">
+          <div class="plan-name">Starter</div>
+          <div class="plan-price">60,000<small> UGX/mo</small></div>
+          <ul class="plan-features">
+            <li>✅ 1 branch</li>
+            <li>✅ 3 users</li>
+            <li>✅ POS & inventory</li>
+            <li>❌ Multi-currency</li>
+            <li>❌ EFRIS e-invoicing</li>
+          </ul>
+          <a href="./app.html#signup" class="btn btn-outline btn-block">Start Free Trial</a>
+        </div>
+        <div class="landing-pricing-card featured">
+          <div class="plan-name">Growth</div>
+          <div class="plan-price">150,000<small> UGX/mo</small></div>
+          <ul class="plan-features">
+            <li>✅ 2 branches</li>
+            <li>✅ 8 users</li>
+            <li>✅ Multi-currency</li>
+            <li>✅ EFRIS e-invoicing</li>
+            <li>✅ Reports & accounting</li>
+          </ul>
+          <a href="./app.html#signup" class="btn btn-primary btn-block">Start Free Trial</a>
+        </div>
+        <div class="landing-pricing-card">
+          <div class="plan-name">Pro</div>
+          <div class="plan-price">300,000<small> UGX/mo</small></div>
+          <ul class="plan-features">
+            <li>✅ Unlimited branches</li>
+            <li>✅ Unlimited users</li>
+            <li>✅ All features included</li>
+            <li>✅ Priority support</li>
+            <li>✅ Everything in Growth</li>
+          </ul>
+          <a href="./app.html#signup" class="btn btn-outline btn-block">Start Free Trial</a>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================== FOOTER ===================== -->
+    <footer class="landing-footer">
+      <p>&copy; 2026 Qwickpos. Built for Ugandan businesses.</p>
+      <p style="margin-top:8px;"><a href="./app.html#login" style="color:var(--brand);font-weight:600;">Sign in to your account →</a></p>
+    </footer>
   </body>
 </html>
