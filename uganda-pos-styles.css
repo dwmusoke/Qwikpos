@@ -1855,8 +1855,9 @@ a:focus-visible {
   border-color: var(--text);
   box-shadow: var(--shadow-md);
 }
-.theme-color-swatch.active::after {
-  content: "\2713";
+.theme-color-swatch.active {
+  border-color: var(--text);
+  box-shadow: var(--shadow-md);
 }
 
 /* =====================================================================

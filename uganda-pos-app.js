@@ -24,6 +24,7 @@ import {
   flushOfflineQueue,
   loadBootstrapData,
   isSubscriptionActive,
+  applyTheme,
 } from "./uganda-pos-core.js";
 import { renderNotifications } from "./uganda-pos-view-notifications.js";
 import { renderAuditLogs } from "./uganda-pos-view-audit.js";
@@ -639,6 +640,7 @@ async function boot() {
   $("login-screen").classList.add("hidden");
   $("signup-screen").classList.add("hidden");
   $("app-shell").classList.remove("hidden");
+  try { applyTheme(); } catch (e) { console.error("applyTheme:", e); }
   try {
     wireShell();
   } catch (e) {

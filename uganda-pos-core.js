@@ -342,6 +342,28 @@ export async function loadSubscription() {
 
 // True while the business can use the app: still inside its trial window,
 // or has an active paid period that hasn't lapsed yet.
+export function applyTheme() {
+  const color = STATE.business?.theme_color || "#0f6b4a";
+  const root = document.documentElement;
+  root.style.setProperty("--brand", color);
+  root.style.setProperty("--brand-dark", shadeColor(color, -20));
+  root.style.setProperty("--brand-darker", shadeColor(color, -35));
+  root.style.setProperty("--brand-light", color + "18");
+  root.style.setProperty("--brand-lighter", color + "0a");
+  root.style.setProperty("--brand-glow", color + "1e");
+  const fontSize = STATE.business?.theme_font_size || "15px";
+  root.style.fontSize = fontSize;
+}
+
+function shadeColor(col, pct) {
+  const hex = col.replace("#", "");
+  const num = parseInt(hex, 16);
+  const r = Math.max(0, Math.min(255, ((num >> 16) & 0xff) + pct));
+  const g = Math.max(0, Math.min(255, ((num >> 8) & 0xff) + pct));
+  const b = Math.max(0, Math.min(255, (num & 0xff) + pct));
+  return "#" + ((r << 16) | (g << 8) | b).toString(16).padStart(6, "0");
+}
+
 export function isSubscriptionActive() {
   if (STATE.isSuperadmin) return true;
   const sub = STATE.subscription;

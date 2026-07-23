@@ -1,7 +1,7 @@
 // =====================================================================
 // QWICKPOS — SETTINGS VIEW
 // =====================================================================
-import { supabase, STATE, $, qsa, escapeHtml, toast, hasRole } from './uganda-pos-core.js';
+import { supabase, STATE, $, qsa, escapeHtml, toast, hasRole, applyTheme } from './uganda-pos-core.js';
 
 export async function renderSettings(root) {
   const { data: users } = await supabase.from('app_users').select('*').eq('business_id', STATE.business.id);
@@ -143,6 +143,31 @@ export async function renderSettings(root) {
         the linking SQL shown in <b>uganda-pos-seed.sql</b> with their new user ID, full name and role.
       </p>
     </div>
+
+    <div class="card">
+      <div class="card-title">Appearance &amp; Theme</div>
+      <p class="help-text">Customize the look and feel of your Qwickpos dashboard. Changes apply immediately.</p>
+      <div class="field"><label>Preset Color Theme</label>
+        <div class="theme-color-grid" id="theme-presets">
+          ${["#0f6b4a","#7c3aed","#4f46e5","#0d9488","#e11d48","#ea580c","#2563eb","#0891b2"].map((c, i) => {
+            const names = ["Green","Purple","Indigo","Teal","Rose","Orange","Blue","Cyan"];
+            const active = (STATE.business.theme_color || "#0f6b4a") === c ? "active" : "";
+            return `<div class="theme-color-swatch ${active}" style="background:${c};" data-color="${c}" title="${names[i]}">${active ? "✓" : ""}</div>`;
+          }).join("")}
+        </div>
+      </div>
+      <div class="field-row">
+        <div class="field"><label>Custom Brand Color</label><input type="color" id="th-custom-color" value="${STATE.business.theme_color || "#0f6b4a"}" style="height:44px;padding:4px;cursor:pointer;" /></div>
+        <div class="field"><label>Font Size</label>
+          <select id="th-font-size">
+            <option value="14px" ${(STATE.business.theme_font_size || "15px") === "14px" ? "selected" : ""}>Small (14px)</option>
+            <option value="15px" ${(STATE.business.theme_font_size || "15px") === "15px" ? "selected" : ""}>Normal (15px)</option>
+            <option value="16px" ${(STATE.business.theme_font_size || "15px") === "16px" ? "selected" : ""}>Large (16px)</option>
+          </select>
+        </div>
+      </div>
+      <button class="btn btn-primary" id="save-theme-btn">Save Theme</button>
+    </div>
   `;
 
   $('save-profile-btn').addEventListener('click', async () => {
@@ -246,4 +271,57 @@ export async function renderSettings(root) {
     toast('Updated', 'success');
     renderSettings(root);
   }));
+
+  // Theme: preset swatches
+  qsa(".theme-color-swatch").forEach((sw) => {
+    sw.addEventListener("click", () => {
+      qsa(".theme-color-swatch").forEach((s) => { s.classList.remove("active"); s.textContent = ""; });
+      sw.classList.add("active");
+      sw.textContent = "\u2713";
+      $("th-custom-color").value = sw.dataset.color;
+      applyPreview(sw.dataset.color);
+    });
+  });
+
+  // Theme: custom color picker
+  $("th-custom-color").addEventListener("input", () => {
+    const col = $("th-custom-color").value;
+    qsa(".theme-color-swatch").forEach((s) => { s.classList.remove("active"); s.textContent = ""; });
+    applyPreview(col);
+  });
+
+  // Theme: font size
+  $("th-font-size").addEventListener("change", () => {
+    document.documentElement.style.fontSize = $("th-font-size").value;
+  });
+
+  // Theme: save
+  $("save-theme-btn").addEventListener("click", async () => {
+    const color = $("th-custom-color").value;
+    const fontSize = $("th-font-size").value;
+    const { error } = await supabase.from("businesses").update({ theme_color: color, theme_font_size: fontSize }).eq("id", STATE.business.id);
+    if (error) { toast("Failed: " + error.message, "error"); return; }
+    STATE.business.theme_color = color;
+    STATE.business.theme_font_size = fontSize;
+    applyTheme();
+    toast("Theme saved", "success");
+  });
+
+  function applyPreview(color) {
+    const root = document.documentElement;
+    root.style.setProperty("--brand", color);
+    root.style.setProperty("--brand-dark", shadeLocal(color, -20));
+    root.style.setProperty("--brand-darker", shadeLocal(color, -35));
+    root.style.setProperty("--brand-light", color + "18");
+    root.style.setProperty("--brand-lighter", color + "0a");
+    root.style.setProperty("--brand-glow", color + "1e");
+  }
+  function shadeLocal(col, pct) {
+    const hex = col.replace("#", "");
+    const num = parseInt(hex, 16);
+    const r = Math.max(0, Math.min(255, ((num >> 16) & 0xff) + pct));
+    const g = Math.max(0, Math.min(255, ((num >> 8) & 0xff) + pct));
+    const b = Math.max(0, Math.min(255, (num & 0xff) + pct));
+    return "#" + ((r << 16) | (g << 8) | b).toString(16).padStart(6, "0");
+  }
 }
