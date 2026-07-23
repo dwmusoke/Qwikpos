@@ -15,7 +15,7 @@ export const SUPABASE_ANON_KEY =
 // Dashboard > Settings > API. Never put your SECRET key here; it belongs
 // only in the edge functions' environment (see uganda-pos-fn-*.ts).
 // TODO: Replace with your actual Flutterwave public key
-export const FLW_PUBLIC_KEY = "FLWPUBK-YOUR-PUBLIC-KEY-X";
+export const FLW_PUBLIC_KEY = "FLWPUBK-c674c3734489ef0493fc36474af983a1-X";
 
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: { persistSession: true, autoRefreshToken: true },
