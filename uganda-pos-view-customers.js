@@ -14,6 +14,7 @@ import {
   refreshCustomers,
   fmtDate,
   printHtml,
+  emptyStateHtml,
 } from "./uganda-pos-core.js";
 import { logAuditAction } from "./uganda-pos-view-audit.js";
 
@@ -39,9 +40,13 @@ export async function renderCustomers(root) {
 function renderTable() {
   const tbody = $("cust-table-body");
   if (!STATE.customers.length) {
-    tbody.innerHTML = `<tr><td colspan="6"><div class="empty-state">No customers yet.</div></td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="6">
+      ${emptyStateHtml("👥", "No Customers Yet", "Add your first customer or import them from a CSV file to start tracking sales and statements.", "+ Add Customer", () => openCustomerModal())}
+      <div style="text-align:center;margin-bottom:14px;"><button class="btn btn-outline btn-sm" onclick="document.getElementById('import-customers-btn')?.click()">📥 Import from CSV</button></div>
+    </td></tr>`;
     return;
   }
+
   tbody.innerHTML = STATE.customers
     .map(
       (c) => `

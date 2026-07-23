@@ -6,6 +6,7 @@ import {
   supabase, STATE, $, qsa, escapeHtml, toast, openModal, closeModal,
   fmtMoney, refreshProducts, stockFor, sanitizeCsvValue,
   makePaginationState, paginationHtml, wirePagination,
+  emptyStateHtml,
 } from './uganda-pos-core.js';
 import { logAuditAction } from './uganda-pos-view-audit.js';
 
@@ -114,11 +115,12 @@ async function renderProductListTab(body) {
           <button class="btn btn-outline btn-sm" data-stock="${p.id}">Stock</button>
           <button class="btn btn-outline btn-sm" data-label="${p.id}">Label</button>
         </td></tr>`;
-    }).join('') : '<tr><td colspan="8"><div class="empty-state">No products found.</div></td></tr>';
+    }).join('') : `<tr><td colspan="8">${emptyStateHtml("🏷️", "No Products Yet", "Start by adding your first product, or import multiple at once from a CSV file.", "+ Add Product", () => openProductModal())}<div style="text-align:center;margin-bottom:14px;"><button class="btn btn-outline btn-sm" data-import-csv>📥 Import CSV</button></div></td></tr>`;
 
     qsa('[data-edit]', tbody).forEach((b) => b.addEventListener('click', () => openProductModal(b.dataset.edit)));
     qsa('[data-stock]', tbody).forEach((b) => b.addEventListener('click', () => openStockModal(b.dataset.stock)));
     qsa('[data-label]', tbody).forEach((b) => b.addEventListener('click', () => openSingleLabelModal(b.dataset.label)));
+    qsa('[data-import-csv]', tbody).forEach((b) => b.addEventListener('click', () => openImportModal()));
 
     let pagBar = tableWrap.querySelector('.pagination-bar');
     if (!pagBar) { pagBar = document.createElement('div'); tableWrap.after(pagBar); }

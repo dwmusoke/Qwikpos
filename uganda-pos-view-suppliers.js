@@ -14,6 +14,7 @@ import {
   fmtMoney,
   refreshSuppliers,
   fmtDate,
+  emptyStateHtml,
 } from "./uganda-pos-core.js";
 import { logAuditAction } from "./uganda-pos-view-audit.js";
 
@@ -88,7 +89,7 @@ async function renderSupTable() {
   });
 
   if (!STATE.suppliers.length) {
-    tbody.innerHTML = `<tr><td colspan="8"><div class="empty-state">No suppliers yet.</div></td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="8">${emptyStateHtml("🚚", "No Suppliers Yet", "Add your first supplier to start tracking purchase orders and supplier payments.", "+ Add Supplier", () => { document.querySelector('[data-route="suppliers"]')?.click(); setTimeout(() => openSupplierModal(), 100); })}</td></tr>`;
     return;
   }
 

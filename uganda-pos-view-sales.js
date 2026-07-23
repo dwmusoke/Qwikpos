@@ -6,7 +6,7 @@ import {
   supabase, STATE, $, qsa, escapeHtml, toast, openModal, closeModal,
   fmtMoney, fmtDate, sanitizeCsvValue, refreshProducts, stockFor,
   makePaginationState, paginationHtml, wirePagination,
-  printHtml, receiptHtml,
+  printHtml, receiptHtml, emptyStateHtml,
 } from './uganda-pos-core.js';
 
 let activeTab = 'list';
@@ -120,7 +120,7 @@ async function renderSalesListTab(body) {
                   <button class="btn btn-ghost btn-sm" data-return-sale="${s.id}" ${s.payment_status === 'credit' ? '' : ''}>Return</button>
                 </td></tr>`;
             }).join('')}
-            ${!lastSales.length ? '<tr><td colspan="9"><div class="empty-state">No sales in this range.</div></td></tr>' : ''}
+            ${!lastSales.length ? `<tr><td colspan="9">${emptyStateHtml("🧾", "No Sales Yet", "Sales will appear here once you start selling from the POS. Date range may also be too narrow.", "Go to POS →", () => { document.querySelector('[data-route="pos"]')?.click(); })}</td></tr>` : ''}
           </tbody></table>
         </div>
         ${lastSales.length ? paginationHtml(sState) : ''}

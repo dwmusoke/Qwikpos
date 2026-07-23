@@ -166,6 +166,20 @@ export function sanitizeCsvValue(v) {
   return s;
 }
 
+export function emptyStateHtml(icon, title, description, ctaLabel, ctaAction) {
+  return `<div class="empty-state" style="padding:60px 24px;">
+    <span class="big-icon" style="font-size:52px;display:block;margin-bottom:16px;">${icon}</span>
+    <h3 style="margin:0 0 8px;font-size:18px;font-weight:700;">${escapeHtml(title)}</h3>
+    <p style="margin:0 auto 20px;color:var(--text-muted);max-width:360px;line-height:1.6;">${escapeHtml(description)}</p>
+    ${ctaLabel && ctaAction ? `<button class="btn btn-primary" id="empty-cta">${ctaLabel}</button>` : ""}
+  </div>`;
+}
+
+export function wireEmptyCta(action) {
+  const btn = document.getElementById("empty-cta");
+  if (btn && action) btn.addEventListener("click", action);
+}
+
 export function printHtml(html, title = "Print") {
   const w = window.open("", "_blank");
   if (!w) { toast("Popup blocked. Allow popups to print.", "error", 4000); return; }
