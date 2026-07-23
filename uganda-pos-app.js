@@ -35,7 +35,6 @@ import { renderBilling } from "./uganda-pos-view-billing.js";
 import {
   initSignupScreen,
   finishPendingSignupIfAny,
-  initCreateBusinessScreen,
 } from "./uganda-pos-view-signup.js";
 
 // ---------------------------------------------------------------------
