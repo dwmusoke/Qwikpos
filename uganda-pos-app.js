@@ -863,19 +863,23 @@ if (landingHash === "#signup" || landingHash === "#login") {
   if (landingHash === "#signup") showSignupScreen();
   else showLoginScreen();
   window.history.replaceState(null, "", window.location.pathname);
+  const splash = document.getElementById("splash-screen");
+  if (splash) {
+    splash.classList.add("fade-out");
+    setTimeout(() => splash.remove(), 400);
+  }
 } else {
   boot().catch((err) => {
     console.error("Auto-boot failed:", err);
     showLoginScreen();
   });
+  setTimeout(() => {
+    const splash = document.getElementById("splash-screen");
+    if (splash) {
+      splash.classList.add("fade-out");
+      setTimeout(() => splash.remove(), 600);
+    }
+  }, 800);
 }
 
 window.__qwickposReady && window.__qwickposReady();
-
-setTimeout(() => {
-  const splash = document.getElementById("splash-screen");
-  if (splash) {
-    splash.classList.add("fade-out");
-    setTimeout(() => splash.remove(), 600);
-  }
-}, 1200);
