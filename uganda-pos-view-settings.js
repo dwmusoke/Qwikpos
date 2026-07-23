@@ -145,6 +145,20 @@ export async function renderSettings(root) {
     </div>
 
     <div class="card">
+      <div class="card-title">Business Logo</div>
+      <div class="field"><label>Current Logo</label>
+        <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
+          <img id="logo-preview" src="${STATE.business.logo_url || './uganda-pos-icon.svg'}" style="width:64px;height:64px;border-radius:12px;object-fit:cover;border:1px solid var(--border);" alt="logo" />
+          <button class="btn btn-outline" id="logo-remove-btn" style="${STATE.business.logo_url ? '' : 'display:none;'}">Remove</button>
+        </div>
+      </div>
+      <div class="field"><label>Upload New Logo</label><input type="file" id="logo-file-input" accept="image/png,image/jpeg,image/webp,image/svg+xml" /></div>
+      <p class="help-text">Recommended: 256x256px PNG or SVG. Max 2MB.</p>
+      <button class="btn btn-primary" id="logo-save-btn">Upload Logo</button>
+      <div id="logo-progress" style="display:none;margin-top:8px;font-size:12px;color:var(--text-muted);">Uploading…</div>
+    </div>
+
+    <div class="card">
       <div class="card-title">Appearance &amp; Theme</div>
       <p class="help-text">Customize the look and feel of your Qwickpos dashboard. Changes apply immediately.</p>
       <div class="field"><label>Preset Color Theme</label>
@@ -295,12 +309,78 @@ export async function renderSettings(root) {
     document.documentElement.style.fontSize = $("th-font-size").value;
   });
 
+  // Logo upload
+  const logoFileInput = $("logo-file-input");
+  const logoSaveBtn = $("logo-save-btn");
+  const logoProgress = $("logo-progress");
+  const logoPreview = $("logo-preview");
+  const logoRemoveBtn = $("logo-remove-btn");
+
+  logoFileInput?.addEventListener("change", () => {
+    const file = logoFileInput.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (e) => { logoPreview.src = e.target.result; };
+      reader.readAsDataURL(file);
+    }
+  });
+
+  logoSaveBtn?.addEventListener("click", async () => {
+    const file = logoFileInput.files[0];
+    if (!file) { toast("Select an image file first", "error"); return; }
+    if (file.size > 2 * 1024 * 1024) { toast("File too large. Max 2MB", "error"); return; }
+    logoProgress.style.display = "block";
+    logoProgress.textContent = "Uploading…";
+    try {
+      const ext = file.name.split(".").pop().toLowerCase();
+      const fileName = `logo-${STATE.business.id}.${ext}`;
+      const { data: uploadData, error: uploadErr } = await supabase.storage
+        .from("logos")
+        .upload(fileName, file, { upsert: true, contentType: file.type });
+      if (uploadErr) throw uploadErr;
+      const { data: urlData } = supabase.storage.from("logos").getPublicUrl(fileName);
+      const logoUrl = urlData.publicUrl;
+      const { error: updateErr } = await supabase.from("businesses").update({ logo_url: logoUrl }).eq("id", STATE.business.id);
+      if (updateErr) throw updateErr;
+      STATE.business.logo_url = logoUrl;
+      logoProgress.textContent = "Logo uploaded!";
+      setTimeout(() => { logoProgress.style.display = "none"; }, 2000);
+      logoRemoveBtn.style.display = "";
+      toast("Logo updated successfully", "success");
+      document.querySelector(".brand-row img")?.setAttribute("src", logoUrl);
+    } catch (e) {
+      logoProgress.textContent = "Upload failed. Check Supabase Storage 'logos' bucket exists and is public.";
+      toast("Upload failed: " + e.message, "error");
+    }
+  });
+
+  logoRemoveBtn?.addEventListener("click", async () => {
+    if (!confirm("Remove business logo?")) return;
+    const { error } = await supabase.from("businesses").update({ logo_url: null }).eq("id", STATE.business.id);
+    if (error) { toast("Failed: " + error.message, "error"); return; }
+    STATE.business.logo_url = null;
+    logoPreview.src = "./uganda-pos-icon.svg";
+    logoRemoveBtn.style.display = "none";
+    logoFileInput.value = "";
+    document.querySelector(".brand-row img")?.setAttribute("src", "./uganda-pos-icon.svg");
+    toast("Logo removed", "success");
+  });
+
   // Theme: save
   $("save-theme-btn").addEventListener("click", async () => {
     const color = $("th-custom-color").value;
     const fontSize = $("th-font-size").value;
     const { error } = await supabase.from("businesses").update({ theme_color: color, theme_font_size: fontSize }).eq("id", STATE.business.id);
-    if (error) { toast("Failed: " + error.message, "error"); return; }
+    if (error) {
+      // Columns may not exist yet — fallback to localStorage
+      localStorage.setItem("ugpos_theme_color", color);
+      localStorage.setItem("ugpos_theme_font_size", fontSize);
+      STATE.business.theme_color = color;
+      STATE.business.theme_font_size = fontSize;
+      applyTheme();
+      toast("Theme saved locally. Run v8.sql to add DB columns.", "success", 4000);
+      return;
+    }
     STATE.business.theme_color = color;
     STATE.business.theme_font_size = fontSize;
     applyTheme();

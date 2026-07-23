@@ -2431,3 +2431,131 @@ body { overscroll-behavior: none; }
 @media (max-width: 400px) {
   .pagination-bar { flex-direction: column; text-align: center; }
 }
+
+/* =====================================================================
+   35. PROFESSIONAL BADGES & STATUS INDICATORS
+   ===================================================================== */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  border-radius: var(--radius-pill);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  line-height: 1.4;
+}
+.badge-green { background: #dcfce7; color: #166534; border: 1px solid #bbf7d0; }
+.badge-red { background: #fee2e2; color: #991b1b; border: 1px solid #fecaca; }
+.badge-yellow { background: #fef9c3; color: #854d0e; border: 1px solid #fef08a; }
+.badge-blue { background: #dbeafe; color: #1e40af; border: 1px solid #bfdbfe; }
+.badge-gray { background: #f1f5f9; color: #475569; border: 1px solid #e2e8f0; }
+[data-theme="dark"] .badge-green { background: rgba(22,163,74,0.12); color: #4ade80; border-color: rgba(22,163,74,0.2); }
+[data-theme="dark"] .badge-red { background: rgba(220,38,38,0.12); color: #f87171; border-color: rgba(220,38,38,0.2); }
+[data-theme="dark"] .badge-yellow { background: rgba(217,119,6,0.12); color: #fbbf24; border-color: rgba(217,119,6,0.2); }
+[data-theme="dark"] .badge-blue { background: rgba(37,99,235,0.12); color: #60a5fa; border-color: rgba(37,99,235,0.2); }
+[data-theme="dark"] .badge-gray { background: rgba(100,116,139,0.12); color: #94a3b8; border-color: rgba(100,116,139,0.2); }
+
+/* =====================================================================
+   36. PROFESSIONAL RECEIPT / DOCUMENT STYLING
+   ===================================================================== */
+.professional-doc {
+  max-width: 800px;
+  margin: 0 auto;
+  background: #fff;
+  color: #111827;
+  font-family: "Inter", -apple-system, sans-serif;
+  padding: 40px;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+}
+.professional-doc .doc-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding-bottom: 20px;
+  border-bottom: 2px solid #111827;
+  margin-bottom: 20px;
+}
+.professional-doc .doc-logo {
+  max-height: 56px;
+  max-width: 160px;
+  object-fit: contain;
+}
+.professional-doc .doc-title {
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  text-transform: uppercase;
+  color: #111827;
+}
+.professional-doc .doc-meta {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 24px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.professional-doc .doc-meta .label { color: #6b7280; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
+.professional-doc .doc-meta .value { font-weight: 600; color: #111827; }
+.professional-doc table.doc-items {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 20px;
+  font-size: 13px;
+}
+.professional-doc table.doc-items th {
+  background: #f3f4f6;
+  padding: 10px 12px;
+  text-align: left;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #6b7280;
+  border-bottom: 2px solid #e5e7eb;
+}
+.professional-doc table.doc-items td {
+  padding: 10px 12px;
+  border-bottom: 1px solid #e5e7eb;
+  vertical-align: top;
+}
+.professional-doc .doc-totals {
+  margin-left: auto;
+  width: 300px;
+  border-top: 2px solid #111827;
+  padding-top: 12px;
+}
+.professional-doc .doc-totals .row {
+  display: flex;
+  justify-content: space-between;
+  padding: 4px 0;
+  font-size: 13px;
+}
+.professional-doc .doc-totals .row.grand {
+  font-size: 17px;
+  font-weight: 800;
+  border-top: 1px solid #e5e7eb;
+  margin-top: 6px;
+  padding-top: 10px;
+}
+.professional-doc .doc-footer {
+  margin-top: 30px;
+  padding-top: 16px;
+  border-top: 1px solid #e5e7eb;
+  font-size: 11px;
+  color: #9ca3af;
+  text-align: center;
+}
+.professional-doc .doc-qr {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 16px;
+}
+.professional-doc .doc-qr img {
+  width: 80px;
+  height: 80px;
+}

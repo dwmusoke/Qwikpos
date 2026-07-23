@@ -180,15 +180,90 @@ export function wireEmptyCta(action) {
   if (btn && action) btn.addEventListener("click", action);
 }
 
+export function statusBadgeHtml(status, size = "sm") {
+  const s = (status || "").toLowerCase().replace(/[\s_]+/g, "_");
+  const map = {
+    paid: { cls: "badge-green", icon: "✓" },
+    unpaid: { cls: "badge-red", icon: "✗" },
+    pending: { cls: "badge-yellow", icon: "⏳" },
+    partial: { cls: "badge-yellow", icon: "◐" },
+    credit: { cls: "badge-blue", icon: "📝" },
+    completed: { cls: "badge-green", icon: "✓" },
+    processing: { cls: "badge-blue", icon: "⚙" },
+    cancelled: { cls: "badge-red", icon: "✕" },
+    voided: { cls: "badge-gray", icon: "⊘" },
+    returned: { cls: "badge-red", icon: "↩" },
+    trialing: { cls: "badge-blue", icon: "★" },
+    active: { cls: "badge-green", icon: "●" },
+    expired: { cls: "badge-red", icon: "⚠" },
+    past_due: { cls: "badge-yellow", icon: "⚠" },
+    draft: { cls: "badge-gray", icon: "✎" },
+    ordered: { cls: "badge-blue", icon: "📦" },
+    received: { cls: "badge-green", icon: "📥" },
+    converted: { cls: "badge-green", icon: "✓" },
+    open: { cls: "badge-blue", icon: "○" },
+    successful: { cls: "badge-green", icon: "✓" },
+    failed: { cls: "badge-red", icon: "✗" },
+    low: { cls: "badge-red", icon: "↓" },
+    in_stock: { cls: "badge-green", icon: "↑" },
+    expiring: { cls: "badge-yellow", icon: "⏰" },
+    expired: { cls: "badge-red", icon: "⚠" },
+  };
+  const entry = map[s] || { cls: "badge-gray", icon: "?" };
+  const isSmall = size === "sm";
+  return `<span class="badge ${entry.cls}" style="${isSmall ? 'font-size:10px;padding:2px 7px;' : 'font-size:11px;padding:3px 10px;'}">${entry.icon} ${escapeHtml(status)}</span>`;
+}
+
 export function printHtml(html, title = "Print") {
   const w = window.open("", "_blank");
   if (!w) { toast("Popup blocked. Allow popups to print.", "error", 4000); return; }
   w.document.write(`<!doctype html><html><head><title>${escapeHtml(title)}</title><style>
-    body { font-family: Arial, sans-serif; padding: 20px; margin: 0; }
-    table { width: 100%; border-collapse: collapse; }
-  </style></head><body>${html}</body></html>`);
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
+    *{box-sizing:border-box;margin:0;padding:0;}
+    body{font-family:'Inter',-apple-system,sans-serif;background:#f3f4f6;padding:20px;color:#111827;-webkit-font-smoothing:antialiased;}
+    .doc-wrap{max-width:800px;margin:0 auto;background:#fff;border-radius:12px;box-shadow:0 4px 24px rgba(0,0,0,0.08);padding:40px;}
+    table{width:100%;border-collapse:collapse;}
+    th{background:#f9fafb;padding:10px 12px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#6b7280;border-bottom:2px solid #e5e7eb;}
+    td{padding:10px 12px;border-bottom:1px solid #e5e7eb;font-size:13px;}
+    .text-right{text-align:right;}
+    .font-bold{font-weight:700;}
+    .text-muted{color:#6b7280;font-size:12px;}
+    .divider{border:none;border-top:1px solid #e5e7eb;margin:8px 0;}
+    h2{font-size:22px;font-weight:800;letter-spacing:-0.02em;}
+  </style></head><body><div class="doc-wrap">${html}</div></body></html>`);
   w.document.close();
   w.onload = () => { w.focus(); w.print(); w.close(); };
+}
+
+export function professionalDocHtml(opts = {}) {
+  const {
+    title = "RECEIPT", docNumber = "", date = "", businessName = "", businessInfo = "",
+    customerName = "", customerInfo = "", items = [], totals = [], footer = "",
+    logoUrl = "", qrData = "",
+  } = opts;
+  const totalRows = totals.map((t) =>
+    `<div class="row ${t.grand ? 'grand' : ''}"><span>${escapeHtml(t.label)}</span><span>${escapeHtml(t.value)}</span></div>`
+  ).join("");
+  return `
+    ${qrData ? `<div class="doc-qr"><img src="${escapeHtml(qrData)}" alt="QR" /></div>` : ""}
+    <div class="doc-header">
+      <div>${logoUrl ? `<img src="${escapeHtml(logoUrl)}" class="doc-logo" alt="logo" />` : `<h2>${escapeHtml(businessName || title)}</h2>`}</div>
+      <div class="doc-title">${escapeHtml(title)}</div>
+    </div>
+    <div class="doc-meta">
+      <div>${docNumber ? `<div class="label">Document No.</div><div class="value">${escapeHtml(docNumber)}</div>` : ""}
+        <div class="label">Date</div><div class="value">${escapeHtml(date)}</div>
+        ${customerName ? `<div class="label">Customer</div><div class="value">${escapeHtml(customerName)}</div>` : ""}
+        ${customerInfo ? `<div class="value">${escapeHtml(customerInfo)}</div>` : ""}
+      </div>
+      <div>${businessInfo ? `<div class="label">Business</div><div class="value">${escapeHtml(businessInfo)}</div>` : ""}</div>
+    </div>
+    ${items.length ? `<table class="doc-items"><thead><tr><th>Item</th><th class="text-right">Qty</th><th class="text-right">Price</th><th class="text-right">Total</th></tr></thead><tbody>
+      ${items.map((it) => `<tr><td>${escapeHtml(it.name)}</td><td class="text-right">${it.qty}</td><td class="text-right">${escapeHtml(it.price)}</td><td class="text-right font-bold">${escapeHtml(it.total)}</td></tr>`).join("")}
+    </tbody></table>` : ""}
+    ${totals.length ? `<div class="doc-totals">${totalRows}</div>` : ""}
+    ${footer ? `<div class="doc-footer">${escapeHtml(footer)}</div>` : ""}
+  `;
 }
 
 // Re-export core sales functions from POS module
@@ -393,7 +468,7 @@ export async function loadSubscription() {
 // True while the business can use the app: still inside its trial window,
 // or has an active paid period that hasn't lapsed yet.
 export function applyTheme() {
-  const color = STATE.business?.theme_color || "#0f6b4a";
+  const color = STATE.business?.theme_color || localStorage.getItem("ugpos_theme_color") || "#0f6b4a";
   const root = document.documentElement;
   root.style.setProperty("--brand", color);
   root.style.setProperty("--brand-dark", shadeColor(color, -20));
@@ -401,7 +476,7 @@ export function applyTheme() {
   root.style.setProperty("--brand-light", color + "18");
   root.style.setProperty("--brand-lighter", color + "0a");
   root.style.setProperty("--brand-glow", color + "1e");
-  const fontSize = STATE.business?.theme_font_size || "15px";
+  const fontSize = STATE.business?.theme_font_size || localStorage.getItem("ugpos_theme_font_size") || "15px";
   root.style.fontSize = fontSize;
 }
 

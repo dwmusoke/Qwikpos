@@ -253,6 +253,13 @@ function wireShell() {
   }
 }
 
+function updateLogo() {
+  const logoEl = $("sidebar-logo");
+  if (logoEl) {
+    logoEl.src = STATE.business?.logo_url || "./uganda-pos-icon.svg";
+  }
+}
+
 function populateUserChip() {
   const initials = (STATE.appUser.full_name || "U")
     .split(" ")
@@ -653,6 +660,7 @@ async function boot() {
   } catch (e) {
     console.error("populateUserChip failed:", e);
   }
+  try { updateLogo(); } catch (e) { console.error("updateLogo:", e); }
   try {
     updateBadges();
   } catch (e) {

@@ -197,3 +197,10 @@ end;
 $$;
 
 grant execute on function create_business_and_owner(text, text, text, text, text) to authenticated;
+
+-- ---------------------------------------------------------------------
+-- 5. THEME COLUMNS for businesses table
+-- ---------------------------------------------------------------------
+alter table businesses add column if not exists theme_color text default '#0f6b4a';
+alter table businesses add column if not exists theme_font_size text default '15px';
+alter table businesses add column if not exists logo_url text;
