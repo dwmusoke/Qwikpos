@@ -96,6 +96,7 @@ export async function renderAdmin(root) {
       <button class="admin-tab ${_activeTab === "users" ? "active" : ""}" data-tab="users">Users</button>
       <button class="admin-tab ${_activeTab === "branches" ? "active" : ""}" data-tab="branches">Branches</button>
       <button class="admin-tab ${_activeTab === "plans" ? "active" : ""}" data-tab="plans">Plans & Payments</button>
+      <button class="admin-tab ${_activeTab === "roles" ? "active" : ""}" data-tab="roles">Roles & Permissions</button>
     </div>
 
     <div id="admin-tab-content"></div>
@@ -161,6 +162,7 @@ export async function renderAdmin(root) {
         businessById,
         subByBusiness,
       });
+    else if (_activeTab === "roles") renderRoles(el);
   }
 
   renderTabContent();
@@ -885,4 +887,446 @@ function vendorStatusBadge(sub, now) {
     expired: "badge-red",
   };
   return `<span class="badge ${map[sub.status] || "badge-gray"}">${escapeHtml(sub.status)}</span>`;
+}
+
+// ---------------------------------------------------------------------
+// ROLES & PERMISSIONS TAB
+// ---------------------------------------------------------------------
+async function renderRoles(el) {
+  // Fetch current role counts
+  const { data: users } = await supabase
+    .from("app_users")
+    .select("id, role, is_active, business_id")
+    .order("role");
+
+  const { data: businesses } = await supabase
+    .from("businesses")
+    .select("id, name")
+    .order("name");
+
+  const roleStats = {};
+  (users || []).forEach((u) => {
+    roleStats[u.role] = (roleStats[u.role] || 0) + 1;
+  });
+
+  // Define all permissions in the system
+  const modules = [
+    { key: "dashboard", label: "Dashboard", perms: ["view"] },
+    {
+      key: "pos",
+      label: "POS / Sell",
+      perms: ["view", "create", "hold", "refund"],
+    },
+    {
+      key: "quotations",
+      label: "Quotations",
+      perms: ["view", "create", "convert"],
+    },
+    {
+      key: "products",
+      label: "Products",
+      perms: ["view", "create", "edit", "delete", "import", "export"],
+    },
+    {
+      key: "inventory",
+      label: "Inventory",
+      perms: ["view", "transfer", "adjust", "count", "valuation"],
+    },
+    {
+      key: "sales",
+      label: "Sales",
+      perms: ["view", "create", "return", "export"],
+    },
+    {
+      key: "purchases",
+      label: "Purchases",
+      perms: ["view", "create", "receive", "return", "export"],
+    },
+    {
+      key: "customers",
+      label: "Customers",
+      perms: ["view", "create", "edit", "statement"],
+    },
+    { key: "suppliers", label: "Suppliers", perms: ["view", "create", "edit"] },
+    { key: "reports", label: "Reports", perms: ["view", "export"] },
+    {
+      key: "accounting",
+      label: "Accounting",
+      perms: ["view", "create", "edit", "post", "reconcile"],
+    },
+    {
+      key: "hrm",
+      label: "HRM",
+      perms: ["view", "create", "edit", "payroll", "leave"],
+    },
+    {
+      key: "leads",
+      label: "Leads / CRM",
+      perms: ["view", "create", "edit", "pipeline"],
+    },
+    {
+      key: "deliveries",
+      label: "Deliveries",
+      perms: ["view", "create", "dispatch", "complete"],
+    },
+    { key: "templates", label: "Templates", perms: ["view", "edit"] },
+    {
+      key: "backup",
+      label: "Backup/Restore",
+      perms: ["view", "export", "import"],
+    },
+    {
+      key: "settings",
+      label: "Settings",
+      perms: ["view", "edit", "team", "efris"],
+    },
+    { key: "chat", label: "Team Chat", perms: ["view", "send"] },
+    { key: "notifications", label: "Notifications", perms: ["view", "send"] },
+    { key: "audit", label: "Audit Logs", perms: ["view", "export"] },
+    { key: "efris", label: "EFRIS", perms: ["view", "register", "submit"] },
+    { key: "billing", label: "Billing", perms: ["view", "upgrade"] },
+    {
+      key: "admin",
+      label: "Platform Admin",
+      perms: [
+        "view",
+        "impersonate",
+        "manage_vendors",
+        "manage_plans",
+        "manage_users",
+      ],
+    },
+  ];
+
+  // Default permission matrix (what each role gets by default)
+  const defaultMatrix = {
+    superadmin: Object.fromEntries(modules.map((m) => [m.key, m.perms])),
+    admin: {
+      dashboard: ["view"],
+      pos: ["view", "create", "hold"],
+      quotations: ["view", "create", "convert"],
+      products: ["view", "create", "edit", "import", "export"],
+      inventory: ["view", "transfer", "adjust", "count", "valuation"],
+      sales: ["view", "create", "return", "export"],
+      purchases: ["view", "create", "receive", "return", "export"],
+      customers: ["view", "create", "edit", "statement"],
+      suppliers: ["view", "create", "edit"],
+      reports: ["view", "export"],
+      accounting: ["view", "create", "edit", "post"],
+      hrm: ["view", "create", "edit", "payroll", "leave"],
+      leads: ["view", "create", "edit", "pipeline"],
+      deliveries: ["view", "create", "dispatch", "complete"],
+      templates: ["view", "edit"],
+      backup: ["view", "export"],
+      settings: ["view", "edit", "team", "efris"],
+      chat: ["view", "send"],
+      notifications: ["view", "send"],
+      audit: ["view", "export"],
+      efris: ["view", "register", "submit"],
+      billing: ["view"],
+      admin: [],
+    },
+    manager: {
+      dashboard: ["view"],
+      pos: ["view", "create", "hold"],
+      quotations: ["view", "create", "convert"],
+      products: ["view", "create", "edit", "export"],
+      inventory: ["view", "transfer", "adjust", "count"],
+      sales: ["view", "create", "return", "export"],
+      purchases: ["view", "create", "receive", "export"],
+      customers: ["view", "create", "edit", "statement"],
+      suppliers: ["view", "create", "edit"],
+      reports: ["view", "export"],
+      accounting: ["view", "create", "edit"],
+      hrm: ["view", "create", "edit", "leave"],
+      leads: ["view", "create", "edit", "pipeline"],
+      deliveries: ["view", "create", "dispatch"],
+      templates: ["view"],
+      backup: ["view"],
+      settings: ["view"],
+      chat: ["view", "send"],
+      notifications: ["view"],
+      audit: ["view"],
+      efris: ["view", "register"],
+      billing: ["view"],
+      admin: [],
+    },
+    accountant: {
+      dashboard: ["view"],
+      pos: ["view"],
+      quotations: ["view"],
+      products: ["view"],
+      inventory: ["view", "valuation"],
+      sales: ["view", "export"],
+      purchases: ["view", "export"],
+      customers: ["view", "statement"],
+      suppliers: ["view"],
+      reports: ["view", "export"],
+      accounting: ["view", "create", "edit", "post", "reconcile"],
+      hrm: ["view", "payroll"],
+      leads: [],
+      deliveries: [],
+      templates: ["view"],
+      backup: ["view", "export"],
+      settings: ["view"],
+      chat: ["view"],
+      notifications: ["view"],
+      audit: ["view", "export"],
+      efris: ["view"],
+      billing: ["view"],
+      admin: [],
+    },
+    cashier: {
+      dashboard: ["view"],
+      pos: ["view", "create", "hold"],
+      quotations: ["view", "create"],
+      products: ["view"],
+      inventory: ["view"],
+      sales: ["view"],
+      purchases: [],
+      customers: ["view", "create"],
+      suppliers: [],
+      reports: ["view"],
+      accounting: [],
+      hrm: [],
+      leads: [],
+      deliveries: ["view"],
+      templates: [],
+      backup: [],
+      settings: [],
+      chat: ["view", "send"],
+      notifications: ["view"],
+      audit: [],
+      efris: [],
+      billing: [],
+      admin: [],
+    },
+    inventory_clerk: {
+      dashboard: ["view"],
+      pos: ["view"],
+      quotations: ["view"],
+      products: ["view", "create", "edit"],
+      inventory: ["view", "transfer", "adjust", "count", "valuation"],
+      sales: ["view"],
+      purchases: ["view", "create", "receive"],
+      customers: ["view"],
+      suppliers: ["view", "create", "edit"],
+      reports: ["view", "export"],
+      accounting: [],
+      hrm: [],
+      leads: [],
+      deliveries: ["view", "dispatch"],
+      templates: [],
+      backup: [],
+      settings: [],
+      chat: ["view", "send"],
+      notifications: ["view"],
+      audit: [],
+      efris: ["view", "register"],
+      billing: [],
+      admin: [],
+    },
+    viewer: {
+      dashboard: ["view"],
+      pos: ["view"],
+      quotations: ["view"],
+      products: ["view"],
+      inventory: ["view"],
+      sales: ["view"],
+      purchases: ["view"],
+      customers: ["view"],
+      suppliers: ["view"],
+      reports: ["view"],
+      accounting: ["view"],
+      hrm: ["view"],
+      leads: ["view"],
+      deliveries: ["view"],
+      templates: ["view"],
+      backup: ["view"],
+      settings: ["view"],
+      chat: ["view"],
+      notifications: ["view"],
+      audit: ["view"],
+      efris: ["view"],
+      billing: ["view"],
+      admin: [],
+    },
+  };
+
+  const roleOrder = [
+    "superadmin",
+    "admin",
+    "manager",
+    "accountant",
+    "cashier",
+    "inventory_clerk",
+    "viewer",
+  ];
+  const roleLabels = {
+    superadmin: "Superadmin",
+    admin: "Admin",
+    manager: "Manager",
+    accountant: "Accountant",
+    cashier: "Cashier",
+    inventory_clerk: "Inventory Clerk",
+    viewer: "Viewer",
+  };
+
+  el.innerHTML = `
+    <div class="card">
+      <div class="card-title">Role Overview</div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Role</th><th>Users</th><th>Description</th></tr></thead>
+          <tbody>
+            ${roleOrder
+              .map(
+                (r) => `
+              <tr>
+                <td><b>${roleLabels[r]}</b></td>
+                <td>${roleStats[r] || 0}</td>
+                <td class="text-muted" style="font-size:12px">
+                  ${
+                    r === "superadmin"
+                      ? "Platform-wide access, impersonation, vendor management"
+                      : r === "admin"
+                        ? "Full business access including settings, team, EFRIS"
+                        : r === "manager"
+                          ? "Operations management, sales, purchases, inventory, HR"
+                          : r === "accountant"
+                            ? "Accounting, reports, banking, payroll view"
+                            : r === "cashier"
+                              ? "POS, quotations, basic customer management"
+                              : r === "inventory_clerk"
+                                ? "Inventory, stock transfers, purchase receiving"
+                                : "Read-only access to all modules"
+                  }
+                </td>
+              </tr>
+            `,
+              )
+              .join("")}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Permission Matrix</div>
+      <div class="table-wrap" style="max-height:500px;overflow:auto">
+        <table style="min-width:1200px">
+          <thead>
+            <tr>
+              <th style="position:sticky;left:0;min-width:180px">Module / Permission</th>
+              ${roleOrder.map((r) => `<th style="min-width:100px;text-align:center">${roleLabels[r]}</th>`).join("")}
+            </tr>
+          </thead>
+          <tbody>
+            ${modules
+              .map(
+                (m) => `
+              <tr>
+                <td style="position:sticky;left:0;background:var(--surface);font-weight:600">${m.label}</td>
+                ${roleOrder
+                  .map(
+                    (r) => `
+                  <td style="text-align:center">
+                    <div style="display:flex;flex-wrap:wrap;justify-content:center;gap:2px;padding:4px">
+                      ${m.perms
+                        .map(
+                          (p) => `
+                        <span class="perm-chip ${defaultMatrix[r][m.key]?.includes(p) ? "granted" : "denied"}" 
+                              title="${m.key}.${p}">${p.substring(0, 1).toUpperCase() + p.substring(1).replace("_", " ")}</span>
+                      `,
+                        )
+                        .join("")}
+                    </div>
+                  </td>
+                `,
+                  )
+                  .join("")}
+              </tr>
+            `,
+              )
+              .join("")}
+          </tbody>
+        </table>
+      </div>
+      <div class="help-text" style="margin-top:8px;font-size:11px">
+        <span class="perm-chip granted" style="margin-right:8px">Granted</span>
+        <span class="perm-chip denied">Denied</span>
+        &nbsp;|&nbsp; Roles are enforced via <code>hasRole()</code> in code and RLS in database.
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Assign Role to User</div>
+      <div class="grid-2">
+        <div class="field">
+          <label>Select User</label>
+          <select id="role-user-select">
+            <option value="">Choose a user…</option>
+            ${(users || []).map((u) => `<option value="${u.id}">${escapeHtml(u.full_name)} (${u.role}) — ${businesses?.find((b) => b.id === u.business_id)?.name || "No business"}</option>`).join("")}
+          </select>
+        </div>
+        <div class="field">
+          <label>New Role</label>
+          <select id="role-new-role">
+            ${roleOrder.map((r) => `<option value="${r}">${roleLabels[r]}</option>`).join("")}
+          </select>
+        </div>
+      </div>
+      <div class="flex gap" style="margin-top:12px">
+        <button class="btn btn-primary" id="role-assign-btn">Assign Role</button>
+        <button class="btn btn-outline" id="role-refresh-btn">Refresh</button>
+      </div>
+      <p id="role-msg" class="help-text" style="margin-top:8px;display:none"></p>
+    </div>
+  `;
+
+  // Add styles for permission chips
+  if (!$("perm-chip-styles")) {
+    const style = document.createElement("style");
+    style.id = "perm-chip-styles";
+    style.textContent = `
+      .perm-chip { display:inline-block; padding:2px 6px; border-radius:4px; font-size:9px; font-weight:600; text-transform:uppercase; }
+      .perm-chip.granted { background:var(--brand-10); color:var(--brand); border:1px solid var(--brand-30); }
+      .perm-chip.denied { background:var(--muted-10); color:var(--text-muted); border:1px solid var(--border); }
+    `;
+    document.head.appendChild(style);
+  }
+
+  // Wire up assign role
+  $("role-assign-btn")?.addEventListener("click", async () => {
+    const userId = $("role-user-select").value;
+    const newRole = $("role-new-role").value;
+    const msg = $("role-msg");
+    if (!userId) {
+      msg.textContent = "Select a user";
+      msg.style.display = "block";
+      return;
+    }
+    msg.style.display = "none";
+
+    const { error } = await supabase
+      .from("app_users")
+      .update({ role: newRole })
+      .eq("id", userId);
+    if (error) {
+      msg.textContent = "Failed: " + error.message;
+      msg.style.color = "var(--danger)";
+      msg.style.display = "block";
+    } else {
+      msg.textContent = "Role updated successfully";
+      msg.style.color = "var(--success)";
+      msg.style.display = "block";
+      setTimeout(() => {
+        document.querySelector('[data-route="admin"]')?.click();
+      }, 1500);
+    }
+  });
+
+  $("role-refresh-btn")?.addEventListener("click", () => {
+    document.querySelector('[data-route="admin"]')?.click();
+  });
 }

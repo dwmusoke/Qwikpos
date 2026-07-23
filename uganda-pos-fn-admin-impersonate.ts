@@ -22,7 +22,8 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-auth",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type, x-supabase-auth",
 };
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -40,7 +41,9 @@ Deno.serve(async (req) => {
     const userClient = createClient(SUPABASE_URL, SUPABASE_URL, {
       global: { headers: { Authorization: `Bearer ${authHeader}` } },
     });
-    const { data: { user } } = await userClient.auth.getUser();
+    const {
+      data: { user },
+    } = await userClient.auth.getUser();
     if (!user) return json({ error: "Invalid token" }, 401);
 
     const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
@@ -60,38 +63,35 @@ Deno.serve(async (req) => {
     // Verify target user exists
     const { data: target } = await admin
       .from("app_users")
-      .select("id, full_name, business_id")
+      .select("id, full_name, business_id, email")
       .eq("id", target_user_id)
       .single();
 
     if (!target) return json({ error: "Target user not found" }, 404);
 
     // Generate a magic link for the target user
-    const { data: linkData, error: linkErr } = await admin.auth.admin.generateLink({
-      type: "magiclink",
-      email: user.email!, // we need the target user's email
-      options redirectTo: `${new URL(req.url).origin}/?impersonate=1`,
-    });
+    const { data: linkData, error: linkErr } =
+      await admin.auth.admin.generateLink({
+        type: "magiclink",
+        email: target.email!,
+        options: { redirectTo: `${new URL(req.url).origin}/?impersonate=1` },
+      });
 
     if (linkErr) {
-      // Fallback: use signInWithOtp via admin
-      const { data: targetUser } = await admin.auth.admin.getUserById(target_user_id);
-      if (!targetUser?.user?.email) {
-        return json({ error: "Cannot get target user email" }, 500);
-      }
-
-      const { data: otpData, error: otpErr } = await admin.auth.admin.generateOtp({
-        email: targetUser.user.email,
-      });
+      // Fallback: generate OTP
+      const { data: otpData, error: otpErr } =
+        await admin.auth.admin.generateOtp({
+          email: target.email!,
+        });
 
       if (otpErr) return json({ error: otpErr.message }, 500);
 
       return json({
         success: true,
         method: "otp",
-        target_email: targetUser.user.email,
+        target_email: target.email!,
         target_name: target.full_name,
-        note: "OTP sent to target user's email. Use the Supabase dashboard to complete the login, or integrate with a redirect flow.",
+        note: "OTP sent to target user's email.",
       });
     }
 
