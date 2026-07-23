@@ -234,6 +234,70 @@
       </div>
     </div>
 
+    <!-- ===================== CREATE BUSINESS SCREEN ===================== -->
+    <div id="create-business-screen" class="login-wrap hidden">
+      <div class="login-card" style="max-width: 520px">
+        <div class="flag-strip"></div>
+        <div class="login-logo">
+          <img src="./uganda-pos-icon.svg" alt="Qwickpos" />
+          <h1>Welcome to Qwickpos</h1>
+          <p>Create your business to start your 14-day free trial.</p>
+        </div>
+
+        <form id="create-business-form">
+          <div class="field">
+            <label for="cb-business-name">Business Name</label>
+            <input
+              id="cb-business-name"
+              type="text"
+              required
+              placeholder="e.g. John's Supermarket"
+              autocomplete="organization"
+            />
+          </div>
+          <div class="field">
+            <label for="cb-full-name">Your Full Name</label>
+            <input
+              id="cb-full-name"
+              type="text"
+              required
+              placeholder="e.g. John Musoke"
+              autocomplete="name"
+            />
+          </div>
+          <div class="field">
+            <label for="cb-phone">Phone (optional)</label>
+            <input
+              id="cb-phone"
+              type="tel"
+              placeholder="+256 7xx xxx xxx"
+              autocomplete="tel"
+            />
+          </div>
+          <div class="field">
+            <label for="cb-currency">Base Currency</label>
+            <select id="cb-currency">
+              <option value="UGX">UGX — Uganda Shilling</option>
+              <option value="USD">USD — US Dollar</option>
+              <option value="KES">KES — Kenyan Shilling</option>
+            </select>
+          </div>
+          <button
+            class="btn btn-primary btn-block"
+            type="submit"
+            id="cb-submit"
+          >
+            Create Business & Start Trial
+          </button>
+          <p
+            id="cb-error"
+            class="help-text"
+            style="color: var(--danger); display: none; margin-top: 10px"
+          ></p>
+        </form>
+      </div>
+    </div>
+
     <!-- ===================== APP SHELL ===================== -->
     <div id="app-shell" class="app-shell hidden">
       <div class="impersonate-banner hidden" id="impersonate-banner">

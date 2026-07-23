@@ -35,6 +35,7 @@ import { renderBilling } from "./uganda-pos-view-billing.js";
 import {
   initSignupScreen,
   finishPendingSignupIfAny,
+  initCreateBusinessScreen,
 } from "./uganda-pos-view-signup.js";
 
 // ---------------------------------------------------------------------
@@ -456,7 +457,114 @@ function showLoginScreen() {
   $("login-screen").classList.remove("hidden");
   $("signup-screen").classList.add("hidden");
   $("reset-screen").classList.add("hidden");
+  $("create-business-screen").classList.add("hidden");
   $("app-shell").classList.add("hidden");
+}
+
+function showCreateBusinessScreen() {
+  $("login-screen").classList.add("hidden");
+  $("signup-screen").classList.add("hidden");
+  $("reset-screen").classList.add("hidden");
+  $("create-business-screen").classList.remove("hidden");
+  $("app-shell").classList.add("hidden");
+}
+
+// ---------------------------------------------------------------------
+// Create Business (for users with auth but no app_users row)
+// ---------------------------------------------------------------------
+async function initCreateBusinessScreen() {
+  const form = $("create-business-form");
+  const btn = $("cb-submit");
+  const errEl = $("cb-error");
+  if (!form) return;
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    errEl.style.display = "none";
+    btn.disabled = true;
+    btn.textContent = "Creating…";
+
+    const businessName = $("cb-business-name").value.trim();
+    const fullName = $("cb-full-name").value.trim();
+    const phone = $("cb-phone").value.trim();
+    const currency = $("cb-currency").value;
+
+    if (!businessName || !fullName) {
+      errEl.textContent = "Business name and your name are required.";
+      errEl.style.display = "block";
+      btn.disabled = false;
+      btn.textContent = "Create Business & Start Trial";
+      return;
+    }
+
+    try {
+      const { data: plan } = await supabase
+        .from("plans")
+        .select("*")
+        .eq("code", "starter")
+        .eq("is_active", true)
+        .single();
+
+      if (!plan) throw new Error("Starter plan not found");
+
+      // Create business
+      const { data: business, error: bizErr } = await supabase
+        .from("businesses")
+        .insert({
+          name: businessName,
+          base_currency: currency,
+          primary_phone: phone || null,
+        })
+        .select()
+        .single();
+
+      if (bizErr) throw bizErr;
+
+      // Create default branch
+      const { data: branch, error: branchErr } = await supabase
+        .from("branches")
+        .insert({ business_id: business.id, name: "Main Branch" })
+        .select()
+        .single();
+
+      if (branchErr) throw branchErr;
+
+      // Link current auth user to the business as admin
+      const { error: userErr } = await supabase.from("app_users").insert({
+        id: STATE.session.user.id,
+        business_id: business.id,
+        branch_id: branch.id,
+        full_name: fullName,
+        phone: phone || null,
+        role: "admin",
+        is_active: true,
+      });
+
+      if (userErr) throw userErr;
+
+      // Create subscription (14-day trial)
+      const trialEnds = new Date();
+      trialEnds.setDate(trialEnds.getDate() + 14);
+      const { error: subErr } = await supabase.from("subscriptions").insert({
+        business_id: business.id,
+        plan_id: plan.id,
+        status: "trialing",
+        trial_ends_at: trialEnds.toISOString(),
+        current_period_end: trialEnds.toISOString(),
+      });
+
+      if (subErr) throw subErr;
+
+      toast("Business created! Starting your 14-day trial…", "success", 4000);
+      await boot();
+    } catch (err) {
+      console.error("Create business failed:", err);
+      errEl.textContent = err.message || "Failed to create business";
+      errEl.style.display = "block";
+      btn.disabled = false;
+      btn.textContent = "Create Business & Start Trial";
+    }
+  });
 }
 
 async function boot() {
@@ -468,6 +576,10 @@ async function boot() {
     const result = await finishPendingSignupIfAny();
     if (result.ok && !result.skipped) {
       ok = await loadBootstrapData();
+    } else if (result.skipped) {
+      // No pending signup data (e.g., password reset user) — show create business screen
+      showCreateBusinessScreen();
+      return;
     }
   }
 
@@ -716,6 +828,7 @@ if (hash && hash.includes("type=recovery")) {
 }
 
 initSignupScreen();
+initCreateBusinessScreen();
 boot().catch((err) => {
   console.error("Auto-boot failed:", err);
   showLoginScreen();

@@ -157,3 +157,140 @@ export async function finishPendingSignupIfAny() {
   localStorage.removeItem(PENDING_KEY);
   return { ok: true };
 }
+
+// ---------------------------------------------------------------------
+// Create Business Screen (for users who logged in via password reset
+// or otherwise have auth but no app_users row)
+// ---------------------------------------------------------------------
+const CREATE_BUSINESS_KEY = "ugpos_create_business";
+
+export function initCreateBusinessScreen() {
+  // This is called from app.js init, but we don't need to do anything
+  // here since the screen is shown dynamically by boot()
+}
+
+export async function showCreateBusinessScreen() {
+  $("login-screen").classList.add("hidden");
+  $("signup-screen").classList.add("hidden");
+  $("reset-screen").classList.add("hidden");
+  $("app-shell").classList.add("hidden");
+
+  let createCard = $("create-business-screen");
+  if (!createCard) {
+    createCard = document.createElement("div");
+    createCard.id = "create-business-screen";
+    createCard.className = "login-wrap";
+    createCard.innerHTML = `
+      <div class="login-card" style="max-width: 520px">
+        <div class="flag-strip"></div>
+        <div class="login-logo">
+          <img src="./uganda-pos-icon.svg" alt="Qwickpos" />
+          <h1>Create Your Business</h1>
+          <p>
+            You're logged in but haven't set up a business yet.
+            Fill in the details to start your 14-day free trial.
+          </p>
+        </div>
+        <form id="create-business-form">
+          <div class="field">
+            <label for="cb-business-name">Business Name</label>
+            <input id="cb-business-name" required placeholder="e.g. My Shop" />
+          </div>
+          <div class="field-row">
+            <div class="field">
+              <label for="cb-full-name">Your Full Name</label>
+              <input id="cb-full-name" required placeholder="John Doe" />
+            </div>
+            <div class="field">
+              <label for="cb-phone">Phone</label>
+              <input id="cb-phone" placeholder="+2567xxxxxxxx" />
+            </div>
+          </div>
+          <div class="field">
+            <label for="cb-currency">Base Currency</label>
+            <select id="cb-currency">
+              <option value="UGX">UGX — Uganda Shilling</option>
+              <option value="USD">USD — US Dollar</option>
+              <option value="KES">KES — Kenyan Shilling</option>
+            </select>
+          </div>
+          <button class="btn btn-primary btn-block" type="submit" id="cb-submit">
+            Create Business & Start Trial
+          </button>
+          <p
+            id="cb-error"
+            class="help-text"
+            style="color: var(--danger); display: none; margin-top: 10px"
+          ></p>
+        </form>
+        <p class="help-text" style="text-align: center; margin-top: 16px">
+          <a href="#" id="cb-cancel">Cancel</a>
+        </p>
+      </div>
+    `;
+    document.body.appendChild(createCard);
+  } else {
+    createCard.classList.remove("hidden");
+  }
+
+  // Wire form
+  const form = $("create-business-form");
+  const submitBtn = $("cb-submit");
+  const errEl = $("cb-error");
+  const cancelLink = $("cb-cancel");
+
+  // Clean up any old listeners
+  const newForm = form.cloneNode(true);
+  form.parentNode.replaceChild(newForm, form);
+
+  // Re-get references after clone
+  const freshForm = $("create-business-form");
+  const freshBtn = $("cb-submit");
+  const freshErr = $("cb-error");
+  const freshCancel = $("cb-cancel");
+
+  freshCancel.addEventListener("click", (e) => {
+    e.preventDefault();
+    showLoginScreen();
+  });
+
+  freshForm.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    freshErr.style.display = "none";
+
+    const businessName = $("cb-business-name").value.trim();
+    const fullName = $("cb-full-name").value.trim();
+    const phone = $("cb-phone").value.trim();
+    const currency = $("cb-currency").value;
+
+    if (!businessName || !fullName) {
+      freshErr.textContent = "Business name and your name are required.";
+      freshErr.style.display = "block";
+      return;
+    }
+
+    freshBtn.disabled = true;
+    freshBtn.textContent = "Creating…";
+
+    const { error } = await supabase.rpc("create_business_and_owner", {
+      p_business_name: businessName,
+      p_full_name: fullName,
+      p_phone: phone,
+      p_base_currency: currency,
+      p_plan_code: "starter",
+    });
+
+    freshBtn.disabled = false;
+    freshBtn.textContent = "Create Business & Start Trial";
+
+    if (error) {
+      freshErr.textContent = error.message;
+      freshErr.style.display = "block";
+    } else {
+      freshErr.style.display = "none";
+      // Business created — reload bootstrap
+      createCard.classList.add("hidden");
+      await boot();
+    }
+  });
+}
