@@ -1,6 +1,30 @@
 // =====================================================================
 // QWICKPOS — APP BOOTSTRAP (auth, router, shell wiring)
 // =====================================================================
+import {
+  supabase,
+  STATE,
+  $,
+  qsa,
+  escapeHtml,
+  toast,
+  openModal,
+  closeModal,
+  fmtDate,
+  fmtMoney,
+  hasFeature,
+  hasRole,
+  lowStockProducts,
+  loadNotifications,
+  subscribeToNotifications,
+  markNotificationRead,
+  markAllNotificationsRead,
+  submitSaleToSupabase,
+  offlineQueueCount,
+  flushOfflineQueue,
+  loadBootstrapData,
+  isSubscriptionActive,
+} from "./uganda-pos-core.js";
 import { renderNotifications } from "./uganda-pos-view-notifications.js";
 import { renderAuditLogs } from "./uganda-pos-view-audit.js";
 import { renderNotificationsCenter } from "./uganda-pos-view-notifications-center.js";
