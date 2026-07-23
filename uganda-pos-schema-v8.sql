@@ -132,7 +132,7 @@ end;
 $$;
 
 -- ---------------------------------------------------------------------
--- 6. PLATFORM SETTINGS TABLE
+-- 7. PLATFORM SETTINGS TABLE
 -- ---------------------------------------------------------------------
 create table if not exists platform_settings (
   id uuid primary key default gen_random_uuid(),
@@ -232,7 +232,34 @@ $$;
 grant execute on function create_business_and_owner(text, text, text, text, text) to authenticated;
 
 -- ---------------------------------------------------------------------
--- 5. MISSING RLS POLICIES (categories, brands, units etc. have no INSERT policies)
+-- 5. FIX: stock trigger must be security definer to bypass RLS
+-- ---------------------------------------------------------------------
+create or replace function apply_sale_stock() returns trigger as $$
+declare
+  v_branch uuid;
+  v_business uuid;
+  v_sale_type text;
+begin
+  select branch_id, business_id, sale_type into v_branch, v_business, v_sale_type from sales where id = new.sale_id;
+
+  if v_sale_type = 'quotation' then
+    return new;
+  end if;
+
+  insert into product_stock (product_id, branch_id, quantity)
+  values (new.product_id, v_branch, -new.quantity)
+  on conflict (product_id, branch_id)
+  do update set quantity = product_stock.quantity - new.quantity;
+
+  insert into stock_movements (business_id, branch_id, product_id, type, quantity, reference, created_at)
+  values (v_business, v_branch, new.product_id, 'sale', new.quantity, new.sale_id::text, now());
+
+  return new;
+end;
+$$ language plpgsql security definer;
+
+-- ---------------------------------------------------------------------
+-- 6. MISSING RLS POLICIES (categories, brands, units etc. have no INSERT policies)
 -- ---------------------------------------------------------------------
 alter table categories enable row level security;
 drop policy if exists categories_select on categories;
@@ -271,8 +298,11 @@ create policy exchange_rates_insert on exchange_rates for insert
   with check (true);
 
 -- ---------------------------------------------------------------------
--- 6. THEME COLUMNS for businesses table
+-- 6. MISSING COLUMNS
 -- ---------------------------------------------------------------------
+alter table tax_categories add column if not exists description text;
+alter table stock_movements add column if not exists notes text;
+alter table stock_movements add column if not exists created_by uuid references app_users(id);
 alter table businesses add column if not exists theme_color text default '#0f6b4a';
 alter table businesses add column if not exists theme_font_size text default '15px';
 alter table businesses add column if not exists logo_url text;
