@@ -32,6 +32,9 @@ import { renderSettings } from "./uganda-pos-view-settings.js";
 import { renderChat } from "./uganda-pos-view-chat.js";
 import { renderAdmin } from "./uganda-pos-view-admin.js";
 import { renderBilling } from "./uganda-pos-view-billing.js";
+import { renderCoupons } from "./uganda-pos-view-coupons.js";
+import { renderOrders } from "./uganda-pos-view-orders.js";
+import { renderProfile } from "./uganda-pos-view-profile.js";
 import {
   initSignupScreen,
   finishPendingSignupIfAny,
@@ -84,6 +87,9 @@ const ROUTES = {
   hrm: { title: "HRM", render: renderHRM },
   templates: { title: "Document Templates", render: renderTemplateSettings },
   backup: { title: "Backup & Restore", render: renderBackupRestore },
+  coupons: { title: "Coupons & Gift Cards", render: renderCoupons },
+  orders: { title: "Orders", render: renderOrders },
+  profile: { title: "My Profile", render: renderProfile },
   billing: {
     title: "Billing",
     render: (root) => renderBilling(root, { paywall: false }),
@@ -834,3 +840,11 @@ boot().catch((err) => {
 });
 
 window.__qwickposReady && window.__qwickposReady();
+
+setTimeout(() => {
+  const splash = document.getElementById("splash-screen");
+  if (splash) {
+    splash.classList.add("fade-out");
+    setTimeout(() => splash.remove(), 600);
+  }
+}, 1200);

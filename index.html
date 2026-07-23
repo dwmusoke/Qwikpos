@@ -49,6 +49,16 @@
     <link rel="stylesheet" href="./uganda-pos-styles.css" />
   </head>
   <body>
+    <!-- ===================== SPLASH SCREEN ===================== -->
+    <div id="splash-screen" class="splash-screen">
+      <div class="splash-content">
+        <img src="./uganda-pos-icon.svg" alt="Qwickpos" class="splash-logo" />
+        <div class="splash-name">Qwickpos</div>
+        <div class="splash-spinner"></div>
+        <div class="splash-tag">EFRIS-Ready POS for Uganda</div>
+      </div>
+    </div>
+
     <!-- ===================== LOGIN SCREEN ===================== -->
     <div id="login-screen" class="login-wrap">
       <div class="login-card">
@@ -347,6 +357,9 @@
         <button class="nav-link" data-route="sales">
           <span class="icon">💰</span> <span data-i18n="nav.sales">Sales</span>
         </button>
+        <button class="nav-link" data-route="orders">
+          <span class="icon">📦</span> Orders
+        </button>
         <button class="nav-link" data-route="purchases">
           <span class="icon">🛒</span>
           <span data-i18n="nav.purchases">Purchases</span>
@@ -358,6 +371,9 @@
         <button class="nav-link" data-route="suppliers">
           <span class="icon">🚚</span>
           <span data-i18n="nav.suppliers">Suppliers</span>
+        </button>
+        <button class="nav-link" data-route="coupons">
+          <span class="icon">🎟️</span> Coupons
         </button>
 
         <div class="nav-group-label">Team &amp; Communication</div>
@@ -424,6 +440,9 @@
         <button class="nav-link" data-route="billing" data-role="admin">
           <span class="icon">💳</span>
           <span data-i18n="nav.billing">Billing</span>
+        </button>
+        <button class="nav-link" data-route="profile">
+          <span class="icon">👤</span> My Profile
         </button>
         <button class="nav-link" data-route="admin" data-superadmin="true">
           <span class="icon">🛠️</span>
