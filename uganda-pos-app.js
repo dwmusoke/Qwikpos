@@ -107,7 +107,8 @@ async function navigateTo(route) {
     if (route === "billing" && !STATE.isSuperadmin && !isSubscriptionActive()) {
       await renderBilling(root, { paywall: true });
     } else {
-    await ROUTES[route].render(root);
+      await ROUTES[route].render(root);
+    }
   } catch (e) {
     console.error(e);
     root.innerHTML = `<div class="empty-state">Something went wrong loading this page. Check the console for details.</div>`;
@@ -117,7 +118,6 @@ async function navigateTo(route) {
   } catch (e) {
     console.error("translatePage after render failed:", e);
   }
-}
 }
 
 function closeSidebarOnMobile() {
