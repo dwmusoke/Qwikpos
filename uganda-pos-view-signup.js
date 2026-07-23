@@ -5,7 +5,7 @@
 // as `anon`. `plans` is publicly readable (see uganda-pos-schema-billing.sql)
 // so pricing can be shown before anyone logs in.
 // =====================================================================
-import { supabase, $, qsa, escapeHtml, toast } from "./uganda-pos-core.js";
+import { supabase, $, qsa, escapeHtml, toast, STATE } from "./uganda-pos-core.js";
 
 const PENDING_KEY = "ugpos_pending_signup";
 let selectedPlan = null;

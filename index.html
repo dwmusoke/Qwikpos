@@ -514,6 +514,47 @@
     <div id="modal-root"></div>
     <div class="toast-stack" id="toast-stack"></div>
 
+    <!-- Inline guard: prevents native form submit + catches module errors -->
+    <script>
+      (function () {
+        "use strict";
+        var loaded = false;
+        window.addEventListener("error", function (e) {
+          if (loaded) return;
+          var el = document.getElementById("login-error");
+          if (el) {
+            el.innerHTML =
+              "<b>App failed to load:</b><br>" +
+              (e.message || "Unknown error") +
+              (e.filename
+                ? "<br><small>in " + e.filename.split("/").pop() + ":" + e.lineno + "</small>"
+                : "");
+            el.style.display = "block";
+          }
+          console.error("FATAL:", e.message, e.filename, e.lineno);
+        });
+        window.addEventListener("unhandledrejection", function (e) {
+          console.error("Unhandled rejection:", e.reason);
+        });
+        document.addEventListener("DOMContentLoaded", function () {
+          var form = document.getElementById("login-form");
+          if (form)
+            form.addEventListener("submit", function (e) {
+              if (!loaded) {
+                e.preventDefault();
+                var el = document.getElementById("login-error");
+                if (el && !el.textContent) {
+                  el.innerHTML =
+                    "<b>App still loading or failed to load.</b><br>" +
+                    "If this persists, press <b>Ctrl+Shift+R</b> to hard refresh, or clear your browser cache.";
+                  el.style.display = "block";
+                }
+              }
+            });
+        });
+        window.__qwickposReady = function () { loaded = true; };
+      })();
+    </script>
     <script type="module" src="./uganda-pos-app.js"></script>
   </body>
 </html>

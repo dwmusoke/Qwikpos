@@ -832,3 +832,5 @@ boot().catch((err) => {
   console.error("Auto-boot failed:", err);
   showLoginScreen();
 });
+
+window.__qwickposReady && window.__qwickposReady();
