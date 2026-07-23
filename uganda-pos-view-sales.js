@@ -219,25 +219,24 @@ async function initiateReturn(saleId) {
 
   openModal(`
     <div class="modal-title-row"><h3>Sales Return</h3></div>
-    ${!sale ? `
-    <div class="field"><label>Search Sale</label><input id="ret-search" placeholder="Type invoice number…" /></div>
-    <div id="ret-search-results"></div>
-    ` : `
-    <div class="summary-row"><span>Original Sale</span><span><b>${escapeHtml(sale.sale_number)}</b></span></div>
-    <div class="summary-row"><span>Total</span><span>${fmtMoney(sale.grand_total_base)}</span></div>
-    <div class="card-title" style="margin-top:12px;">Select Items to Return</div>
-    <div id="ret-items">
-      ${(sale.sale_items || []).map((it, i) => `
-        <div class="field-row" style="align-items:end; margin-bottom:8px;">
-          <div class="field" style="flex:2;"><label>${escapeHtml(it.product_name)}</label></div>
-          <div class="field" style="flex:1;"><label>Ordered: ${it.quantity}</label></div>
-          <div class="field" style="flex:1;"><label>Return Qty</label><input type="number" min="0" max="${it.quantity}" value="0" data-ret-qty="${i}" data-ret-item="${it.id}" data-ret-pid="${it.product_id}" data-ret-price="${it.unit_price}" /></div>
-        </div>`).join('')}
+    ${!sale
+      ? `<div class="field"><label>Search Sale</label><input id="ret-search" placeholder="Type invoice number\u2026" /></div>
+         <div id="ret-search-results"></div>`
+      : `<div class="summary-row"><span>Original Sale</span><span><b>${escapeHtml(sale.sale_number)}</b></span></div>
+         <div class="summary-row"><span>Total</span><span>${fmtMoney(sale.grand_total_base)}</span></div>
+         <div class="card-title" style="margin-top:12px;">Select Items to Return</div>
+         <div id="ret-items">
+           ${(sale.sale_items || []).map((it, i) => `
+             <div class="field-row" style="align-items:end; margin-bottom:8px;">
+               <div class="field" style="flex:2;"><label>${escapeHtml(it.product_name)}</label></div>
+               <div class="field" style="flex:1;"><label>Ordered: ${it.quantity}</label></div>
+               <div class="field" style="flex:1;"><label>Return Qty</label><input type="number" min="0" max="${it.quantity}" value="0" data-ret-qty="${i}" data-ret-item="${it.id}" data-ret-pid="${it.product_id}" data-ret-price="${it.unit_price}" /></div>
+             </div>`).join('')}
+         </div>
+         <div class="field"><label>Reason</label><input id="ret-reason" placeholder="Reason for return" /></div>
+         <div class="field"><label>Refund Method</label><select id="ret-method"><option value="cash">Cash</option><option value="mobile_money">Mobile Money</option><option value="bank">Bank Transfer</option><option value="card">Card</option><option value="exchange">Exchange</option></select></div>
+         <button class="btn btn-primary btn-block" id="ret-submit" style="margin-top:14px;">Submit Return</button>`}
     </div>
-    <div class="field"><label>Reason</label><input id="ret-reason" placeholder="Reason for return" /></div>
-    <div class="field"><label>Refund Method</label><select id="ret-method"><option value="cash">Cash</option><option value="mobile_money">Mobile Money</option><option value="bank">Bank Transfer</option><option value="card">Card</option><option value="exchange">Exchange</option></select></div>
-    <button class="btn btn-primary btn-block" id="ret-submit" style="margin-top:14px;">Submit Return</button>
-    `} `}</div>
     <button class="btn btn-outline btn-block" data-close-modal style="margin-top:8px;">Cancel</button>
   `, {
     large: !!sale,
