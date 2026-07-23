@@ -23,6 +23,8 @@ import {
   createNotification,
   lowStockProducts,
 } from "./uganda-pos-core.js";
+import { logAuditAction } from "./uganda-pos-view-audit.js";
+import { getReceiptTemplate } from "./uganda-pos-view-templates.js";
 
 let posSaleCurrency = STATE.displayCurrency;
 let posDiscountInput = 0;
@@ -72,7 +74,7 @@ export async function renderPOS(root) {
     <div class="pos-layout">
       <div class="pos-catalog">
         <div class="pos-search-row">
-          <input id="pos-search" placeholder="Search product, SKU or scan barcode…" autocomplete="off" />
+          <input id="pos-search" data-i18n-placeholder="pos.search" placeholder="Search product, SKU or scan barcode…" autocomplete="off" />
           <button class="btn btn-outline" id="pos-scan-btn" title="Focus for barcode scanner">📷</button>
         </div>
         <div class="category-chips" id="pos-categories">
@@ -85,7 +87,7 @@ export async function renderPOS(root) {
       <div class="cart-panel">
         <div class="cart-header">
           <b>${posMode === "quotation" ? "New Quotation" : "Current Sale"}</b>
-          <button class="btn btn-ghost btn-sm" id="pos-clear-cart">Clear</button>
+          <button class="btn btn-ghost btn-sm" id="pos-clear-cart" data-i18n="pos.clear">Clear</button>
         </div>
 
         <div class="pos-mode-toggle" id="pos-mode-toggle" style="display:flex; gap:6px; padding:0 16px 10px;">
@@ -95,7 +97,7 @@ export async function renderPOS(root) {
 
         <div style="padding:10px 16px 0;">
           <div class="field" style="margin-bottom:8px;">
-            <label>Customer</label>
+            <label data-i18n="pos.customer">Customer</label>
             <select id="pos-customer-select">
               <option value="">Walk-in Customer</option>
               ${STATE.customers.map((c) => `<option value="${c.id}">${escapeHtml(c.name)}${c.phone ? " — " + escapeHtml(c.phone) : ""}</option>`).join("")}
@@ -127,6 +129,21 @@ export async function renderPOS(root) {
 
   renderProductGrid();
   renderCart();
+
+  // Mobile cart toggle
+  const cartPanel = root.querySelector(".cart-panel");
+  const cartHeader = root.querySelector(".cart-header");
+  if (cartPanel && cartHeader && window.innerWidth <= 980) {
+    cartHeader.addEventListener("click", () => {
+      cartPanel.classList.toggle("cart-open");
+    });
+    // Close cart when clicking a product on mobile
+    root.addEventListener("click", (e) => {
+      if (window.innerWidth <= 980 && e.target.closest(".product-card")) {
+        cartPanel.classList.remove("cart-open");
+      }
+    });
+  }
 
   $("pos-search").addEventListener("input", (e) => {
     posSearchTerm = e.target.value.toLowerCase();
@@ -548,6 +565,19 @@ export async function submitSaleToSupabase(payload) {
   );
   if (paymentsErr) throw paymentsErr;
 
+  // Audit log
+  logAuditAction({
+    action: "create",
+    entityType: "sale",
+    entityId: sale.id,
+    entityName: saleNumber,
+    newValue: {
+      grand_total: payload.grand_total,
+      payment_status: payload.payment_status,
+      items: payload.items.length,
+    },
+  });
+
   // ---- EFRIS: stage a fiscal invoice for this sale. The invoice is only
   // submitted to URA when you press "Submit" on the EFRIS tab (or
   // automatically once you enable live mode) — see uganda-pos-view-efris.js ----
@@ -804,17 +834,25 @@ export function receiptHtml(sale, opts = {}) {
   const { lines, subtotal, discountTotal, vatTotal, grandTotal } =
     cartTotalsSnapshot(sale);
   const business = STATE.business;
+  const tpl = getReceiptTemplate();
+  const color = tpl.primaryColor || "#0f6b4a";
+  const textColor = tpl.secondaryColor || "#333333";
+  const fontSize = tpl.fontSize || "13";
   return `
-    <div class="receipt" id="receipt-print-area">
-      <div class="center"><b>${escapeHtml(business.name)}</b></div>
-      <div class="center">${escapeHtml(business.address || "")}</div>
-      <div class="center">TIN: ${escapeHtml(business.tin || "N/A")}</div>
-      <hr/>
-      <div class="center"><b>${escapeHtml(docLabel)}</b></div>
-      <div>No: ${escapeHtml(sale.sale_number)}</div>
-      <div>Date: ${new Date(sale.created_at || Date.now()).toLocaleString("en-UG")}</div>
-      <div>Served by: ${escapeHtml(STATE.appUser.full_name)}</div>
-      <hr/>
+    <div class="receipt" id="receipt-print-area" style="font-size:${fontSize}px; color:${textColor};">
+      ${tpl.showLogo && tpl.logoUrl ? `<div class="center"><img src="${escapeHtml(tpl.logoUrl)}" style="max-height:50px; max-width:100%;" /></div>` : ""}
+      ${tpl.headerText ? `<div class="center" style="font-size:10px; color:#999;">${escapeHtml(tpl.headerText)}</div>` : ""}
+      ${tpl.showBusinessName ? `<div class="center"><b style="color:${color}; font-size:${parseInt(fontSize) + 3}px;">${escapeHtml(business.name)}</b></div>` : ""}
+      ${tpl.showAddress ? `<div class="center">${escapeHtml(business.address || "")}</div>` : ""}
+      ${tpl.showTin ? `<div class="center">TIN: ${escapeHtml(business.tin || "N/A")}</div>` : ""}
+      ${tpl.showPhone && business.phone ? `<div class="center">${escapeHtml(business.phone)}</div>` : ""}
+      ${tpl.showEmail && business.email ? `<div class="center">${escapeHtml(business.email)}</div>` : ""}
+      <hr style="border-color:${color};"/>
+      <div class="center"><b style="color:${color};">${escapeHtml(docLabel || tpl.invoiceTitle)}</b></div>
+      ${tpl.showInvoiceNumber ? `<div>No: ${escapeHtml(sale.sale_number)}</div>` : ""}
+      ${tpl.showDate ? `<div>Date: ${new Date(sale.created_at || Date.now()).toLocaleString("en-UG")}</div>` : ""}
+      ${tpl.showServerName ? `<div>Served by: ${escapeHtml(STATE.appUser.full_name)}</div>` : ""}
+      <hr style="border-color:${color};"/>
       <table>
         ${lines
           .map(
@@ -825,16 +863,15 @@ export function receiptHtml(sale, opts = {}) {
           )
           .join("")}
       </table>
-      <hr/>
+      <hr style="border-color:${color};"/>
       <table>
         <tr><td>Subtotal</td><td style="text-align:right;">${fmtMoneyRaw(subtotal, sale.currency_code)}</td></tr>
-        <tr><td>Discount</td><td style="text-align:right;">- ${fmtMoneyRaw(discountTotal, sale.currency_code)}</td></tr>
-        <tr><td>VAT (incl.)</td><td style="text-align:right;">${fmtMoneyRaw(vatTotal, sale.currency_code)}</td></tr>
-        <tr><td><b>TOTAL</b></td><td style="text-align:right;"><b>${fmtMoneyRaw(grandTotal, sale.currency_code)}</b></td></tr>
+        ${tpl.showDiscount ? `<tr><td>Discount</td><td style="text-align:right;">- ${fmtMoneyRaw(discountTotal, sale.currency_code)}</td></tr>` : ""}
+        ${tpl.showTaxBreakdown ? `<tr><td>VAT (incl.)</td><td style="text-align:right;">${fmtMoneyRaw(vatTotal, sale.currency_code)}</td></tr>` : ""}
+        <tr><td><b>TOTAL</b></td><td style="text-align:right;"><b style="color:${color};">${fmtMoneyRaw(grandTotal, sale.currency_code)}</b></td></tr>
       </table>
-      <hr/>
-      ${footNote ? `<div class="center">${escapeHtml(footNote)}</div>` : ""}
-      <div class="center">Thank you for your business!</div>
+      <hr style="border-color:${color};"/>
+      ${tpl.showFooter ? `<div class="center">${escapeHtml(footNote || tpl.footerText)}</div>` : ""}
     </div>`;
 }
 

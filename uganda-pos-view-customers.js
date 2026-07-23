@@ -15,6 +15,7 @@ import {
   fmtDate,
   printHtml,
 } from "./uganda-pos-core.js";
+import { logAuditAction } from "./uganda-pos-view-audit.js";
 
 export async function renderCustomers(root) {
   root.innerHTML = `
@@ -111,6 +112,7 @@ function openCustomerModal(customerId) {
             return;
           }
           toast(editing ? "Customer updated" : "Customer added", "success");
+          logAuditAction({ action: editing ? 'update' : 'create', entityType: 'customer', entityId: editing ? customerId : null, entityName: name, newValue: record });
           closeModal();
           await refreshCustomers();
           renderTable();

@@ -15,6 +15,7 @@ import {
   refreshSuppliers,
   fmtDate,
 } from "./uganda-pos-core.js";
+import { logAuditAction } from "./uganda-pos-view-audit.js";
 
 let supTab = "list";
 
@@ -169,6 +170,13 @@ function openSupplierModal(supplierId) {
             return;
           }
           toast(editing ? "Supplier updated" : "Supplier added", "success");
+          logAuditAction({
+            action: editing ? "update" : "create",
+            entityType: "supplier",
+            entityId: editing ? supplierId : null,
+            entityName: record.name,
+            newValue: record,
+          });
           closeModal();
           await refreshSuppliers();
           renderSupTable();

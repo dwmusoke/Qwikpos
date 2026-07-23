@@ -199,58 +199,110 @@
 
         <div class="nav-group-label">Operations</div>
         <button class="nav-link" data-route="dashboard">
-          <span class="icon">📊</span> Dashboard
+          <span class="icon">📊</span>
+          <span data-i18n="nav.dashboard">Dashboard</span>
         </button>
         <button class="nav-link" data-route="pos">
-          <span class="icon">🧾</span> Sell (POS)
+          <span class="icon">🧾</span>
+          <span data-i18n="nav.pos">Sell (POS)</span>
         </button>
         <button class="nav-link" data-route="quotations">
-          <span class="icon">📄</span> Quotations
+          <span class="icon">📄</span>
+          <span data-i18n="nav.quotations">Quotations</span>
+        </button>
+        <button class="nav-link" data-route="products">
+          <span class="icon">🏷️</span>
+          <span data-i18n="nav.products">Products</span>
         </button>
         <button class="nav-link" data-route="inventory">
-          <span class="icon">📦</span> Inventory
+          <span class="icon">📦</span>
+          <span data-i18n="nav.inventory">Inventory</span>
           <span class="nav-badge hidden" id="low-stock-badge">0</span>
         </button>
+        <button class="nav-link" data-route="sales">
+          <span class="icon">💰</span> <span data-i18n="nav.sales">Sales</span>
+        </button>
+        <button class="nav-link" data-route="purchases">
+          <span class="icon">🛒</span>
+          <span data-i18n="nav.purchases">Purchases</span>
+        </button>
         <button class="nav-link" data-route="customers">
-          <span class="icon">👥</span> Customers
+          <span class="icon">👥</span>
+          <span data-i18n="nav.customers">Customers</span>
         </button>
         <button class="nav-link" data-route="suppliers">
-          <span class="icon">🚚</span> Suppliers
+          <span class="icon">🚚</span>
+          <span data-i18n="nav.suppliers">Suppliers</span>
         </button>
 
         <div class="nav-group-label">Team &amp; Communication</div>
         <button class="nav-link" data-route="chat">
-          <span class="icon">💬</span> Chat
+          <span class="icon">💬</span> <span data-i18n="nav.chat">Chat</span>
           <span class="nav-badge hidden" id="chat-badge">0</span>
         </button>
         <button class="nav-link" data-route="notifications">
-          <span class="icon">🔔</span> Notifications
+          <span class="icon">🔔</span>
+          <span data-i18n="nav.notifications">Notifications</span>
           <span class="nav-badge hidden" id="notif-sidebar-badge">0</span>
+        </button>
+        <button class="nav-link" data-route="notifications_center">
+          <span class="icon">✉️</span>
+          <span data-i18n="nav.email_sms">Email &amp; SMS</span>
+        </button>
+
+        <div class="nav-group-label">Sales &amp; CRM</div>
+        <button class="nav-link" data-route="leads">
+          <span class="icon">💼</span>
+          <span data-i18n="nav.leads">Lead Management</span>
+        </button>
+        <button class="nav-link" data-route="deliveries">
+          <span class="icon">🚚</span>
+          <span data-i18n="nav.deliveries">Deliveries</span>
+        </button>
+
+        <div class="nav-group-label">People</div>
+        <button class="nav-link" data-route="hrm">
+          <span class="icon">👥</span> <span data-i18n="nav.hrm">HRM</span>
         </button>
 
         <div class="nav-group-label">Compliance &amp; Insights</div>
+        <button class="nav-link" data-route="audit">
+          <span class="icon">📋</span>
+          <span data-i18n="nav.audit">Audit Logs</span>
+        </button>
         <button class="nav-link" data-route="efris">
-          <span class="icon">🏛️</span> EFRIS
+          <span class="icon">🏛️</span> <span data-i18n="nav.efris">EFRIS</span>
           <span class="nav-badge hidden" id="efris-badge">0</span>
         </button>
         <button class="nav-link" data-route="reports">
-          <span class="icon">📈</span> Reports
+          <span class="icon">📈</span>
+          <span data-i18n="nav.reports">Reports</span>
         </button>
         <button class="nav-link" data-route="accounting">
-          <span class="icon">🧮</span> Accounting
+          <span class="icon">🧮</span>
+          <span data-i18n="nav.accounting">Accounting</span>
         </button>
         <button
           class="nav-link"
           data-route="settings"
           data-role="admin,manager"
         >
-          <span class="icon">⚙️</span> Settings
+          <span class="icon">⚙️</span>
+          <span data-i18n="nav.settings">Settings</span>
+        </button>
+        <button class="nav-link" data-route="templates">
+          <span class="icon">🧾</span> Templates
+        </button>
+        <button class="nav-link" data-route="backup">
+          <span class="icon">💾</span> Backup
         </button>
         <button class="nav-link" data-route="billing" data-role="admin">
-          <span class="icon">💳</span> Billing
+          <span class="icon">💳</span>
+          <span data-i18n="nav.billing">Billing</span>
         </button>
         <button class="nav-link" data-route="admin" data-superadmin="true">
-          <span class="icon">🛠️</span> Platform Admin
+          <span class="icon">🛠️</span>
+          <span data-i18n="nav.admin">Platform Admin</span>
         </button>
 
         <div class="sidebar-footer">
@@ -280,6 +332,20 @@
               background: var(--surface);
             "
           ></select>
+          <select
+            id="lang-picker"
+            title="Language"
+            style="
+              border-radius: 999px;
+              border: 1px solid var(--border);
+              padding: 6px 10px;
+              background: var(--surface);
+              font-size: 13px;
+            "
+          >
+            <option value="en">EN</option>
+            <option value="lg">LG</option>
+          </select>
           <div class="notif-wrapper" id="notif-wrapper">
             <button class="icon-btn" id="notif-bell" title="Notifications">
               🔔

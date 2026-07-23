@@ -1,40 +1,21 @@
 // =====================================================================
 // QWICKPOS — APP BOOTSTRAP (auth, router, shell wiring)
 // =====================================================================
-import {
-  supabase,
-  STATE,
-  $,
-  qsa,
-  toast,
-  loadBootstrapData,
-  hasRole,
-  hasFeature,
-  isSubscriptionActive,
-  lowStockProducts,
-  offlineQueueCount,
-  flushOfflineQueue,
-  loadNotifications,
-  subscribeToNotifications,
-  markNotificationRead,
-  markAllNotificationsRead,
-  escapeHtml,
-  fmtDate,
-} from "./uganda-pos-core.js";
-import { renderDashboard } from "./uganda-pos-view-dashboard.js";
-import { renderPOS, submitSaleToSupabase } from "./uganda-pos-view-pos.js";
-import { renderQuotations } from "./uganda-pos-view-quotations.js";
-import { renderInventory } from "./uganda-pos-view-inventory.js";
-import { renderCustomers } from "./uganda-pos-view-customers.js";
-import { renderSuppliers } from "./uganda-pos-view-suppliers.js";
-import { renderEfris } from "./uganda-pos-view-efris.js";
-import { renderReports } from "./uganda-pos-view-reports.js";
-import { renderAccounting } from "./uganda-pos-view-accounting.js";
-import { renderSettings } from "./uganda-pos-view-settings.js";
-import { renderBilling } from "./uganda-pos-view-billing.js";
-import { renderAdmin } from "./uganda-pos-view-admin.js";
-import { renderChat } from "./uganda-pos-view-chat.js";
 import { renderNotifications } from "./uganda-pos-view-notifications.js";
+import { renderAuditLogs } from "./uganda-pos-view-audit.js";
+import { renderNotificationsCenter } from "./uganda-pos-view-notifications-center.js";
+import { renderLeads } from "./uganda-pos-view-leads.js";
+import { renderDeliveries } from "./uganda-pos-view-deliveries.js";
+import { renderHRM } from "./uganda-pos-view-hrm.js";
+import { renderTemplateSettings } from "./uganda-pos-view-templates.js";
+import { renderBackupRestore } from "./uganda-pos-view-backup.js";
+import {
+  getLang,
+  setLang,
+  getAvailableLanguages,
+  translatePage,
+  t,
+} from "./uganda-pos-i18n.js";
 import {
   initSignupScreen,
   finishPendingSignupIfAny,
@@ -57,7 +38,10 @@ const ROUTES = {
   dashboard: { title: "Dashboard", render: renderDashboard },
   pos: { title: "Sell (POS)", render: renderPOS },
   quotations: { title: "Quotations", render: renderQuotations },
+  products: { title: "Products", render: renderProductsModule },
   inventory: { title: "Inventory", render: renderInventory },
+  sales: { title: "Sales", render: renderSalesModule },
+  purchases: { title: "Purchases", render: renderPurchasesModule },
   customers: { title: "Customers", render: renderCustomers },
   suppliers: { title: "Suppliers", render: renderSuppliers },
   efris: { title: "EFRIS", render: renderEfris, feature: "efris" },
@@ -74,6 +58,16 @@ const ROUTES = {
   settings: { title: "Settings", render: renderSettings },
   chat: { title: "Team Chat", render: renderChat },
   notifications: { title: "Notifications", render: renderNotifications },
+  audit: { title: "Audit Logs", render: renderAuditLogs },
+  notifications_center: {
+    title: "Notifications Center",
+    render: renderNotificationsCenter,
+  },
+  leads: { title: "Lead Management", render: renderLeads },
+  deliveries: { title: "Deliveries", render: renderDeliveries },
+  hrm: { title: "HRM", render: renderHRM },
+  templates: { title: "Document Templates", render: renderTemplateSettings },
+  backup: { title: "Backup & Restore", render: renderBackupRestore },
   billing: {
     title: "Billing",
     render: (root) => renderBilling(root, { paywall: false }),
@@ -113,12 +107,17 @@ async function navigateTo(route) {
     if (route === "billing" && !STATE.isSuperadmin && !isSubscriptionActive()) {
       await renderBilling(root, { paywall: true });
     } else {
-      await ROUTES[route].render(root);
-    }
+    await ROUTES[route].render(root);
   } catch (e) {
     console.error(e);
     root.innerHTML = `<div class="empty-state">Something went wrong loading this page. Check the console for details.</div>`;
   }
+  try {
+    translatePage();
+  } catch (e) {
+    console.error("translatePage after render failed:", e);
+  }
+}
 }
 
 function closeSidebarOnMobile() {
@@ -202,6 +201,17 @@ function wireShell() {
     STATE.displayCurrency = e.target.value;
     navigateTo(STATE.route);
   });
+
+  // Language picker
+  const langPicker = $("lang-picker");
+  if (langPicker) {
+    langPicker.value = getLang();
+    langPicker.addEventListener("change", (e) => {
+      setLang(e.target.value);
+      translatePage();
+      toast("Language updated", "default", 2000);
+    });
+  }
 }
 
 function populateUserChip() {
@@ -456,6 +466,11 @@ async function boot() {
     wireShell();
   } catch (e) {
     console.error("wireShell failed:", e);
+  }
+  try {
+    translatePage();
+  } catch (e) {
+    console.error("translatePage failed:", e);
   }
   try {
     populateUserChip();

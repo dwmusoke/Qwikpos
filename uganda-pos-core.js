@@ -38,6 +38,8 @@ export const STATE = {
   customers: [],
   suppliers: [],
   taxCategories: [],
+  brands: [],
+  units: [],
   cart: [], // { productId, name, qty, unitPriceBase, taxCode, discount }
   cartCustomerId: null,
   displayCurrency: "UGX",
@@ -197,7 +199,14 @@ export async function loadBootstrapData() {
     return true;
   }
 
-  let business, branches, currencies, rates, categories, taxCategories;
+  let business,
+    branches,
+    currencies,
+    rates,
+    categories,
+    taxCategories,
+    brands,
+    units;
   try {
     [
       { data: business },
@@ -206,6 +215,8 @@ export async function loadBootstrapData() {
       { data: rates },
       { data: categories },
       { data: taxCategories },
+      { data: brands },
+      { data: units },
     ] = await Promise.all([
       supabase
         .from("businesses")
@@ -226,6 +237,11 @@ export async function loadBootstrapData() {
         .select("*")
         .eq("business_id", appUser.business_id),
       supabase.from("tax_categories").select("*"),
+      supabase
+        .from("brands")
+        .select("*")
+        .eq("business_id", appUser.business_id),
+      supabase.from("units").select("*").eq("is_active", true),
     ]);
   } catch (e) {
     console.error("Bootstrap query failed:", e);
@@ -240,6 +256,8 @@ export async function loadBootstrapData() {
   STATE.currencies = currencies || [];
   STATE.categories = categories || [];
   STATE.taxCategories = taxCategories || [];
+  STATE.brands = brands || [];
+  STATE.units = units || [];
   STATE.displayCurrency = business?.base_currency || "UGX";
 
   // latest rate per currency
@@ -258,6 +276,8 @@ export async function loadBootstrapData() {
     refreshSuppliers().catch((e) =>
       console.warn("refreshSuppliers failed:", e),
     ),
+    refreshBrands().catch((e) => console.warn("refreshBrands failed:", e)),
+    refreshUnits().catch((e) => console.warn("refreshUnits failed:", e)),
     loadSubscription().catch((e) =>
       console.warn("loadSubscription failed:", e),
     ),
@@ -347,6 +367,25 @@ export async function refreshSuppliers() {
     .eq("business_id", STATE.business.id)
     .order("name");
   STATE.suppliers = data || [];
+}
+
+export async function refreshBrands() {
+  if (!STATE.business) return;
+  const { data } = await supabase
+    .from("brands")
+    .select("*")
+    .eq("business_id", STATE.business.id)
+    .order("name");
+  STATE.brands = data || [];
+}
+
+export async function refreshUnits() {
+  const { data } = await supabase
+    .from("units")
+    .select("*")
+    .eq("is_active", true)
+    .order("name");
+  STATE.units = data || [];
 }
 
 export function stockFor(productId) {

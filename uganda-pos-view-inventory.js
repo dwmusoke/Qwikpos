@@ -17,6 +17,7 @@ import {
   stockFor,
   hasFeature,
 } from "./uganda-pos-core.js";
+import { logAuditAction } from "./uganda-pos-view-audit.js";
 
 const JSBARCODE_CDN =
   "https://cdnjs.cloudflare.com/ajax/libs/JsBarcode/3.11.5/JsBarcode.all.min.js";
@@ -887,6 +888,17 @@ function openTransferModal() {
           });
 
           toast("Stock transferred", "success");
+          logAuditAction({
+            action: "transfer",
+            entityType: "stock_transfer",
+            entityName: `${productName} × ${qty}`,
+            newValue: {
+              from: fromId,
+              to: toId,
+              product: productName,
+              quantity: qty,
+            },
+          });
           closeModal();
           await refreshProducts();
           loadTransfersList();

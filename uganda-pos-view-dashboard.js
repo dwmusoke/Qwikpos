@@ -144,7 +144,7 @@ export async function renderDashboard(root) {
     const rows = Object.values(branchMap).sort((a, b) => b.total - a.total);
     branchComparison = `
       <div class="card">
-        <div class="card-title">Store/Branch Comparison (YTD)</div>
+        <div class="card-title" data-i18n="dash.branch_comparison">Store/Branch Comparison (YTD)</div>
         <div class="table-wrap"><table>
           <thead><tr><th>Branch</th><th>Sales</th><th>Transactions</th><th>VAT</th><th>Paid</th><th>Credit</th></tr></thead>
           <tbody>
@@ -166,21 +166,135 @@ export async function renderDashboard(root) {
       </div>`;
   }
 
+  // Calculate yesterday's sales for trend comparison
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+  yesterday.setHours(0, 0, 0, 0);
+  const yesterdayEnd = new Date(yesterday);
+  yesterdayEnd.setHours(23, 59, 59, 999);
+  const yesterdaySales = allSales.filter(
+    (s) =>
+      new Date(s.created_at) >= yesterday &&
+      new Date(s.created_at) <= yesterdayEnd,
+  );
+  const yesterdayTotal = sum(yesterdaySales, "grand_total_base");
+  const todayTrend =
+    yesterdayTotal > 0
+      ? (((todayTotal - yesterdayTotal) / yesterdayTotal) * 100).toFixed(1)
+      : null;
+
+  // Daily sales for the last 7 days (mini chart)
+  const dailySales7 = [];
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    d.setHours(0, 0, 0, 0);
+    const dEnd = new Date(d);
+    dEnd.setHours(23, 59, 59, 999);
+    const dayTotal = allSales
+      .filter(
+        (s) => new Date(s.created_at) >= d && new Date(s.created_at) <= dEnd,
+      )
+      .reduce((a, s) => a + Number(s.grand_total_base || 0), 0);
+    dailySales7.push({
+      label: d.toLocaleDateString("en", { weekday: "short" }),
+      value: dayTotal,
+    });
+  }
+  const maxDaily = Math.max(...dailySales7.map((d) => d.value), 1);
+
   root.innerHTML = `
     <div class="kpi-grid">
-      <div class="kpi-card"><div class="label">Today's Sales</div><div class="value">${fmtMoney(todayTotal)}</div><div class="delta up">${todaySales.length} transactions</div></div>
-      <div class="kpi-card"><div class="label">This Month</div><div class="value">${fmtMoney(monthTotal)}</div><div class="delta up">${monthSales.length} transactions</div></div>
-      <div class="kpi-card"><div class="label">This Year</div><div class="value">${fmtMoney(yearTotal)}</div><div class="delta up">${yearSales.length} transactions</div></div>
-      <div class="kpi-card"><div class="label">VAT Collected (Month)</div><div class="value">${fmtMoney(monthVat)}</div><div class="delta">Standard rate 18%</div></div>
-      <div class="kpi-card"><div class="label">Inventory Value</div><div class="value">${fmtMoney(inventoryValue)}</div><div class="delta">${STATE.products.length} SKUs</div></div>
-      <div class="kpi-card"><div class="label">Low Stock Alerts</div><div class="value" style="color:${lowStock.length ? "var(--danger)" : "inherit"}">${lowStock.length}</div><div class="delta">at/below reorder level</div></div>
-      <div class="kpi-card"><div class="label">Outstanding Balances</div><div class="value">${fmtMoney(outstandingBalance)}</div><div class="delta">across all customers</div></div>
-      <div class="kpi-card"><div class="label">YTD VAT Collected</div><div class="value">${fmtMoney(yearVat)}</div><div class="delta">Jan — ${new Date().toLocaleString("default", { month: "short" })}</div></div>
+      <div class="kpi-card kpi-accent-blue">
+        <div class="kpi-icon">🧾</div>
+        <div class="kpi-content">
+          <div class="label" data-i18n="dash.today_sales">Today's Sales</div>
+          <div class="value">${fmtMoney(todayTotal)}</div>
+          <div class="delta ${todayTrend !== null ? (Number(todayTrend) >= 0 ? "up" : "down") : ""}">
+            ${todayTrend !== null ? `${Number(todayTrend) >= 0 ? "↑" : "↓"} ${Math.abs(Number(todayTrend))}% vs yesterday` : "First sale today"}
+            <span class="delta-sub">${todaySales.length} transaction${todaySales.length !== 1 ? "s" : ""}</span>
+          </div>
+        </div>
+      </div>
+      <div class="kpi-card kpi-accent-green">
+        <div class="kpi-icon">📅</div>
+        <div class="kpi-content">
+          <div class="label" data-i18n="dash.month">This Month</div>
+          <div class="value">${fmtMoney(monthTotal)}</div>
+          <div class="delta up">${monthSales.length} transactions</div>
+        </div>
+      </div>
+      <div class="kpi-card kpi-accent-purple">
+        <div class="kpi-icon">📊</div>
+        <div class="kpi-content">
+          <div class="label" data-i18n="dash.year">This Year</div>
+          <div class="value">${fmtMoney(yearTotal)}</div>
+          <div class="delta up">${yearSales.length} transactions</div>
+        </div>
+      </div>
+      <div class="kpi-card kpi-accent-orange">
+        <div class="kpi-icon">🏛️</div>
+        <div class="kpi-content">
+          <div class="label" data-i18n="dash.vat_month">VAT Collected (Month)</div>
+          <div class="value">${fmtMoney(monthVat)}</div>
+          <div class="delta">Standard rate 18%</div>
+        </div>
+      </div>
+      <div class="kpi-card kpi-accent-teal">
+        <div class="kpi-icon">📦</div>
+        <div class="kpi-content">
+          <div class="label" data-i18n="dash.inventory_value">Inventory Value</div>
+          <div class="value">${fmtMoney(inventoryValue)}</div>
+          <div class="delta">${STATE.products.length} active SKUs</div>
+        </div>
+      </div>
+      <div class="kpi-card ${lowStock.length ? "kpi-accent-red" : ""}">
+        <div class="kpi-icon">⚠️</div>
+        <div class="kpi-content">
+          <div class="label" data-i18n="dash.low_stock">Low Stock Alerts</div>
+          <div class="value" style="color:${lowStock.length ? "var(--danger)" : "inherit"}">${lowStock.length}</div>
+          <div class="delta">at/below reorder level</div>
+        </div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-icon">👥</div>
+        <div class="kpi-content">
+          <div class="label" data-i18n="dash.outstanding">Outstanding Balances</div>
+          <div class="value">${fmtMoney(outstandingBalance)}</div>
+          <div class="delta">across all customers</div>
+        </div>
+      </div>
+      <div class="kpi-card kpi-accent-indigo">
+        <div class="kpi-icon">🏛️</div>
+        <div class="kpi-content">
+          <div class="label" data-i18n="dash.vat_ytd">YTD VAT Collected</div>
+          <div class="value">${fmtMoney(yearVat)}</div>
+          <div class="delta">Jan — ${new Date().toLocaleString("default", { month: "short" })}</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:16px;">
+      <div class="card-title" data-i18n="dash.sales_trend">📈 Sales Trend (Last 7 Days)</div>
+      <div class="mini-chart">
+        ${dailySales7
+          .map(
+            (d) => `
+          <div class="mini-bar-col">
+            <div class="mini-bar-value">${fmtMoney(d.value)}</div>
+            <div class="mini-bar-track">
+              <div class="mini-bar-fill" style="height:${d.value > 0 ? Math.max((d.value / maxDaily) * 100, 4) : 0}%"></div>
+            </div>
+            <div class="mini-bar-label">${d.label}</div>
+          </div>`,
+          )
+          .join("")}
+      </div>
     </div>
 
     <div class="grid-2">
       <div class="card">
-        <div class="card-title">Recent Transactions</div>
+        <div class="card-title" data-i18n="dash.recent">Recent Transactions</div>
         ${
           recent.length
             ? `
@@ -205,7 +319,7 @@ export async function renderDashboard(root) {
       </div>
 
       <div class="card">
-        <div class="card-title">Top Selling Products (90d)</div>
+        <div class="card-title" data-i18n="dash.top_products">Top Selling Products (90d)</div>
         ${
           topProducts.length
             ? topProducts
@@ -235,7 +349,7 @@ export async function renderDashboard(root) {
       lowStock.length
         ? `
     <div class="card">
-      <div class="card-title">⚠️ Low Stock Alerts</div>
+      <div class="card-title" data-i18n="dash.low_stock">⚠️ Low Stock Alerts</div>
       <div class="table-wrap"><table>
         <thead><tr><th>Product</th><th>In Stock</th><th>Reorder Level</th></tr></thead>
         <tbody>
@@ -267,7 +381,7 @@ export async function renderDashboard(root) {
       if (!expiring.length && !expired.length) return "";
       return `
     <div class="card">
-      <div class="card-title">📅 Expiry Alerts</div>
+      <div class="card-title" data-i18n="dash.expiry_alerts">📅 Expiry Alerts</div>
       <div class="table-wrap"><table>
         <thead><tr><th>Product</th><th>Expiry Date</th><th>Status</th><th>Stock</th></tr></thead>
         <tbody>

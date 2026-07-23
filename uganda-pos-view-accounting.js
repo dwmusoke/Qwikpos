@@ -81,6 +81,8 @@ export async function renderAccounting(root) {
         ["journal", "📓 Journal Entries"],
         ["trial", "⚖️ Trial Balance"],
         ["expenses", "💸 Expenses"],
+        ["transfers", "🔄 Fund Transfers"],
+        ["deposits", "🏦 Deposits"],
         ["pnl", "📈 Profit &amp; Loss"],
         ["balance", "🏦 Balance Sheet"],
         ["cashflow", "💵 Cash Flow"],
@@ -112,6 +114,8 @@ export async function renderAccounting(root) {
     else if (acctTab === "journal") await renderJournalTab(body);
     else if (acctTab === "trial") await renderTrialBalanceTab(body);
     else if (acctTab === "expenses") await renderExpensesTab(body);
+    else if (acctTab === "transfers") await renderTransfersTab(body);
+    else if (acctTab === "deposits") await renderDepositsTab(body);
     else if (acctTab === "pnl") await renderPnlTab(body);
     else if (acctTab === "balance") await renderBalanceSheetTab(body);
     else if (acctTab === "cashflow") await renderCashFlowTab(body);
@@ -1222,4 +1226,354 @@ async function renderCashFlowTab(body) {
       `cashflow-${$("cf-from").value}-to-${$("cf-to").value}.csv`,
     );
   }
+}
+
+// ---------------------------------------------------------------------
+// FUND TRANSFERS TAB
+// ---------------------------------------------------------------------
+async function renderTransfersTab(body) {
+  const [{ data: transfers }, { data: accounts }] = await Promise.all([
+    supabase
+      .from("fund_transfers")
+      .select("*")
+      .eq("business_id", STATE.business.id)
+      .order("created_at", { ascending: false })
+      .limit(200),
+    supabase
+      .from("account_balances")
+      .select("*")
+      .eq("business_id", STATE.business.id)
+      .order("account_name"),
+  ]);
+
+  const allTransfers = transfers || [];
+  const allAccounts = accounts || [];
+  const totalMoved = allTransfers
+    .filter((t) => t.status === "completed")
+    .reduce((a, t) => a + Number(t.amount || 0), 0);
+  const totalFees = allTransfers.reduce((a, t) => a + Number(t.fee || 0), 0);
+
+  body.innerHTML = `
+    <div class="kpi-grid" style="margin-bottom:16px;">
+      <div class="kpi-card"><div class="label">Total Transferred</div><div class="value">${fmtMoney(totalMoved)}</div></div>
+      <div class="kpi-card"><div class="label">Total Fees</div><div class="value" style="color:var(--danger);">${fmtMoney(totalFees)}</div></div>
+      <div class="kpi-card"><div class="label">Transfers</div><div class="value">${allTransfers.length}</div></div>
+      <div class="kpi-card"><div class="label">Accounts</div><div class="value">${allAccounts.length}</div></div>
+    </div>
+
+    <div class="grid-2" style="gap:16px; margin-bottom:16px;">
+      <div class="card">
+        <div class="card-title">Account Balances</div>
+        ${
+          allAccounts.length
+            ? `
+          <div class="table-wrap"><table>
+            <thead><tr><th>Account</th><th>Type</th><th>Balance</th></tr></thead>
+            <tbody>
+              ${allAccounts
+                .map(
+                  (a) => `
+                <tr>
+                  <td><b>${escapeHtml(a.account_name.replace(/_/g, " "))}</b></td>
+                  <td><span class="badge badge-${a.account_type === "cash" ? "green" : a.account_type === "bank" ? "blue" : "purple"}">${a.account_type}</span></td>
+                  <td style="font-weight:700;">${fmtMoney(a.balance)}</td>
+                </tr>
+              `,
+                )
+                .join("")}
+            </tbody>
+          </table></div>
+        `
+            : '<div class="empty-state">No accounts configured. Run schema v7 to seed default accounts.</div>'
+        }
+      </div>
+
+      <div class="card">
+        <div class="card-title">New Transfer</div>
+        <div class="field">
+          <label>From Account</label>
+          <select id="ft-from">
+            ${allAccounts.map((a) => `<option value="${a.account_name}">${escapeHtml(a.account_name.replace(/_/g, " "))} (${fmtMoney(a.balance)})</option>`).join("")}
+          </select>
+        </div>
+        <div class="field">
+          <label>To Account</label>
+          <select id="ft-to">
+            ${allAccounts.map((a) => `<option value="${a.account_name}">${escapeHtml(a.account_name.replace(/_/g, " "))}</option>`).join("")}
+          </select>
+        </div>
+        <div class="field-row">
+          <div class="field"><label>Amount *</label><input id="ft-amount" type="number" min="0" step="0.01" /></div>
+          <div class="field"><label>Fee</label><input id="ft-fee" type="number" min="0" step="0.01" value="0" /></div>
+        </div>
+        <div class="field"><label>Reference</label><input id="ft-ref" placeholder="Optional reference number" /></div>
+        <div class="field"><label>Notes</label><textarea id="ft-notes" rows="2"></textarea></div>
+        <button class="btn btn-primary btn-block" id="ft-save">🔄 Transfer Funds</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Transfer History</div>
+      ${
+        allTransfers.length
+          ? `
+        <div class="table-wrap"><table>
+          <thead><tr><th>Date</th><th>From</th><th>To</th><th>Amount</th><th>Fee</th><th>Status</th></tr></thead>
+          <tbody>
+            ${allTransfers
+              .map(
+                (t) => `
+              <tr>
+                <td style="white-space:nowrap;">${new Date(t.created_at).toLocaleString("en-UG")}</td>
+                <td>${escapeHtml(t.from_account.replace(/_/g, " "))}</td>
+                <td>${escapeHtml(t.to_account.replace(/_/g, " "))}</td>
+                <td style="font-weight:700;">${fmtMoney(t.amount)}</td>
+                <td>${t.fee ? fmtMoney(t.fee) : "—"}</td>
+                <td><span class="badge badge-${t.status === "completed" ? "green" : t.status === "cancelled" ? "red" : "yellow"}">${t.status}</span></td>
+              </tr>
+            `,
+              )
+              .join("")}
+          </tbody>
+        </table></div>
+      `
+          : '<div class="empty-state">No transfers yet.</div>'
+      }
+    </div>
+  `;
+
+  // Wire save
+  $("ft-save")?.addEventListener("click", async () => {
+    const from = $("ft-from")?.value;
+    const to = $("ft-to")?.value;
+    const amount = parseFloat($("ft-amount")?.value);
+    const fee = parseFloat($("ft-fee")?.value || 0);
+    if (!from || !to || !amount || amount <= 0) {
+      toast("Fill in from, to, and a valid amount", "error");
+      return;
+    }
+    if (from === to) {
+      toast("Cannot transfer to the same account", "error");
+      return;
+    }
+
+    // Record transfer
+    const { error } = await supabase.from("fund_transfers").insert({
+      business_id: STATE.business.id,
+      branch_id: STATE.branch?.id,
+      from_account: from,
+      to_account: to,
+      amount,
+      fee,
+      reference: $("ft-ref")?.value.trim() || null,
+      notes: $("ft-notes")?.value.trim() || null,
+      status: "completed",
+      initiated_by: STATE.appUser.id,
+    });
+    if (error) {
+      toast("Transfer failed: " + error.message, "error");
+      return;
+    }
+
+    // Update account balances
+    const fromAcct = allAccounts.find((a) => a.account_name === from);
+    const toAcct = allAccounts.find((a) => a.account_name === to);
+    if (fromAcct) {
+      await supabase
+        .from("account_balances")
+        .update({
+          balance: Number(fromAcct.balance) - amount - fee,
+          last_updated: new Date().toISOString(),
+        })
+        .eq("id", fromAcct.id);
+    }
+    if (toAcct) {
+      await supabase
+        .from("account_balances")
+        .update({
+          balance: Number(toAcct.balance) + amount,
+          last_updated: new Date().toISOString(),
+        })
+        .eq("id", toAcct.id);
+    }
+
+    toast("Funds transferred", "success");
+    renderTransfersTab(body);
+  });
+}
+
+// ---------------------------------------------------------------------
+// DEPOSITS TAB
+// ---------------------------------------------------------------------
+async function renderDepositsTab(body) {
+  const [{ data: deposits }, { data: accounts }] = await Promise.all([
+    supabase
+      .from("deposits")
+      .select("*")
+      .eq("business_id", STATE.business.id)
+      .order("deposit_date", { ascending: false })
+      .limit(200),
+    supabase
+      .from("account_balances")
+      .select("*")
+      .eq("business_id", STATE.business.id)
+      .order("account_name"),
+  ]);
+
+  const allDeposits = deposits || [];
+  const allAccounts = accounts || [];
+  const totalDeposited = allDeposits
+    .filter((d) => d.status === "confirmed")
+    .reduce((a, d) => a + Number(d.amount || 0), 0);
+  const monthDeposits = allDeposits.filter((d) => {
+    const dt = new Date(d.deposit_date);
+    const now = new Date();
+    return (
+      dt.getMonth() === now.getMonth() && dt.getFullYear() === now.getFullYear()
+    );
+  });
+  const monthTotal = monthDeposits.reduce(
+    (a, d) => a + Number(d.amount || 0),
+    0,
+  );
+
+  body.innerHTML = `
+    <div class="kpi-grid" style="margin-bottom:16px;">
+      <div class="kpi-card"><div class="label">Total Deposited</div><div class="value">${fmtMoney(totalDeposited)}</div></div>
+      <div class="kpi-card"><div class="label">This Month</div><div class="value">${fmtMoney(monthTotal)}</div></div>
+      <div class="kpi-card"><div class="label">Total Deposits</div><div class="value">${allDeposits.length}</div></div>
+    </div>
+
+    <div class="grid-2" style="gap:16px; margin-bottom:16px;">
+      <div class="card">
+        <div class="card-title">Record Deposit</div>
+        <div class="field">
+          <label>Deposit To Account *</label>
+          <select id="dep-account">
+            ${allAccounts
+              .filter((a) => a.account_type !== "cash")
+              .map(
+                (a) =>
+                  `<option value="${a.account_name}">${escapeHtml(a.account_name.replace(/_/g, " "))} (${fmtMoney(a.balance)})</option>`,
+              )
+              .join("")}
+          </select>
+        </div>
+        <div class="field-row">
+          <div class="field"><label>Amount *</label><input id="dep-amount" type="number" min="0" step="0.01" /></div>
+          <div class="field">
+            <label>Method</label>
+            <select id="dep-method">
+              <option value="cash">Cash</option>
+              <option value="cheque">Cheque</option>
+              <option value="transfer">Transfer</option>
+              <option value="mobile_money">Mobile Money</option>
+            </select>
+          </div>
+        </div>
+        <div class="field-row">
+          <div class="field"><label>Deposit Date</label><input id="dep-date" type="date" value="${new Date().toISOString().slice(0, 10)}" /></div>
+          <div class="field"><label>Reference</label><input id="dep-ref" placeholder="Optional" /></div>
+        </div>
+        <div class="field"><label>Notes</label><textarea id="dep-notes" rows="2"></textarea></div>
+        <button class="btn btn-primary btn-block" id="dep-save">🏦 Record Deposit</button>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Deposit Summary by Account</div>
+        ${
+          allAccounts
+            .filter((a) => a.account_type !== "cash")
+            .map((a) => {
+              const acctDeposits = allDeposits.filter(
+                (d) => d.account === a.account_name && d.status === "confirmed",
+              );
+              const acctTotal = acctDeposits.reduce(
+                (s, d) => s + Number(d.amount || 0),
+                0,
+              );
+              return `
+            <div class="summary-row">
+              <span>${escapeHtml(a.account_name.replace(/_/g, " "))}</span>
+              <span><b>${fmtMoney(acctTotal)}</b> (${acctDeposits.length} deposits)</span>
+            </div>
+          `;
+            })
+            .join("") ||
+          '<div class="empty-state">No bank/mobile accounts.</div>'
+        }
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Deposit History</div>
+      ${
+        allDeposits.length
+          ? `
+        <div class="table-wrap"><table>
+          <thead><tr><th>Date</th><th>Account</th><th>Method</th><th>Amount</th><th>Reference</th><th>Status</th></tr></thead>
+          <tbody>
+            ${allDeposits
+              .map(
+                (d) => `
+              <tr>
+                <td>${d.deposit_date}</td>
+                <td>${escapeHtml(d.account.replace(/_/g, " "))}</td>
+                <td><span class="badge badge-gray">${d.deposit_method}</span></td>
+                <td style="font-weight:700;">${fmtMoney(d.amount)}</td>
+                <td>${escapeHtml(d.reference || "—")}</td>
+                <td><span class="badge badge-${d.status === "confirmed" ? "green" : d.status === "reversed" ? "red" : "yellow"}">${d.status}</span></td>
+              </tr>
+            `,
+              )
+              .join("")}
+          </tbody>
+        </table></div>
+      `
+          : '<div class="empty-state">No deposits recorded yet.</div>'
+      }
+    </div>
+  `;
+
+  // Wire save
+  $("dep-save")?.addEventListener("click", async () => {
+    const account = $("dep-account")?.value;
+    const amount = parseFloat($("dep-amount")?.value);
+    if (!account || !amount || amount <= 0) {
+      toast("Select account and enter a valid amount", "error");
+      return;
+    }
+
+    const { error } = await supabase.from("deposits").insert({
+      business_id: STATE.business.id,
+      branch_id: STATE.branch?.id,
+      account,
+      amount,
+      deposit_method: $("dep-method")?.value,
+      reference: $("dep-ref")?.value.trim() || null,
+      deposit_date: $("dep-date")?.value,
+      notes: $("dep-notes")?.value.trim() || null,
+      status: "confirmed",
+      recorded_by: STATE.appUser.id,
+    });
+    if (error) {
+      toast("Deposit failed: " + error.message, "error");
+      return;
+    }
+
+    // Update account balance
+    const acct = allAccounts.find((a) => a.account_name === account);
+    if (acct) {
+      await supabase
+        .from("account_balances")
+        .update({
+          balance: Number(acct.balance) + amount,
+          last_updated: new Date().toISOString(),
+        })
+        .eq("id", acct.id);
+    }
+
+    toast("Deposit recorded", "success");
+    renderDepositsTab(body);
+  });
 }
