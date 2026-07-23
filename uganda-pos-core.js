@@ -166,6 +166,35 @@ export function sanitizeCsvValue(v) {
   return s;
 }
 
+export function printHtml(html, title = "Print") {
+  const w = window.open("", "_blank");
+  if (!w) { toast("Popup blocked. Allow popups to print.", "error", 4000); return; }
+  w.document.write(`<!doctype html><html><head><title>${escapeHtml(title)}</title><style>
+    body { font-family: Arial, sans-serif; padding: 20px; margin: 0; }
+    table { width: 100%; border-collapse: collapse; }
+  </style></head><body>${html}</body></html>`);
+  w.document.close();
+  w.onload = () => { w.focus(); w.print(); w.close(); };
+}
+
+// Re-export core sales functions from POS module
+export { submitSaleToSupabase } from "./uganda-pos-view-pos.js";
+export { submitQuotationToSupabase } from "./uganda-pos-view-pos.js";
+export { receiptHtml } from "./uganda-pos-view-pos.js";
+export { printHtml as posPrintHtml } from "./uganda-pos-view-pos.js";
+  w.document
+    .write(`<!doctype html><html><head><title>${escapeHtml(title)}</title><style>
+    body { font-family: Arial, sans-serif; padding: 20px; margin: 0; }
+    table { width: 100%; border-collapse: collapse; }
+  </style></head><body>${html}</body></html>`);
+  w.document.close();
+  w.onload = () => {
+    w.focus();
+    w.print();
+    w.close();
+  };
+}
+
 // ---------------------------------------------------------------------
 // 5. DATA LOADERS
 // ---------------------------------------------------------------------

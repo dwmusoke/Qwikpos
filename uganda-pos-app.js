@@ -16,6 +16,22 @@ import {
   translatePage,
   t,
 } from "./uganda-pos-i18n.js";
+import { renderDashboard } from "./uganda-pos-view-dashboard.js";
+import { renderPOS } from "./uganda-pos-view-pos.js";
+import { renderQuotations } from "./uganda-pos-view-quotations.js";
+import { renderProductsModule } from "./uganda-pos-view-products.js";
+import { renderInventory } from "./uganda-pos-view-inventory.js";
+import { renderSalesModule } from "./uganda-pos-view-sales.js";
+import { renderPurchasesModule } from "./uganda-pos-view-purchases.js";
+import { renderCustomers } from "./uganda-pos-view-customers.js";
+import { renderSuppliers } from "./uganda-pos-view-suppliers.js";
+import { renderEfris } from "./uganda-pos-view-efris.js";
+import { renderReports } from "./uganda-pos-view-reports.js";
+import { renderAccounting } from "./uganda-pos-view-accounting.js";
+import { renderSettings } from "./uganda-pos-view-settings.js";
+import { renderChat } from "./uganda-pos-view-chat.js";
+import { renderAdmin } from "./uganda-pos-view-admin.js";
+import { renderBilling } from "./uganda-pos-view-billing.js";
 import {
   initSignupScreen,
   finishPendingSignupIfAny,
