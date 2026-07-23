@@ -197,34 +197,41 @@ export async function loadBootstrapData() {
     return true;
   }
 
-  const [
-    { data: business },
-    { data: branches },
-    { data: currencies },
-    { data: rates },
-    { data: categories },
-    { data: taxCategories },
-  ] = await Promise.all([
-    supabase
-      .from("businesses")
-      .select("*")
-      .eq("id", appUser.business_id)
-      .single(),
-    supabase
-      .from("branches")
-      .select("*")
-      .eq("business_id", appUser.business_id),
-    supabase.from("currencies").select("*").eq("is_active", true),
-    supabase
-      .from("exchange_rates")
-      .select("*")
-      .order("effective_at", { ascending: false }),
-    supabase
-      .from("categories")
-      .select("*")
-      .eq("business_id", appUser.business_id),
-    supabase.from("tax_categories").select("*"),
-  ]);
+  let business, branches, currencies, rates, categories, taxCategories;
+  try {
+    [
+      { data: business },
+      { data: branches },
+      { data: currencies },
+      { data: rates },
+      { data: categories },
+      { data: taxCategories },
+    ] = await Promise.all([
+      supabase
+        .from("businesses")
+        .select("*")
+        .eq("id", appUser.business_id)
+        .single(),
+      supabase
+        .from("branches")
+        .select("*")
+        .eq("business_id", appUser.business_id),
+      supabase.from("currencies").select("*").eq("is_active", true),
+      supabase
+        .from("exchange_rates")
+        .select("*")
+        .order("effective_at", { ascending: false }),
+      supabase
+        .from("categories")
+        .select("*")
+        .eq("business_id", appUser.business_id),
+      supabase.from("tax_categories").select("*"),
+    ]);
+  } catch (e) {
+    console.error("Bootstrap query failed:", e);
+    toast("Failed to load business data — please refresh.", "error", 8000);
+    return false;
+  }
 
   STATE.business = business;
   STATE.branches = branches || [];
@@ -244,10 +251,16 @@ export async function loadBootstrapData() {
   STATE.rates = latest;
 
   await Promise.all([
-    refreshProducts(),
-    refreshCustomers(),
-    refreshSuppliers(),
-    loadSubscription(),
+    refreshProducts().catch((e) => console.warn("refreshProducts failed:", e)),
+    refreshCustomers().catch((e) =>
+      console.warn("refreshCustomers failed:", e),
+    ),
+    refreshSuppliers().catch((e) =>
+      console.warn("refreshSuppliers failed:", e),
+    ),
+    loadSubscription().catch((e) =>
+      console.warn("loadSubscription failed:", e),
+    ),
   ]);
   return true;
 }

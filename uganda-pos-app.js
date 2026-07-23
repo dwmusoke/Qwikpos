@@ -341,13 +341,6 @@ function renderSidebarNotifBadge() {
   badge.classList.toggle("hidden", !STATE.unreadCount);
 }
 
-function renderNotifBadge() {
-  const badge = $("notif-badge");
-  if (!badge) return;
-  badge.textContent = STATE.unreadCount;
-  badge.classList.toggle("hidden", STATE.unreadCount === 0);
-}
-
 function renderNotifList() {
   const list = $("notif-list");
   if (!list) return;
@@ -459,12 +452,36 @@ async function boot() {
   $("login-screen").classList.add("hidden");
   $("signup-screen").classList.add("hidden");
   $("app-shell").classList.remove("hidden");
-  wireShell();
-  populateUserChip();
-  updateBadges();
-  wireConnectivity();
-  await wireNotifications();
-  wireImpersonation();
+  try {
+    wireShell();
+  } catch (e) {
+    console.error("wireShell failed:", e);
+  }
+  try {
+    populateUserChip();
+  } catch (e) {
+    console.error("populateUserChip failed:", e);
+  }
+  try {
+    updateBadges();
+  } catch (e) {
+    console.error("updateBadges failed:", e);
+  }
+  try {
+    wireConnectivity();
+  } catch (e) {
+    console.error("wireConnectivity failed:", e);
+  }
+  try {
+    await wireNotifications();
+  } catch (e) {
+    console.error("wireNotifications failed:", e);
+  }
+  try {
+    wireImpersonation();
+  } catch (e) {
+    console.error("wireImpersonation failed:", e);
+  }
 
   if (STATE.isSuperadmin && !STATE.business) {
     navigateTo("admin");
@@ -484,15 +501,25 @@ $("login-form").addEventListener("submit", async (e) => {
   btn.textContent = "Signing in…";
 
   const { error } = await supabase.auth.signInWithPassword({ email, password });
-  btn.disabled = false;
-  btn.textContent = "Sign In";
 
   if (error) {
+    btn.disabled = false;
+    btn.textContent = "Sign In";
     errEl.textContent = error.message;
     errEl.style.display = "block";
     return;
   }
-  await boot();
+
+  try {
+    await boot();
+  } catch (err) {
+    console.error("Boot failed:", err);
+    btn.disabled = false;
+    btn.textContent = "Sign In";
+    errEl.textContent =
+      "Failed to load the application: " + (err.message || "Unknown error");
+    errEl.style.display = "block";
+  }
 });
 
 $("show-signup-link")?.addEventListener("click", (e) => {
@@ -513,4 +540,7 @@ if (window.location.hash || window.location.search) {
   window.history.replaceState(null, "", window.location.pathname);
 }
 initSignupScreen();
-boot();
+boot().catch((err) => {
+  console.error("Auto-boot failed:", err);
+  showLoginScreen();
+});
