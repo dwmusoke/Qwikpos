@@ -439,6 +439,7 @@ function wireImpersonation() {
 function showLoginScreen() {
   $("login-screen").classList.remove("hidden");
   $("signup-screen").classList.add("hidden");
+  $("reset-screen").classList.add("hidden");
   $("app-shell").classList.add("hidden");
 }
 
@@ -535,6 +536,18 @@ $("login-form").addEventListener("submit", async (e) => {
       "Failed to load the application: " + (err.message || "Unknown error");
     errEl.style.display = "block";
   }
+
+  // If boot() returned but we're still on the login screen, something
+  // failed silently (e.g. no app_users row). Show a visible message.
+  if (!$("login-screen").classList.contains("hidden")) {
+    btn.disabled = false;
+    btn.textContent = "Sign In";
+    if (!errEl.textContent) {
+      errEl.textContent =
+        "Login succeeded but could not load your account. Please check your email was confirmed and try again.";
+      errEl.style.display = "block";
+    }
+  }
 });
 
 $("show-signup-link")?.addEventListener("click", (e) => {
@@ -549,11 +562,137 @@ $("show-login-link")?.addEventListener("click", (e) => {
 });
 
 // ---------------------------------------------------------------------
+// Forgot / Reset Password
+// ---------------------------------------------------------------------
+$("show-forgot-link")?.addEventListener("click", (e) => {
+  e.preventDefault();
+  $("login-screen").classList.add("hidden");
+  $("reset-screen").classList.remove("hidden");
+});
+
+$("show-login-from-reset")?.addEventListener("click", (e) => {
+  e.preventDefault();
+  $("reset-screen").classList.add("hidden");
+  $("login-screen").classList.remove("hidden");
+});
+
+$("reset-form")?.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const email = $("reset-email").value.trim();
+  const btn = $("reset-submit");
+  const errEl = $("reset-error");
+  const successEl = $("reset-success");
+  errEl.style.display = "none";
+  successEl.style.display = "none";
+
+  if (!email) {
+    errEl.textContent = "Please enter your email address.";
+    errEl.style.display = "block";
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = "Sending…";
+
+  const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: window.location.origin,
+  });
+
+  btn.disabled = false;
+  btn.textContent = "Send Reset Link";
+
+  if (error) {
+    errEl.textContent = error.message;
+    errEl.style.display = "block";
+  } else {
+    successEl.textContent = "Password reset link sent! Check your email inbox.";
+    successEl.style.display = "block";
+    $("reset-email").value = "";
+  }
+});
+
+// ---------------------------------------------------------------------
 // Init
 // ---------------------------------------------------------------------
-if (window.location.hash || window.location.search) {
+// Handle Supabase password recovery redirect (hash contains access_token & type=recovery)
+const hash = window.location.hash;
+if (hash && hash.includes("type=recovery")) {
+  // Supabase client processes the hash automatically.
+  // Show a simple prompt for the new password.
+  $("login-screen").classList.add("hidden");
+  $("app-shell").classList.add("hidden");
+
+  const resetCard = document.createElement("div");
+  resetCard.className = "login-wrap";
+  resetCard.innerHTML = `
+    <div class="login-card">
+      <div class="flag-strip"></div>
+      <div class="login-logo">
+        <img src="./uganda-pos-icon.svg" alt="Qwickpos" />
+        <h1>Set New Password</h1>
+        <p>Enter your new password below.</p>
+      </div>
+      <form id="recovery-form">
+        <div class="field">
+          <label for="recovery-password">New Password</label>
+          <input id="recovery-password" type="password" required placeholder="At least 6 characters" minlength="6" />
+        </div>
+        <div class="field">
+          <label for="recovery-password2">Confirm Password</label>
+          <input id="recovery-password2" type="password" required placeholder="Repeat password" minlength="6" />
+        </div>
+        <button class="btn btn-primary btn-block" type="submit" id="recovery-submit">Set Password</button>
+        <p id="recovery-error" class="help-text" style="color:var(--danger);display:none;margin-top:10px"></p>
+        <p id="recovery-success" class="help-text" style="color:var(--success);display:none;margin-top:10px"></p>
+      </form>
+    </div>
+  `;
+  document.body.appendChild(resetCard);
+
+  $("recovery-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const pw = $("recovery-password").value;
+    const pw2 = $("recovery-password2").value;
+    const errEl = $("recovery-error");
+    const successEl = $("recovery-success");
+    errEl.style.display = "none";
+    successEl.style.display = "none";
+
+    if (pw.length < 6) {
+      errEl.textContent = "Password must be at least 6 characters.";
+      errEl.style.display = "block";
+      return;
+    }
+    if (pw !== pw2) {
+      errEl.textContent = "Passwords do not match.";
+      errEl.style.display = "block";
+      return;
+    }
+
+    $("recovery-submit").disabled = true;
+    $("recovery-submit").textContent = "Saving…";
+
+    const { error } = await supabase.auth.updateUser({ password: pw });
+
+    if (error) {
+      $("recovery-submit").disabled = false;
+      $("recovery-submit").textContent = "Set Password";
+      errEl.textContent = error.message;
+      errEl.style.display = "block";
+    } else {
+      successEl.textContent = "Password updated! Redirecting to login…";
+      successEl.style.display = "block";
+      window.history.replaceState(null, "", window.location.pathname);
+      setTimeout(() => {
+        resetCard.remove();
+        showLoginScreen();
+      }, 2000);
+    }
+  });
+} else {
   window.history.replaceState(null, "", window.location.pathname);
 }
+
 initSignupScreen();
 boot().catch((err) => {
   console.error("Auto-boot failed:", err);

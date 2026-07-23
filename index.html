@@ -90,6 +90,12 @@
           ></p>
         </form>
 
+        <p class="help-text" style="text-align: center; margin-top: 10px">
+          <a href="#" id="show-forgot-link" style="color: var(--primary)"
+            >Forgot password?</a
+          >
+        </p>
+
         <p class="help-text" style="text-align: center; margin-top: 16px">
           New business?
           <a href="#" id="show-signup-link">Start your 14-day free trial</a>
@@ -176,6 +182,54 @@
 
         <p class="help-text" style="text-align: center; margin-top: 16px">
           Already have an account? <a href="#" id="show-login-link">Sign in</a>
+        </p>
+      </div>
+    </div>
+
+    <!-- ===================== RESET PASSWORD SCREEN ===================== -->
+    <div id="reset-screen" class="login-wrap hidden">
+      <div class="login-card">
+        <div class="flag-strip"></div>
+        <div class="login-logo">
+          <img src="./uganda-pos-icon.svg" alt="Qwickpos" />
+          <h1>Reset Password</h1>
+          <p>Enter your email and we'll send you a reset link.</p>
+        </div>
+
+        <form id="reset-form">
+          <div class="field">
+            <label for="reset-email">Email</label>
+            <input
+              id="reset-email"
+              type="email"
+              autocomplete="email"
+              required
+              placeholder="you@business.com"
+            />
+          </div>
+          <button
+            class="btn btn-primary btn-block"
+            type="submit"
+            id="reset-submit"
+          >
+            Send Reset Link
+          </button>
+          <p
+            id="reset-error"
+            class="help-text"
+            style="color: var(--danger); display: none; margin-top: 10px"
+          ></p>
+          <p
+            id="reset-success"
+            class="help-text"
+            style="color: var(--success); display: none; margin-top: 10px"
+          ></p>
+        </form>
+
+        <p class="help-text" style="text-align: center; margin-top: 16px">
+          <a href="#" id="show-login-from-reset" style="color: var(--primary)"
+            >← Back to Sign In</a
+          >
         </p>
       </div>
     </div>
