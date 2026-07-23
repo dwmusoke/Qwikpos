@@ -533,11 +533,18 @@
     <div id="modal-root"></div>
     <div class="toast-stack" id="toast-stack"></div>
 
-    <!-- Inline guard: prevents native form submit + catches module errors -->
+    <!-- Inline guard: prevents native form submit, removes splash, catches errors -->
     <script>
       (function () {
         "use strict";
         var loaded = false;
+        var hash = window.location.hash;
+        // Instantly kill splash when coming from landing page CTAs
+        if (hash === "#signup" || hash === "#login") {
+          var s = document.getElementById("splash-screen");
+          if (s) s.remove();
+          window.history.replaceState(null, "", window.location.pathname);
+        }
         window.addEventListener("error", function (e) {
           if (loaded) return;
           var el = document.getElementById("login-error");
@@ -564,12 +571,20 @@
                 var el = document.getElementById("login-error");
                 if (el && !el.textContent) {
                   el.innerHTML =
-                    "<b>App still loading or failed to load.</b><br>" +
-                    "If this persists, press <b>Ctrl+Shift+R</b> to hard refresh, or clear your browser cache.";
+                    "<b>App still loading.</b><br>" +
+                    "If this persists, press <b>Ctrl+Shift+R</b> to hard refresh.";
                   el.style.display = "block";
                 }
               }
             });
+          // If JS module failed, show login in case splash is still up
+          setTimeout(function () {
+            if (!loaded) {
+              var splash = document.getElementById("splash-screen");
+              if (splash) splash.remove();
+              document.getElementById("login-screen").classList.remove("hidden");
+            }
+          }, 4000);
         });
         window.__qwickposReady = function () { loaded = true; };
       })();

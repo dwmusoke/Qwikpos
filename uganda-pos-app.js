@@ -855,29 +855,15 @@ if (hash && hash.includes("type=recovery")) {
   }
 }
 
-const landingHash = window.location.hash;
-if (landingHash === "#signup" || landingHash === "#login") {
-  if (landingHash === "#signup") showSignupScreen();
-  else showLoginScreen();
-  window.history.replaceState(null, "", window.location.pathname);
+initSignupScreen().catch((e) => console.error("initSignupScreen:", e));
+initCreateBusinessScreen();
+boot().catch((err) => {
+  console.error("Auto-boot failed:", err);
+  showLoginScreen();
+});
+setTimeout(() => {
   const splash = document.getElementById("splash-screen");
-  if (splash) splash.remove();
-  initSignupScreen().catch((e) => console.error("initSignupScreen:", e));
-  initCreateBusinessScreen();
-} else {
-  initSignupScreen().catch((e) => console.error("initSignupScreen:", e));
-  initCreateBusinessScreen();
-  boot().catch((err) => {
-    console.error("Auto-boot failed:", err);
-    showLoginScreen();
-  });
-  setTimeout(() => {
-    const splash = document.getElementById("splash-screen");
-    if (splash) {
-      splash.classList.add("fade-out");
-      setTimeout(() => splash.remove(), 600);
-    }
-  }, 800);
-}
+  if (splash) { splash.classList.add("fade-out"); setTimeout(() => splash.remove(), 600); }
+}, 1000);
 
 window.__qwickposReady && window.__qwickposReady();
