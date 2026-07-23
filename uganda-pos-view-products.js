@@ -130,7 +130,7 @@ async function openProductModal(productId) {
     </div>
     <div class="field-row">
       <div class="field"><label>SKU</label><input id="pf-sku" value="${escapeHtml(p.sku || '')}" /></div>
-      <div class="field"><label>Barcode</label><input id="pf-barcode" value="${escapeHtml(p.barcode || '')}" /></div>
+      <div class="field"><label>Barcode</label><div style="display:flex;gap:6px;"><input id="pf-barcode" value="${escapeHtml(p.barcode || '')}" style="flex:1;" /><button type="button" class="btn btn-outline btn-sm" id="pf-scan-btn" title="Scan barcode with camera">📷 Scan</button></div>
     </div>
     <div class="field-row">
       <div class="field"><label>Category</label><select id="pf-category"><option value="">— None —</option>${STATE.categories.map((c) => `<option value="${c.id}" ${p.category_id === c.id ? 'selected' : ''}>${escapeHtml(c.name)}</option>`).join('')}</select></div>
@@ -166,6 +166,38 @@ async function openProductModal(productId) {
       const unitSel = $('pf-unit');
       const customWrap = $('pf-unit-custom-wrap');
       unitSel?.addEventListener('change', () => { customWrap.style.display = unitSel.value === '_custom' ? '' : 'none'; });
+
+      // Barcode scanner
+      $('pf-scan-btn')?.addEventListener('click', async () => {
+        try {
+          const { default: QrScanner } = await import('https://esm.sh/qr-scanner@1.4.2');
+          const video = document.createElement('video');
+          video.style.width = '100%';
+          video.style.maxWidth = '480px';
+          video.style.borderRadius = '12px';
+          const scannerOverlay = document.createElement('div');
+          scannerOverlay.className = 'modal-overlay';
+          scannerOverlay.style.zIndex = '300';
+          scannerOverlay.innerHTML = `<div class="modal" style="max-width:520px;text-align:center;"><div class="modal-title-row"><h3>📷 Scan Barcode</h3><button class="btn btn-ghost" id="scanner-close">&times;</button></div><p class="help-text" style="margin-bottom:12px;">Point your camera at a barcode or QR code.</p></div>`;
+          const modalContent = scannerOverlay.querySelector('.modal');
+          modalContent.appendChild(video);
+          document.body.appendChild(scannerOverlay);
+          const scanner = new QrScanner(video, (result) => {
+            if (result?.data) {
+              $('pf-barcode').value = result.data;
+              toast('Barcode scanned: ' + result.data, 'success');
+              scanner.stop();
+              scannerOverlay.remove();
+            }
+          }, { onDecodeError: () => {} });
+          await scanner.start();
+          $('scanner-close')?.addEventListener('click', () => { scanner.stop(); scannerOverlay.remove(); });
+          scannerOverlay.addEventListener('click', (e) => { if (e.target === scannerOverlay) { scanner.stop(); scannerOverlay.remove(); } });
+        } catch (scanErr) {
+          toast('Camera scanner not available. Please enter barcode manually.', 'error');
+          console.error('Scanner error:', scanErr);
+        }
+      });
 
       // Image upload
       let pendingImageFile = null;

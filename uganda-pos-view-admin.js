@@ -238,7 +238,10 @@ function renderOverview(el, d) {
 function renderVendors(el, d) {
   el.innerHTML = `
     <div class="card">
-      <div class="card-title">All Vendor Businesses</div>
+      <div class="card-title">
+        <span>All Vendor Businesses</span>
+        <button class="btn btn-primary btn-sm" id="admin-add-business">+ Add Business</button>
+      </div>
       <div class="table-wrap">
         <table>
           <thead><tr><th>Business</th><th>Owner</th><th>Plan</th><th>Status</th><th>Branches</th><th>Users</th><th>Products</th><th></th></tr></thead>
@@ -294,6 +297,52 @@ function renderVendors(el, d) {
       impersonateVendor(btn.dataset.impersonate, d),
     ),
   );
+
+  $("admin-add-business")?.addEventListener("click", () => {
+    openModal(`
+      <div class="modal-title-row"><h3>Create New Business</h3></div>
+      <div class="field"><label>Business Name</label><input id="ab-name" required placeholder="My Shop" /></div>
+      <div class="field"><label>Admin Name</label><input id="ab-admin-name" required placeholder="John Doe" /></div>
+      <div class="field"><label>Admin Email (creates auth account)</label><input id="ab-email" type="email" required placeholder="admin@myshop.com" /></div>
+      <div class="field-row">
+        <div class="field"><label>Admin Phone</label><input id="ab-phone" placeholder="+2567xxxxxxxx" /></div>
+        <div class="field"><label>Base Currency</label><select id="ab-currency"><option value="UGX">UGX</option><option value="USD">USD</option><option value="KES">KES</option></select></div>
+      </div>
+      <div class="field"><label>Plan</label><select id="ab-plan">${(d.plans || []).map((p) => `<option value="${p.id}">${escapeHtml(p.name)} (${Number(p.price_ugx).toLocaleString()} UGX/mo)</option>`).join("")}</select></div>
+      <div class="field"><label>Admin Password</label><input id="ab-pw" type="password" required minlength="8" placeholder="At least 8 characters" /></div>
+      <div class="flex gap" style="margin-top:14px">
+        <button class="btn btn-outline btn-block" data-close-modal>Cancel</button>
+        <button class="btn btn-primary btn-block" id="ab-save">Create Business</button>
+      </div>
+    `, {
+      onMount: async () => {
+        $("ab-save").addEventListener("click", async () => {
+          const bizName = $("ab-name").value.trim();
+          const adminName = $("ab-admin-name").value.trim();
+          const email = $("ab-email").value.trim();
+          const phone = $("ab-phone").value.trim();
+          const currency = $("ab-currency").value;
+          const planId = $("ab-plan").value;
+          const password = $("ab-pw").value;
+          if (!bizName || !adminName || !email || password.length < 8) { toast("All fields required (password 8+ chars)", "error"); return; }
+          const { data: authData, error: authErr } = await supabase.auth.admin.createUser({ email, password, email_confirm: true });
+          if (authErr) { toast("Auth error: " + authErr.message, "error"); return; }
+          const { data: business, error: bizErr } = await supabase.from("businesses").insert({ name: bizName, base_currency: currency, primary_phone: phone || null }).select().single();
+          if (bizErr) { toast("Business error: " + bizErr.message, "error"); return; }
+          const { error: branchErr } = await supabase.from("branches").insert({ business_id: business.id, name: "Main Branch", is_main: true });
+          if (branchErr) { toast("Branch error: " + branchErr.message, "error"); return; }
+          const { error: userErr } = await supabase.from("app_users").insert({ id: authData.user.id, business_id: business.id, full_name: adminName, phone: phone || null, role: "admin", is_active: true });
+          if (userErr) { toast("User error: " + userErr.message, "error"); return; }
+          const trialEnd = new Date(); trialEnd.setDate(trialEnd.getDate() + 14);
+          const { error: subErr } = await supabase.from("subscriptions").insert({ business_id: business.id, plan_id: planId, status: "trialing", trial_ends_at: trialEnd.toISOString(), current_period_end: trialEnd.toISOString() });
+          if (subErr) { toast("Sub error: " + subErr.message, "error"); return; }
+          toast("Business created with admin account", "success");
+          closeModal();
+          document.querySelector('[data-route="admin"]')?.click();
+        });
+      },
+    });
+  });
 }
 
 async function impersonateVendor(businessId, d) {
@@ -391,6 +440,7 @@ function openManageModal(business, sub, plans, branches, users) {
       <div class="flex gap" style="margin-top:14px">
         <button class="btn btn-outline btn-block" data-close-modal>Cancel</button>
         <button class="btn btn-primary btn-block" id="mg-save-btn">Save Changes</button>
+        <button class="btn btn-danger btn-block" id="mg-delete-btn">Delete Business</button>
       </div>
     </div>
 
@@ -514,6 +564,17 @@ function openManageModal(business, sub, plans, branches, users) {
           document.querySelector('[data-route="admin"]')?.click();
         });
 
+        // Delete business
+        $("mg-delete-btn")?.addEventListener("click", async () => {
+          if (!confirm("Delete business ${escapeHtml(business.name)} and ALL its data? This CANNOT be undone.")) return;
+          if (!confirm("Are you sure? This will delete all sales, products, users, and settings for this business.")) return;
+          const { error } = await supabase.from("businesses").delete().eq("id", business.id);
+          if (error) { toast("Delete failed: " + error.message, "error"); return; }
+          toast("Business deleted", "success");
+          closeModal();
+          document.querySelector('[data-route="admin"]')?.click();
+        });
+
         // Add branch
         $("mg-add-branch")?.addEventListener("click", async () => {
           const name = prompt("Branch name:");
@@ -622,7 +683,10 @@ function openManageModal(business, sub, plans, branches, users) {
 function renderUsers(el, d) {
   el.innerHTML = `
     <div class="card">
-      <div class="card-title">All Users (${(d.users || []).length})</div>
+      <div class="card-title">
+        <span>All Users (${(d.users || []).length})</span>
+        <button class="btn btn-primary btn-sm" id="admin-add-user">+ Add User</button>
+      </div>
       <div class="table-wrap" style="max-height:600px;overflow-y:auto">
         <table>
           <thead><tr><th>Name</th><th>Business</th><th>Role</th><th>Status</th><th>Joined</th><th></th></tr></thead>
@@ -652,6 +716,47 @@ function renderUsers(el, d) {
     </div>
   `;
 
+  $("admin-add-user").addEventListener("click", () => {
+    openModal(`
+      <div class="modal-title-row"><h3>Add User</h3></div>
+      <div class="field"><label>Full Name</label><input id="au-name" required placeholder="John Doe" /></div>
+      <div class="field"><label>Email (creates auth account)</label><input id="au-email" type="email" required placeholder="john@example.com" /></div>
+      <div class="field"><label>Phone</label><input id="au-phone" placeholder="+2567xxxxxxxx" /></div>
+      <div class="field"><label>Business</label><select id="au-business">${(d.businesses || []).map((b) => `<option value="${b.id}">${escapeHtml(b.name)}</option>`).join("")}</select></div>
+      <div class="field"><label>Role</label><select id="au-role">${["admin", "manager", "cashier", "inventory_clerk", "accountant"].map((r) => `<option value="${r}">${r.replace("_", " ")}</option>`).join("")}</select></div>
+      <div class="field"><label>Password</label><input id="au-pw" type="password" required minlength="8" placeholder="At least 8 characters" /></div>
+      <div class="flex gap" style="margin-top:14px">
+        <button class="btn btn-outline btn-block" data-close-modal>Cancel</button>
+        <button class="btn btn-primary btn-block" id="au-save">Create User</button>
+      </div>
+    `, {
+      onMount: () => {
+        $("au-save").addEventListener("click", async () => {
+          const name = $("au-name").value.trim();
+          const email = $("au-email").value.trim();
+          const phone = $("au-phone").value.trim();
+          const businessId = $("au-business").value;
+          const role = $("au-role").value;
+          const password = $("au-pw").value;
+          if (!name || !email || password.length < 8) { toast("Name, email, and password (8+ chars) required", "error"); return; }
+          const biz = d.businessById[businessId];
+          const branch = (d.branchesByBusiness[businessId] || [])[0];
+          if (!branch) { toast("Business has no branches", "error"); return; }
+          const { data: authData, error: authErr } = await supabase.auth.admin.createUser({ email, password, email_confirm: true });
+          if (authErr) { toast("Auth error: " + authErr.message, "error"); return; }
+          const { error: userErr } = await supabase.from("app_users").insert({
+            id: authData.user.id, business_id: businessId, branch_id: branch.id,
+            full_name: name, phone: phone || null, role, is_active: true,
+          });
+          if (userErr) { toast("DB error: " + userErr.message, "error"); return; }
+          toast("User created", "success");
+          closeModal();
+          document.querySelector('[data-route="admin"]')?.click();
+        });
+      },
+    });
+  });
+
   qsa("[data-user-manage]", el).forEach((btn) => {
     btn.addEventListener("click", async () => {
       const u = (d.users || []).find((u) => u.id === btn.dataset.userManage);
@@ -668,23 +773,23 @@ function renderUsers(el, d) {
         <div class="flex gap" style="margin-top:14px">
           <button class="btn btn-outline btn-block" data-close-modal>Cancel</button>
           <button class="btn btn-primary btn-block" id="um-save">Save</button>
+          <button class="btn btn-danger btn-block" id="um-delete">Delete User</button>
         </div>
       `,
         {
           onMount: () => {
             $("um-save").addEventListener("click", async () => {
-              const { error } = await supabase
-                .from("app_users")
-                .update({
-                  role: $("um-role").value,
-                  is_active: $("um-active").value === "true",
-                })
-                .eq("id", u.id);
-              if (error) {
-                toast("Failed: " + error.message, "error");
-                return;
-              }
+              const { error } = await supabase.from("app_users").update({ role: $("um-role").value, is_active: $("um-active").value === "true" }).eq("id", u.id);
+              if (error) { toast("Failed: " + error.message, "error"); return; }
               toast("User updated", "success");
+              closeModal();
+              document.querySelector('[data-route="admin"]')?.click();
+            });
+            $("um-delete").addEventListener("click", async () => {
+              if (!confirm("Delete user ${escapeHtml(u.full_name)}? This cannot be undone.")) return;
+              const { error } = await supabase.from("app_users").delete().eq("id", u.id);
+              if (error) { toast("Delete failed: " + error.message, "error"); return; }
+              toast("User deleted", "success");
               closeModal();
               document.querySelector('[data-route="admin"]')?.click();
             });
