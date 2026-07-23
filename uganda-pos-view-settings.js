@@ -1,7 +1,7 @@
 // =====================================================================
 // QWICKPOS — SETTINGS VIEW
 // =====================================================================
-import { supabase, STATE, $, qsa, escapeHtml, toast, hasRole, applyTheme } from './uganda-pos-core.js';
+import { supabase, STATE, $, qsa, escapeHtml, toast, hasRole, applyTheme, openModal } from './uganda-pos-core.js';
 
 export async function renderSettings(root) {
   const { data: users } = await supabase.from('app_users').select('*').eq('business_id', STATE.business.id);
@@ -368,7 +368,19 @@ export async function renderSettings(root) {
           return;
         } catch (e2) {
           logoProgress.textContent = "";
-          toast("Go to Supabase Dashboard → Storage → Create a public 'logos' bucket.", "error", 6000);
+          openModal(`<div style="text-align:center;padding:8px;">
+            <span style="font-size:48px;display:block;margin-bottom:12px;">📦</span>
+            <h3 style="margin:0 0 8px;">Storage Bucket Required</h3>
+            <p style="color:var(--text-muted);margin-bottom:16px;line-height:1.5;">Create a public bucket in Supabase Storage:</p>
+            <ol style="text-align:left;color:var(--text-muted);font-size:13px;line-height:1.8;margin-bottom:16px;padding-left:20px;">
+              <li>Go to <b>Supabase Dashboard</b></li>
+              <li>Click <b>Storage</b> → <b>Create bucket</b></li>
+              <li>Name: <code style="background:var(--surface-2);padding:2px 6px;border-radius:4px;">logos</code></li>
+              <li>Enable <b>Public bucket</b></li>
+              <li>Click <b>Create</b></li>
+            </ol>
+            <a href="https://supabase.com/dashboard/project/ixntllvgntshbfocwuur/storage/buckets" target="_blank" class="btn btn-primary">Open Supabase Storage →</a>
+          </div>`);
           return;
         }
       }
