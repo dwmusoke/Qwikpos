@@ -44,7 +44,7 @@ begin
   if not exists (select 1 from app_users where id = auth.uid() and role = 'superadmin' and is_active = true) then
     raise exception 'Not authorized';
   end if;
-  return (select jsonb_agg(to_jsonb(b.*)) from businesses b);
+  return coalesce((select jsonb_agg(to_jsonb(b.*)) from businesses b), '[]'::jsonb);
 end;
 $$;
 
@@ -56,7 +56,7 @@ begin
   if not exists (select 1 from app_users where id = auth.uid() and role = 'superadmin' and is_active = true) then
     raise exception 'Not authorized';
   end if;
-  return (select jsonb_agg(to_jsonb(u.*)) from app_users u);
+  return coalesce((select jsonb_agg(to_jsonb(u.*)) from app_users u), '[]'::jsonb);
 end;
 $$;
 
@@ -68,13 +68,13 @@ begin
   if not exists (select 1 from app_users where id = auth.uid() and role = 'superadmin' and is_active = true) then
     raise exception 'Not authorized';
   end if;
-  return (select jsonb_agg(jsonb_build_object(
+  return coalesce((select jsonb_agg(jsonb_build_object(
     'id', s.id, 'business_id', s.business_id, 'plan_id', s.plan_id,
     'status', s.status, 'trial_ends_at', s.trial_ends_at,
     'current_period_end', s.current_period_end, 'current_period_start', s.current_period_start,
     'auto_renew', s.auto_renew, 'created_at', s.created_at, 'updated_at', s.updated_at,
     'plans', (select to_jsonb(p.*) from plans p where p.id = s.plan_id)
-  )) from subscriptions s);
+  )) from subscriptions s), '[]'::jsonb);
 end;
 $$;
 
@@ -86,12 +86,12 @@ begin
   if not exists (select 1 from app_users where id = auth.uid() and role = 'superadmin' and is_active = true) then
     raise exception 'Not authorized';
   end if;
-  return (select jsonb_agg(jsonb_build_object(
+  return coalesce((select jsonb_agg(jsonb_build_object(
     'id', p.id, 'business_id', p.business_id, 'plan_id', p.plan_id,
     'amount', p.amount, 'currency', p.currency, 'status', p.status,
     'flw_tx_ref', p.flw_tx_ref, 'created_at', p.created_at,
     'plans', (select to_jsonb(pl.*) from plans pl where pl.id = p.plan_id)
-  )) from subscription_payments p order by p.created_at desc limit 50);
+  )) from subscription_payments p order by p.created_at desc limit 50), '[]'::jsonb);
 end;
 $$;
 
@@ -103,7 +103,7 @@ begin
   if not exists (select 1 from app_users where id = auth.uid() and role = 'superadmin' and is_active = true) then
     raise exception 'Not authorized';
   end if;
-  return (select jsonb_agg(to_jsonb(b.*)) from branches b);
+  return coalesce((select jsonb_agg(to_jsonb(b.*)) from branches b), '[]'::jsonb);
 end;
 $$;
 
@@ -115,7 +115,7 @@ begin
   if not exists (select 1 from app_users where id = auth.uid() and role = 'superadmin' and is_active = true) then
     raise exception 'Not authorized';
   end if;
-  return (select jsonb_agg(to_jsonb(s.*)) from sales s);
+  return coalesce((select jsonb_agg(to_jsonb(s.*)) from sales s), '[]'::jsonb);
 end;
 $$;
 
@@ -127,9 +127,42 @@ begin
   if not exists (select 1 from app_users where id = auth.uid() and role = 'superadmin' and is_active = true) then
     raise exception 'Not authorized';
   end if;
-  return (select jsonb_agg(to_jsonb(p.*)) from products p);
+  return coalesce((select jsonb_agg(to_jsonb(p.*)) from products p), '[]'::jsonb);
 end;
 $$;
+
+-- ---------------------------------------------------------------------
+-- 6. PLATFORM SETTINGS TABLE
+-- ---------------------------------------------------------------------
+create table if not exists platform_settings (
+  id uuid primary key default gen_random_uuid(),
+  key text unique not null,
+  value text,
+  updated_at timestamptz default now()
+);
+insert into platform_settings (key, value) values
+  ('system_name', 'Qwickpos'),
+  ('support_email', 'support@qwickpos.com'),
+  ('maintenance_mode', 'false'),
+  ('default_trial_days', '14')
+on conflict (key) do nothing;
+
+drop trigger if exists trg_platform_settings_updated_at on platform_settings;
+create trigger trg_platform_settings_updated_at before update on platform_settings
+  for each row execute function set_updated_at();
+
+drop function if exists admin_get_platform_settings();
+create or replace function admin_get_platform_settings()
+returns jsonb
+language plpgsql security definer stable as $$
+begin
+  if not exists (select 1 from app_users where id = auth.uid() and role = 'superadmin' and is_active = true) then
+    raise exception 'Not authorized';
+  end if;
+  return coalesce((select jsonb_agg(to_jsonb(s.*)) from platform_settings s), '[]'::jsonb);
+end;
+$$;
+grant execute on function admin_get_platform_settings() to authenticated;
 
 grant execute on function admin_get_businesses() to authenticated;
 grant execute on function admin_get_users() to authenticated;
