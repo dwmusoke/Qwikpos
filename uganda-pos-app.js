@@ -857,11 +857,18 @@ if (hash && hash.includes("type=recovery")) {
 
 initSignupScreen();
 initCreateBusinessScreen();
-boot().catch((err) => {
-  console.error("Auto-boot failed:", err);
-  showLoginScreen();
-  handleLandingHash();
-});
+
+const landingHash = window.location.hash;
+if (landingHash === "#signup" || landingHash === "#login") {
+  if (landingHash === "#signup") showSignupScreen();
+  else showLoginScreen();
+  window.history.replaceState(null, "", window.location.pathname);
+} else {
+  boot().catch((err) => {
+    console.error("Auto-boot failed:", err);
+    showLoginScreen();
+  });
+}
 
 window.__qwickposReady && window.__qwickposReady();
 
