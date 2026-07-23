@@ -204,6 +204,11 @@ function wireShell() {
     link.addEventListener("click", () => navigateTo(route));
   });
 
+  // Superadmin with no business: hide nav group labels (all links hidden anyway)
+  if (STATE.isSuperadmin && !STATE.business) {
+    qsa(".nav-group-label").forEach((el) => (el.style.display = "none"));
+  }
+
   $("menu-btn").addEventListener("click", () => {
     $("sidebar").classList.add("open");
     $("sidebar-backdrop").classList.add("show");
