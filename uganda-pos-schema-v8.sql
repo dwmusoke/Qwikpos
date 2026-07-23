@@ -232,7 +232,46 @@ $$;
 grant execute on function create_business_and_owner(text, text, text, text, text) to authenticated;
 
 -- ---------------------------------------------------------------------
--- 5. THEME COLUMNS for businesses table
+-- 5. MISSING RLS POLICIES (categories, brands, units etc. have no INSERT policies)
+-- ---------------------------------------------------------------------
+alter table categories enable row level security;
+drop policy if exists categories_select on categories;
+create policy categories_select on categories for select
+  using (business_id = auth_business_id() OR is_superadmin());
+drop policy if exists categories_insert on categories;
+create policy categories_insert on categories for insert
+  with check (business_id = auth_business_id());
+
+alter table brands enable row level security;
+drop policy if exists brands_select on brands;
+create policy brands_select on brands for select
+  using (business_id = auth_business_id() OR is_superadmin());
+drop policy if exists brands_insert on brands;
+create policy brands_insert on brands for insert
+  with check (business_id = auth_business_id());
+drop policy if exists brands_update on brands;
+create policy brands_update on brands for update
+  using (business_id = auth_business_id())
+  with check (business_id = auth_business_id());
+
+alter table units enable row level security;
+drop policy if exists units_select on units;
+create policy units_select on units for select
+  using (is_active = true OR is_superadmin());
+drop policy if exists units_insert on units;
+create policy units_insert on units for insert
+  with check (true);
+
+alter table exchange_rates enable row level security;
+drop policy if exists exchange_rates_select on exchange_rates;
+create policy exchange_rates_select on exchange_rates for select
+  using (true);
+drop policy if exists exchange_rates_insert on exchange_rates;
+create policy exchange_rates_insert on exchange_rates for insert
+  with check (true);
+
+-- ---------------------------------------------------------------------
+-- 6. THEME COLUMNS for businesses table
 -- ---------------------------------------------------------------------
 alter table businesses add column if not exists theme_color text default '#0f6b4a';
 alter table businesses add column if not exists theme_font_size text default '15px';
