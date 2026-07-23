@@ -808,7 +808,6 @@ function openImportModal() {
       URL.revokeObjectURL(url);
     });
     $('import-run').addEventListener('click', async () => {
-    $('import-run').addEventListener('click', async () => {
       const file = $('import-file').files[0];
       if (!file) { toast('Select a CSV file', 'error'); return; }
       const text = await file.text();
