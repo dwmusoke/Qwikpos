@@ -587,45 +587,13 @@ export async function renderSettings(root) {
       toast("Logo updated successfully", "success");
       document.querySelector(".brand-row img")?.setAttribute("src", logoUrl);
     } catch (e) {
-      const msg = e.message || String(e);
-      if (msg.includes("Bucket not found")) {
-        try {
-          await supabase.storage.createBucket("logos", { public: true });
-          logoProgress.textContent = "Retrying upload…";
-          const logoUrl = await tryUpload();
-          STATE.business.logo_url = logoUrl;
-          logoProgress.textContent = "Logo uploaded!";
-          setTimeout(() => { logoProgress.style.display = "none"; }, 2000);
-          logoRemoveBtn.style.display = "";
-          toast("Logo uploaded (bucket auto-created)", "success");
-          document.querySelector(".brand-row img")?.setAttribute("src", logoUrl);
-          return;
-        } catch (e2) {
-          logoProgress.style.display = "none";
-          openModal(`<div style="text-align:center;padding:8px;">
-            <span style="font-size:48px;display:block;margin-bottom:12px;">📦</span>
-            <h3 style="margin:0 0 8px;">Storage Bucket Required</h3>
-            <p style="color:var(--text-muted);margin-bottom:16px;line-height:1.5;">Create a public bucket in Supabase Storage:</p>
-            <ol style="text-align:left;color:var(--text-muted);font-size:13px;line-height:1.8;margin-bottom:16px;padding-left:20px;">
-              <li>Go to <b>Supabase Dashboard</b></li>
-              <li>Click <b>Storage</b> → <b>Create bucket</b></li>
-              <li>Name: <code style="background:var(--surface-2);padding:2px 6px;border-radius:4px;">logos</code></li>
-              <li>Enable <b>Public bucket</b></li>
-              <li>Click <b>Create</b></li>
-            </ol>
-            <a href="https://supabase.com/dashboard/project/ixntllvgntshbfocwuur/storage/buckets" target="_blank" class="btn btn-primary">Open Supabase Storage →</a>
-          </div>`);
-          return;
-        }
-      }
       logoProgress.style.display = "none";
-      openModal(`<div style="text-align:center;padding:8px;">
-        <span style="font-size:48px;display:block;margin-bottom:12px;">⚠️</span>
-        <h3 style="margin:0 0 8px;">Logo Upload Failed</h3>
-        <p style="color:var(--text-muted);margin-bottom:16px;line-height:1.5;">${escapeHtml(msg)}</p>
-        <p style="color:var(--text-muted);margin-bottom:16px;font-size:13px;line-height:1.5;">If this is a permissions error, check that the <code style="background:var(--surface-2);padding:2px 6px;border-radius:4px;">logos</code> bucket has the correct RLS policies, or set it to <b>Public</b> in Supabase Dashboard → Storage.</p>
-        <button class="btn btn-primary" onclick="this.closest('.modal-overlay').remove()">OK</button>
-      </div>`);
+      const msg = e.message || String(e);
+      if (msg.includes("Bucket not found") || msg.includes("bucket")) {
+        toast("Run uganda-pos-schema-v8c.sql in Supabase SQL Editor to create storage buckets, then try again.", "error", 6000);
+      } else {
+        toast("Upload failed: " + msg, "error", 5000);
+      }
     }
   });
 

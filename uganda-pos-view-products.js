@@ -267,18 +267,7 @@ async function openProductModal(productId) {
           const path = `${STATE.business.id}/${saved.id}.${ext}`;
           const { error: uploadErr } = await supabase.storage.from('product-images').upload(path, pendingImageFile, { upsert: true });
           if (uploadErr?.message?.includes("Bucket not found")) {
-            try {
-              await supabase.storage.createBucket("product-images", { public: true });
-              const retry = await supabase.storage.from('product-images').upload(path, pendingImageFile, { upsert: true });
-              if (!retry.error) {
-                const { data: urlData } = supabase.storage.from('product-images').getPublicUrl(path);
-                await supabase.from('products').update({ image_url: urlData.publicUrl }).eq('id', saved.id);
-              } else {
-                toast("Image upload failed: " + retry.error.message, "error");
-              }
-            } catch (e2) {
-              toast("Create 'product-images' bucket in Supabase Storage (public)", "error", 5000);
-            }
+            toast("Run uganda-pos-schema-v8c.sql to create storage buckets, then try again.", "error", 6000);
           } else if (uploadErr) {
             toast("Image upload failed: " + uploadErr.message, "error");
           } else {
