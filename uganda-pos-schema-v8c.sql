@@ -1,7 +1,31 @@
 -- =====================================================================
 -- QWICKPOS — SCHEMA V8C
--- Add missing columns and tables across multiple tables
+-- Add missing columns, tables, and fix RLS policies
 -- =====================================================================
+
+-- Ensure is_superadmin() exists (needed for RLS policies)
+drop function if exists is_superadmin();
+create or replace function is_superadmin() returns boolean
+language sql security definer stable as $$
+  select exists (
+    select 1 from app_users where id = auth.uid() and role = 'superadmin' and is_active = true
+  );
+$$;
+grant execute on function is_superadmin() to authenticated, anon;
+
+-- Ensure auth_business_id() exists
+drop function if exists auth_business_id();
+create or replace function auth_business_id() returns uuid
+language sql security definer stable as $$
+  select business_id from app_users where id = auth.uid()
+$$;
+
+-- Fix branches RLS — drop and recreate with proper INSERT support
+alter table branches enable row level security;
+drop policy if exists business_isolation_branches on branches;
+create policy business_isolation_branches on branches
+  for all using (business_id = auth_business_id() or is_superadmin())
+  with check (business_id = auth_business_id() or is_superadmin());
 
 -- Orders table (referenced by uganda-pos-view-orders.js, not in base schema)
 create table if not exists orders (

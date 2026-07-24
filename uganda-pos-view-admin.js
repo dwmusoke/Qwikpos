@@ -370,6 +370,19 @@ async function impersonateVendor(businessId, d) {
           STATE.appUser = targetUser;
           STATE.branch = (d.branchesByBusiness[businessId] || [])[0] || null;
 
+          // If no branch found from pre-loaded data, fetch directly
+          if (!STATE.branch) {
+            const { data: freshBranches } = await supabase
+              .from("branches")
+              .select("*")
+              .eq("business_id", businessId)
+              .order("is_main", { ascending: false });
+            STATE.branches = freshBranches || [];
+            STATE.branch = STATE.branches[0] || null;
+          } else {
+            STATE.branches = d.branchesByBusiness[businessId] || [];
+          }
+
           toast(
             `Now viewing as ${targetUser.full_name} (${business.name})`,
             "success",

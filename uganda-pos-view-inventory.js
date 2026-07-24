@@ -401,6 +401,10 @@ function openProductModal(productId) {
 // STOCK IN / OUT / ADJUSTMENT
 // ---------------------------------------------------------------------
 function openStockModal(productId) {
+  if (!STATE.branch) {
+    toast("No branch selected. Go to Settings → Warehouses to create a branch first.", "error", 5000);
+    return;
+  }
   const p = STATE.products.find((x) => x.id === productId);
   const currentStock = stockFor(productId);
 
