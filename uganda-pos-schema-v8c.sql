@@ -84,7 +84,7 @@ create policy business_isolation_branches on branches
   for all using (business_id = auth_business_id() or is_superadmin())
   with check (business_id = auth_business_id() or is_superadmin());
 
--- Create storage buckets (if not exists) and ensure public
+-- Storage buckets: ensure they exist and are public
 DO $$
 BEGIN
   INSERT INTO storage.buckets (id, name, public) VALUES ('logos', 'logos', true)
@@ -93,22 +93,23 @@ BEGIN
     ON CONFLICT (id) DO UPDATE SET public = true;
 END $$;
 
--- Storage RLS policies for logos bucket (single FOR ALL policy per bucket)
-DROP POLICY IF EXISTS "logos_public_select" ON storage.objects;
-DROP POLICY IF EXISTS "logos_insert_auth" ON storage.objects;
-DROP POLICY IF EXISTS "logos_delete_auth" ON storage.objects;
-DROP POLICY IF EXISTS "logos_update_auth" ON storage.objects;
-DROP POLICY IF EXISTS "logos_all" ON storage.objects;
+-- Remove ALL existing policies on storage.objects (clean slate)
+DO $$
+DECLARE
+  pol RECORD;
+BEGIN
+  FOR pol IN SELECT policyname FROM pg_policies WHERE schemaname = 'storage' AND tablename = 'objects'
+  LOOP
+    EXECUTE format('DROP POLICY IF EXISTS %I ON storage.objects', pol.policyname);
+  END LOOP;
+END $$;
+
+-- Full access policies for logos bucket
 CREATE POLICY "logos_all" ON storage.objects
   FOR ALL USING (bucket_id = 'logos')
   WITH CHECK (bucket_id = 'logos');
 
--- Storage RLS policies for product-images bucket
-DROP POLICY IF EXISTS "product_images_public_select" ON storage.objects;
-DROP POLICY IF EXISTS "product_images_insert_auth" ON storage.objects;
-DROP POLICY IF EXISTS "product_images_delete_auth" ON storage.objects;
-DROP POLICY IF EXISTS "product_images_update_auth" ON storage.objects;
-DROP POLICY IF EXISTS "product_images_all" ON storage.objects;
+-- Full access policies for product-images bucket
 CREATE POLICY "product_images_all" ON storage.objects
   FOR ALL USING (bucket_id = 'product-images')
   WITH CHECK (bucket_id = 'product-images');
