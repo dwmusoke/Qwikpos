@@ -1,10 +1,52 @@
 -- =====================================================================
 -- QWICKPOS — SCHEMA V8D
--- Create missing tables, add missing columns, fix stock trigger
+-- Create missing tables, add missing columns, fix stock trigger, taxes
 -- =====================================================================
 
 -- Add branch_id to purchase_orders (missing from original schema)
 alter table purchase_orders add column if not exists branch_id uuid references branches(id);
+
+-- ═══════════════════════════════════════════════════════════════════════
+-- FIX STOCK TRIGGER: SECURITY DEFINER to bypass RLS on product_stock
+-- ═══════════════════════════════════════════════════════════════════════
+create or replace function apply_sale_stock() returns trigger as $$
+declare
+  v_branch uuid;
+  v_business uuid;
+  v_sale_type text;
+begin
+  select branch_id, business_id, sale_type into v_branch, v_business, v_sale_type from sales where id = new.sale_id;
+
+  if v_sale_type = 'quotation' then
+    return new;
+  end if;
+
+  insert into product_stock (product_id, branch_id, quantity)
+  values (new.product_id, v_branch, -new.quantity)
+  on conflict (product_id, branch_id)
+  do update set quantity = product_stock.quantity - new.quantity;
+
+  insert into stock_movements (business_id, branch_id, product_id, type, quantity, reference, created_at)
+  values (v_business, v_branch, new.product_id, 'sale', new.quantity, new.sale_id::text, now());
+
+  return new;
+end;
+$$ language plpgsql security definer;
+
+-- Ensure trigger exists on sale_items
+drop trigger if exists trg_apply_sale_stock on sale_items;
+create trigger trg_apply_sale_stock after insert on sale_items
+  for each row execute function apply_sale_stock();
+
+-- ═══════════════════════════════════════════════════════════════════════
+-- FIX TAX CATEGORIES: ensure seed data exists
+-- ═══════════════════════════════════════════════════════════════════════
+insert into tax_categories (code, name, rate, efris_tax_code) values
+  ('STD', 'Standard Rated (18%)', 18.00, '01'),
+  ('ZERO', 'Zero Rated', 0.00, '02'),
+  ('EXEMPT', 'Exempt', 0.00, '03'),
+  ('DEEMED', 'Deemed VAT', 18.00, '04')
+on conflict (code) do nothing;
 
 -- Coupons
 create table if not exists coupons (
