@@ -13,6 +13,7 @@ import {
   hasRole,
   fmtMoney,
   fmtMoneyRaw,
+  fmtDate,
   stockFor,
   sanitizeCsvValue,
 } from "./uganda-pos-core.js";
