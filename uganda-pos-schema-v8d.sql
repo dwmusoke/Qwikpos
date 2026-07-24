@@ -43,10 +43,19 @@ create trigger trg_apply_sale_stock after insert on sale_items
 -- ═══════════════════════════════════════════════════════════════════════
 insert into tax_categories (code, name, rate, efris_tax_code) values
   ('STD', 'Standard Rated (18%)', 18.00, '01'),
+  ('VAT', 'VAT (18%)', 18.00, '01'),
   ('ZERO', 'Zero Rated', 0.00, '02'),
   ('EXEMPT', 'Exempt', 0.00, '03'),
   ('DEEMED', 'Deemed VAT', 18.00, '04')
 on conflict (code) do nothing;
+
+-- Migrate any existing products and sale_items from STD to VAT
+update sale_items set tax_category_code = 'VAT' where tax_category_code = 'STD';
+update products set tax_category_code = 'VAT' where tax_category_code = 'STD';
+-- Update products table default from STD to VAT
+alter table products alter column tax_category_code set default 'VAT';
+-- Remove old STD code
+delete from tax_categories where code = 'STD';
 
 -- Coupons
 create table if not exists coupons (

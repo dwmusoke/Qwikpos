@@ -527,7 +527,7 @@ function addToCart(productId, qty = 1) {
       name: product.name,
       qty: addQty,
       unitPriceBase: Number(product.selling_price),
-      taxCode: product.tax_category_code || "STD",
+      taxCode: product.tax_category_code || "VAT",
       discount: 0,
     });
   }

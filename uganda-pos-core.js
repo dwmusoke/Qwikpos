@@ -837,8 +837,8 @@ export async function flushOfflineQueue(insertSaleFn) {
 //     Invoices" doc link above for those payload shapes if you need them.
 // ---------------------------------------------------------------------
 
-const EFRIS_TAX_CODE = { STD: "01", ZERO: "02", EXEMPT: "03", DEEMED: "04" };
-const EFRIS_TAX_RATE = { STD: "0.18", ZERO: "0", EXEMPT: "-", DEEMED: "0.18" };
+const EFRIS_TAX_CODE = { VAT: "01", STD: "01", ZERO: "02", EXEMPT: "03", DEEMED: "04" };
+const EFRIS_TAX_RATE = { VAT: "0.18", STD: "0.18", ZERO: "0", EXEMPT: "-", DEEMED: "0.18" };
 
 const PAYMENT_MODE_CODE = {
   credit: "101",

@@ -154,7 +154,7 @@ function renderProductTable() {
         <td>${fmtMoney(p.cost_price)}</td>
         <td>${fmtMoney(p.selling_price)}</td>
         <td><span class="badge ${low ? "badge-red" : "badge-green"}">${stock} ${escapeHtml(p.unit || "pc")}</span></td>
-        <td><span class="badge badge-blue">${escapeHtml(p.tax_category_code || "STD")}</span></td>
+        <td><span class="badge badge-blue">${escapeHtml(p.tax_category_code || "VAT")}</span></td>
         ${efrisOn ? `<td>${p.efris_registered_at ? '<span class="badge badge-green">registered</span>' : `<button class="btn btn-outline btn-sm" data-efris-register="${p.id}">Register</button>`}</td>` : ""}
         <td class="flex gap">
           <button class="btn btn-outline btn-sm" data-edit="${p.id}">Edit</button>
@@ -564,7 +564,7 @@ function openImportModal() {
               p_cost_price: parseFloat(row.cost_price) || 0,
               p_selling_price: parseFloat(row.selling_price) || 0,
               p_wholesale_price: row.wholesale_price ? parseFloat(row.wholesale_price) : null,
-              p_tax_category_code: row.tax_category || "STD",
+              p_tax_category_code: row.tax_category || "VAT",
               p_reorder_level: parseFloat(row.reorder_level) || 5,
               p_is_active: true,
               p_brand_id: null,

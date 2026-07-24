@@ -457,7 +457,7 @@ async function renderTaxTab(output, range) {
     const taxGroups = {};
     validSales.forEach((s) =>
       (s.sale_items || []).forEach((it) => {
-        const code = it.tax_category_code || "STD";
+        const code = it.tax_category_code || "VAT";
         if (!taxGroups[code]) taxGroups[code] = { net: 0, vat: 0, gross: 0 };
         const rate =
           STATE.taxCategories.find((t) => t.code === code)?.rate || 0;
