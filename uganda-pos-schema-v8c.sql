@@ -93,39 +93,25 @@ BEGIN
     ON CONFLICT (id) DO UPDATE SET public = true;
 END $$;
 
--- Storage RLS policies for logos bucket (open to all authenticated + public read)
+-- Storage RLS policies for logos bucket (single FOR ALL policy per bucket)
 DROP POLICY IF EXISTS "logos_public_select" ON storage.objects;
-CREATE POLICY "logos_public_select" ON storage.objects
-  FOR SELECT USING (bucket_id = 'logos');
-
 DROP POLICY IF EXISTS "logos_insert_auth" ON storage.objects;
-CREATE POLICY "logos_insert_auth" ON storage.objects
-  FOR INSERT WITH CHECK (bucket_id = 'logos');
-
 DROP POLICY IF EXISTS "logos_delete_auth" ON storage.objects;
-CREATE POLICY "logos_delete_auth" ON storage.objects
-  FOR DELETE USING (bucket_id = 'logos');
-
 DROP POLICY IF EXISTS "logos_update_auth" ON storage.objects;
-CREATE POLICY "logos_update_auth" ON storage.objects
-  FOR UPDATE USING (bucket_id = 'logos');
+DROP POLICY IF EXISTS "logos_all" ON storage.objects;
+CREATE POLICY "logos_all" ON storage.objects
+  FOR ALL USING (bucket_id = 'logos')
+  WITH CHECK (bucket_id = 'logos');
 
 -- Storage RLS policies for product-images bucket
 DROP POLICY IF EXISTS "product_images_public_select" ON storage.objects;
-CREATE POLICY "product_images_public_select" ON storage.objects
-  FOR SELECT USING (bucket_id = 'product-images');
-
 DROP POLICY IF EXISTS "product_images_insert_auth" ON storage.objects;
-CREATE POLICY "product_images_insert_auth" ON storage.objects
-  FOR INSERT WITH CHECK (bucket_id = 'product-images');
-
 DROP POLICY IF EXISTS "product_images_delete_auth" ON storage.objects;
-CREATE POLICY "product_images_delete_auth" ON storage.objects
-  FOR DELETE USING (bucket_id = 'product-images');
-
 DROP POLICY IF EXISTS "product_images_update_auth" ON storage.objects;
-CREATE POLICY "product_images_update_auth" ON storage.objects
-  FOR UPDATE USING (bucket_id = 'product-images');
+DROP POLICY IF EXISTS "product_images_all" ON storage.objects;
+CREATE POLICY "product_images_all" ON storage.objects
+  FOR ALL USING (bucket_id = 'product-images')
+  WITH CHECK (bucket_id = 'product-images');
 
 -- Orders table (referenced by uganda-pos-view-orders.js, not in base schema)
 create table if not exists orders (
