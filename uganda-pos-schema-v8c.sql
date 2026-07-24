@@ -234,3 +234,6 @@ alter table businesses add column if not exists whatsapp_number text;
 alter table businesses add column if not exists whatsapp_provider text;
 alter table businesses add column if not exists whatsapp_api_key text;
 alter table businesses add column if not exists whatsapp_enabled boolean default false;
+
+-- Refresh PostgREST schema cache so new RPC functions are immediately available
+notify pgrst, 'reload schema';
