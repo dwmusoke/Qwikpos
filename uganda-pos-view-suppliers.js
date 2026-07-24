@@ -13,7 +13,7 @@ import {
   closeModal,
   fmtMoney,
   refreshSuppliers,
-  fmtDate,
+  fmtDate, stockFor
   emptyStateHtml,
 } from "./uganda-pos-core.js";
 import { logAuditAction } from "./uganda-pos-view-audit.js";
@@ -462,30 +462,9 @@ async function renderPOTab(el) {
       // Add stock for received items
       if (po?.items) {
         for (const it of po.items) {
-          const { data: stock } = await supabase
-            .from("product_stock")
-            .select("quantity")
-            .eq("product_id", it.product_id)
-            .eq("branch_id", STATE.branch?.id)
-            .single();
-          const current = Number(stock?.quantity || 0);
-          await supabase.from("product_stock").upsert(
-            {
-              product_id: it.product_id,
-              branch_id: STATE.branch.id,
-              quantity: current + Number(it.quantity),
-            },
-            { onConflict: "product_id,branch_id" },
-          );
-          await supabase.from("stock_movements").insert({
-            business_id: STATE.business.id,
-            branch_id: STATE.branch.id,
-            product_id: it.product_id,
-            type: "in",
-            quantity: it.quantity,
-            notes: `PO received: ${po.po_number}`,
-            created_by: STATE.appUser.id,
-          });
+          const current = stockFor(it.product_id) || 0;
+          await supabase.rpc("upsert_product_stock", { p_product_id: it.product_id, p_branch_id: STATE.branch.id, p_quantity: current + Number(it.quantity) });
+          await supabase.rpc("insert_stock_movement", { p_business_id: STATE.business.id, p_branch_id: STATE.branch.id, p_product_id: it.product_id, p_type: "in", p_quantity: it.quantity, p_notes: `PO received: ${po.po_number}`, p_created_by: STATE.appUser.id });
         }
       }
 

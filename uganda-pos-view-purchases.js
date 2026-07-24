@@ -281,30 +281,9 @@ async function receivePO(poId, poList) {
     return;
 
   for (const it of po.items) {
-    const { data: stock } = await supabase
-      .from("product_stock")
-      .select("quantity")
-      .eq("product_id", it.product_id)
-      .eq("branch_id", STATE.branch?.id)
-      .maybeSingle();
-    const current = Number(stock?.quantity || 0);
-    await supabase.from("product_stock").upsert(
-      {
-        product_id: it.product_id,
-        branch_id: STATE.branch.id,
-        quantity: current + Number(it.quantity),
-      },
-      { onConflict: "product_id,branch_id" },
-    );
-    await supabase.from("stock_movements").insert({
-      business_id: STATE.business.id,
-      branch_id: STATE.branch.id,
-      product_id: it.product_id,
-      type: "in",
-      quantity: it.quantity,
-      notes: `PO received: ${po.po_number}`,
-      created_by: STATE.appUser.id,
-    });
+    const current = stockFor(it.product_id) || 0;
+    await supabase.rpc("upsert_product_stock", { p_product_id: it.product_id, p_branch_id: STATE.branch.id, p_quantity: current + Number(it.quantity) });
+    await supabase.rpc("insert_stock_movement", { p_business_id: STATE.business.id, p_branch_id: STATE.branch.id, p_product_id: it.product_id, p_type: "in", p_quantity: it.quantity, p_notes: `PO received: ${po.po_number}`, p_created_by: STATE.appUser.id });
   }
 
   await supabase
@@ -1243,31 +1222,10 @@ async function openReturnItemModal(po) {
 
           // Deduct stock for returned items
           for (const it of validItems) {
-            const { data: stock } = await supabase
-              .from("product_stock")
-              .select("quantity")
-              .eq("product_id", it.productId)
-              .eq("branch_id", STATE.branch?.id)
-              .maybeSingle();
-            const current = Number(stock?.quantity || 0);
+            const current = stockFor(it.productId) || 0;
             const newQty = Math.max(0, current - it.returnQty);
-            await supabase.from("product_stock").upsert(
-              {
-                product_id: it.productId,
-                branch_id: STATE.branch.id,
-                quantity: newQty,
-              },
-              { onConflict: "product_id,branch_id" },
-            );
-            await supabase.from("stock_movements").insert({
-              business_id: STATE.business.id,
-              branch_id: STATE.branch.id,
-              product_id: it.productId,
-              type: "out",
-              quantity: it.returnQty,
-              notes: `Purchase return: ${returnNumber}`,
-              created_by: STATE.appUser.id,
-            });
+            await supabase.rpc("upsert_product_stock", { p_product_id: it.productId, p_branch_id: STATE.branch.id, p_quantity: newQty });
+            await supabase.rpc("insert_stock_movement", { p_business_id: STATE.business.id, p_branch_id: STATE.branch.id, p_product_id: it.productId, p_type: "out", p_quantity: it.returnQty, p_notes: `Purchase return: ${returnNumber}`, p_created_by: STATE.appUser.id });
           }
 
           // Update supplier balance (reduce by refund amount)

@@ -325,3 +325,9 @@ alter table businesses add column if not exists whatsapp_enabled boolean default
 
 -- Refresh PostgREST schema cache so new RPC functions are immediately available
 notify pgrst, 'reload schema';
+
+-- Force PostgREST to build function cache by listing new functions
+-- (query runs after NOTIFY to ensure cache picks up the functions)
+select proname::text as rpc_available from pg_proc
+where pronamespace = (select oid from pg_namespace where nspname = 'public')
+  and proname in ('upsert_product_stock','insert_stock_movement','upsert_supplier','delete_supplier','upsert_product','create_branch','update_branch','delete_branch');

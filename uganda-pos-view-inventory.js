@@ -291,46 +291,44 @@ function openProductModal(productId) {
             return;
           }
 
-          const record = {
-            business_id: STATE.business.id,
-            name,
-            sku: $("pf-sku").value.trim() || null,
-            barcode: $("pf-barcode").value.trim() || null,
-            category_id: $("pf-category").value || null,
-            unit: $("pf-unit").value.trim() || "pc",
-            cost_price: parseFloat($("pf-cost").value) || 0,
-            selling_price: price,
-            wholesale_price: $("pf-wholesale").value
-              ? parseFloat($("pf-wholesale").value)
-              : null,
-            reorder_level: parseFloat($("pf-reorder").value) || 0,
-            tax_category_code: $("pf-tax").value,
-            expiry_date: $("pf-expiry").value || null,
-          };
-
+          const name = $("pf-name").value.trim();
+          const price = parseFloat($("pf-price").value);
+          const unitVal = $("pf-unit").value.trim() || "pc";
+          let efrisCat = null, efrisUnit = null, efrisReset = false;
           if (STATE.business.efris_live_enabled) {
-            record.efris_commodity_category_id =
-              $("pf-efris-cat").value.trim() || null;
-            record.efris_measure_unit =
-              $("pf-efris-unit").value.trim() || "101";
-            if (
-              editing &&
-              $("pf-efris-cat").value.trim() !==
-                (p.efris_commodity_category_id || "")
-            )
-              record.efris_registered_at = null;
+            efrisCat = $("pf-efris-cat").value.trim() || null;
+            efrisUnit = $("pf-efris-unit").value.trim() || "101";
+            if (editing && efrisCat !== (p.efris_commodity_category_id || ""))
+              efrisReset = true;
           }
 
-          const query = editing
-            ? supabase.from("products").update(record).eq("id", productId)
-            : supabase.from("products").insert(record);
-          const { data: saved, error } = await query.select().single();
+          const { data: saved, error } = await supabase.rpc(
+            editing ? "upsert_product" : "upsert_product",
+            {
+              p_business_id: STATE.business.id,
+              p_name: name,
+              p_sku: $("pf-sku").value.trim() || null,
+              p_barcode: $("pf-barcode").value.trim() || null,
+              p_description: null,
+              p_category_id: $("pf-category").value || null,
+              p_supplier_id: null,
+              p_unit: unitVal,
+              p_cost_price: parseFloat($("pf-cost").value) || 0,
+              p_selling_price: price,
+              p_wholesale_price: $("pf-wholesale").value ? parseFloat($("pf-wholesale").value) : null,
+              p_tax_category_code: $("pf-tax").value,
+              p_reorder_level: parseFloat($("pf-reorder").value) || 0,
+              p_is_active: true,
+              p_brand_id: null,
+              p_id: editing ? productId : null,
+            },
+          );
           if (error) {
             toast("Save failed: " + error.message, "error");
             return;
           }
 
-          // Upload image if selected
+          // Upload image
           if (pendingImageFile && saved) {
             const ext = pendingImageFile.name.split(".").pop() || "jpg";
             const path = `${STATE.business.id}/${saved.id}.${ext}`;
@@ -340,16 +338,23 @@ function openProductModal(productId) {
             if (uploadErr?.message?.includes("Bucket not found")) {
               toast("Run uganda-pos-schema-v8c.sql to create storage buckets, then try again.", "error", 6000);
             } else if (uploadErr) {
-              toast("Image upload failed: " + uploadErr.message, "error");
+              toast("Image upload is: " + uploadErr.message, "error");
             } else {
               const { data: urlData } = supabase.storage
                 .from("product-images")
                 .getPublicUrl(path);
-              await supabase
-                .from("products")
-                .update({ image_url: urlData.publicUrl })
-                .eq("id", saved.id);
+              await supabase.rpc("upsert_product", { p_id: saved.id, p_image_url: urlData.publicUrl, p_business_id: STATE.business.id, p_name: name, p_selling_price: price, p_unit: unitVal });
             }
+          }
+
+          // Set initial stock for new products
+          if (!editing && STATE.branch) {
+            const initStock = parseFloat($("pf-stock").value) || 0;
+            if (initStock > 0 && saved?.id) {
+              await supabase.rpc("upsert_product_stock", { p_product_id: saved.id, p_branch_id: STATE.branch.id, p_quantity: initStock });
+              await supabase.rpc("insert_stock_movement", { p_business_id: STATE.business.id, p_branch_id: STATE.branch.id, p_product_id: saved.id, p_type: "in", p_quantity: initStock, p_notes: "Initial stock", p_created_by: STATE.appUser.id });
+            }
+          }
           }
 
           // Set initial stock for new products
@@ -572,25 +577,24 @@ function openImportModal() {
                 )?.id || null
               : null;
 
-            const { data: product, error } = await supabase
-              .from("products")
-              .insert({
-                business_id: STATE.business.id,
-                name: row.name.trim(),
-                sku: row.sku || null,
-                barcode: row.barcode || null,
-                category_id: catId,
-                unit: row.unit || "pc",
-                cost_price: parseFloat(row.cost_price) || 0,
-                selling_price: parseFloat(row.selling_price) || 0,
-                wholesale_price: row.wholesale_price
-                  ? parseFloat(row.wholesale_price)
-                  : null,
-                reorder_level: parseFloat(row.reorder_level) || 5,
-                tax_category_code: row.tax_category || "STD",
-              })
-              .select()
-              .single();
+            const { data: product, error } = await supabase.rpc("upsert_product", {
+              p_business_id: STATE.business.id,
+              p_name: row.name.trim(),
+              p_sku: row.sku || null,
+              p_barcode: row.barcode || null,
+              p_description: null,
+              p_category_id: catId,
+              p_supplier_id: null,
+              p_unit: row.unit || "pc",
+              p_cost_price: parseFloat(row.cost_price) || 0,
+              p_selling_price: parseFloat(row.selling_price) || 0,
+              p_wholesale_price: row.wholesale_price ? parseFloat(row.wholesale_price) : null,
+              p_tax_category_code: row.tax_category || "STD",
+              p_reorder_level: parseFloat(row.reorder_level) || 5,
+              p_is_active: true,
+              p_brand_id: null,
+              p_id: null,
+            });
 
             if (error) {
               failed++;
@@ -600,23 +604,8 @@ function openImportModal() {
             // Set initial stock
             const stockQty = parseFloat(row.stock) || 0;
             if (stockQty > 0 && STATE.branch) {
-              await supabase.from("product_stock").upsert(
-                {
-                  product_id: product.id,
-                  branch_id: STATE.branch.id,
-                  quantity: stockQty,
-                },
-                { onConflict: "product_id,branch_id" },
-              );
-              await supabase.from("stock_movements").insert({
-                business_id: STATE.business.id,
-                branch_id: STATE.branch.id,
-                product_id: product.id,
-                type: "in",
-                quantity: stockQty,
-                notes: "CSV import",
-                created_by: STATE.appUser.id,
-              });
+              await supabase.rpc("upsert_product_stock", { p_product_id: product.id, p_branch_id: STATE.branch.id, p_quantity: stockQty });
+              await supabase.rpc("insert_stock_movement", { p_business_id: STATE.business.id, p_branch_id: STATE.branch.id, p_product_id: product.id, p_type: "in", p_quantity: stockQty, p_notes: "CSV import", p_created_by: STATE.appUser.id });
             }
 
             imported++;
@@ -868,64 +857,15 @@ function openTransferModal() {
             return;
           }
 
-          const fromStock = await supabase
-            .from("product_stock")
-            .select("quantity")
-            .eq("product_id", productId)
-            .eq("branch_id", fromId)
-            .single();
-          const available = Number(fromStock.data?.quantity || 0);
-          if (qty > available) {
-            toast(`Insufficient stock. Available: ${available}`, "error");
-            return;
-          }
-
           // Deduct from source
-          await supabase.from("product_stock").upsert(
-            {
-              product_id: productId,
-              branch_id: fromId,
-              quantity: available - qty,
-            },
-            { onConflict: "product_id,branch_id" },
-          );
-
+          await supabase.rpc("upsert_product_stock", { p_product_id: productId, p_branch_id: fromId, p_quantity: (stockFor(productId) - qty) });
           // Add to destination
-          const { data: destStock } = await supabase
-            .from("product_stock")
-            .select("quantity")
-            .eq("product_id", productId)
-            .eq("branch_id", toId)
-            .single();
-          const destQty = Number(destStock?.quantity || 0);
-          await supabase.from("product_stock").upsert(
-            {
-              product_id: productId,
-              branch_id: toId,
-              quantity: destQty + qty,
-            },
-            { onConflict: "product_id,branch_id" },
-          );
+          const destQty = stockFor(productId) || 0;
+          await supabase.rpc("upsert_product_stock", { p_product_id: productId, p_branch_id: toId, p_quantity: (destQty + qty) });
 
-          // Record movement
-          await supabase.from("stock_movements").insert({
-            business_id: STATE.business.id,
-            branch_id: fromId,
-            product_id: productId,
-            type: "transfer",
-            quantity: -qty,
-            notes: `Transfer to ${STATE.branches.find((b) => b.id === toId)?.name || "branch"}${notes ? ": " + notes : ""}`,
-            created_by: STATE.appUser.id,
-          });
-          await supabase.from("stock_movements").insert({
-            business_id: STATE.business.id,
-            branch_id: toId,
-            product_id: productId,
-            type: "transfer",
-            quantity: qty,
-            notes: `Transfer from ${STATE.branches.find((b) => b.id === fromId)?.name || "branch"}${notes ? ": " + notes : ""}`,
-            created_by: STATE.appUser.id,
-          });
+          // Record movements
+          await supabase.rpc("insert_stock_movement", { p_business_id: STATE.business.id, p_branch_id: fromId, p_product_id: productId, p_type: "transfer", p_quantity: -qty, p_notes: "Transfer to " + (STATE.branches.find(b => b.id === toId)?.name || "branch") + (notes ? ": " + notes : ""), p_created_by: STATE.appUser.id });
+          await supabase.rpc("insert_stock_movement", { p_business_id: STATE.business.id, p_branch_id: toId, p_product_id: productId, p_type: "transfer", p_quantity: qty, p_notes: "Transfer from " + (STATE.branches.find(b => b.id === fromId)?.name || "branch") + (notes ? ": " + notes : ""), p_created_by: STATE.appUser.id });
 
           toast("Stock transferred", "success");
           logAuditAction({
@@ -1029,21 +969,11 @@ function renderStockCountTab(el) {
       if (counted === undefined || counted === sys) continue;
 
       const delta = counted - sys;
-      const { error: upsertErr } = await supabase.from("product_stock").upsert(
-        { product_id: p.id, branch_id: STATE.branch.id, quantity: counted },
-        { onConflict: "product_id,branch_id" },
-      );
+      const { error: upsertErr } = await supabase.rpc("upsert_product_stock", { p_product_id: p.id, p_branch_id: STATE.branch.id, p_quantity: counted });
       if (upsertErr) { lastErr = upsertErr; continue; }
 
-      const { error: movErr } = await supabase.from("stock_movements").insert({
-        business_id: STATE.business.id,
-        branch_id: STATE.branch.id,
-        product_id: p.id,
-        type: "adjustment",
-        quantity: delta,
-        notes: `Stock count: ${sys} → ${counted}`,
-        created_by: STATE.appUser.id,
-      });
+      const { error: movErr } = await supabase.rpc("insert_stock_movement", { p_business_id: STATE.business.id, p_branch_id: STATE.branch.id, p_product_id: p.id, p_type: "adjustment", p_quantity: delta, p_notes: `Stock count: ${sys} → ${counted}`, p_created_by: STATE.appUser.id });
+      if (movErr) { lastErr = movErr; continue; }
       if (movErr) { lastErr = movErr; continue; }
       adjusted++;
     }
@@ -1917,61 +1847,16 @@ async function assembleProduct(bomId) {
   // Deduct components
   for (const item of bom.items) {
     const needed = item.quantity * assembleQty;
-    const { data: stock } = await supabase
-      .from("product_stock")
-      .select("quantity")
-      .eq("product_id", item.component_product_id)
-      .eq("branch_id", STATE.branch.id)
-      .single();
-    const current = Number(stock?.quantity || 0);
-
-    await supabase.from("product_stock").upsert(
-      {
-        product_id: item.component_product_id,
-        branch_id: STATE.branch.id,
-        quantity: current - needed,
-      },
-      { onConflict: "product_id,branch_id" },
-    );
-
-    await supabase.from("stock_movements").insert({
-      business_id: STATE.business.id,
-      branch_id: STATE.branch.id,
-      product_id: item.component_product_id,
-      type: "out",
-      quantity: needed,
-      notes: `Production: assembled ${assembleQty}x ${bom.name || bom.finished_product_id}`,
-      created_by: STATE.appUser.id,
-    });
+    const current = stockFor(item.component_product_id);
+    await supabase.rpc("upsert_product_stock", { p_product_id: item.component_product_id, p_branch_id: STATE.branch.id, p_quantity: current - needed });
+    await supabase.rpc("insert_stock_movement", { p_business_id: STATE.business.id, p_branch_id: STATE.branch.id, p_product_id: item.component_product_id, p_type: "out", p_quantity: needed, p_notes: `Production: assembled ${assembleQty}x ${bom.name || bom.finished_product_id}`, p_created_by: STATE.appUser.id });
   }
 
   // Add finished product
   const finishedQty = assembleQty * (bom.yield_qty || 1);
-  const { data: finStock } = await supabase
-    .from("product_stock")
-    .select("quantity")
-    .eq("product_id", bom.finished_product_id)
-    .eq("branch_id", STATE.branch.id)
-    .single();
-
-  await supabase.from("product_stock").upsert(
-    {
-      product_id: bom.finished_product_id,
-      branch_id: STATE.branch.id,
-      quantity: Number(finStock?.quantity || 0) + finishedQty,
-    },
-    { onConflict: "product_id,branch_id" },
-  );
-
-  await supabase.from("stock_movements").insert({
-    business_id: STATE.business.id,
-    branch_id: STATE.branch.id,
-    product_id: bom.finished_product_id,
-    type: "in",
-    quantity: finishedQty,
-    notes: `Production: assembled ${assembleQty}x from ${bom.name || "recipe"}`,
-    created_by: STATE.appUser.id,
-  });
+  const finCurrent = stockFor(bom.finished_product_id);
+  await supabase.rpc("upsert_product_stock", { p_product_id: bom.finished_product_id, p_branch_id: STATE.branch.id, p_quantity: finCurrent + finishedQty });
+  await supabase.rpc("insert_stock_movement", { p_business_id: STATE.business.id, p_branch_id: STATE.branch.id, p_product_id: bom.finished_product_id, p_type: "in", p_quantity: finishedQty, p_notes: `Production: assembled ${assembleQty}x from ${bom.name || "recipe"}`, p_created_by: STATE.appUser.id });
 
   await supabase.from("production_logs").insert({
     business_id: STATE.business.id,
@@ -2016,53 +1901,15 @@ async function disassembleProduct(bomId) {
   }
 
   // Deduct finished product
-  await supabase.from("product_stock").upsert(
-    {
-      product_id: bom.finished_product_id,
-      branch_id: STATE.branch.id,
-      quantity: finishedStock - disassembleQty,
-    },
-    { onConflict: "product_id,branch_id" },
-  );
-
-  await supabase.from("stock_movements").insert({
-    business_id: STATE.business.id,
-    branch_id: STATE.branch.id,
-    product_id: bom.finished_product_id,
-    type: "out",
-    quantity: disassembleQty,
-    notes: `Disassembled ${disassembleQty}x ${bom.name || "recipe"}`,
-    created_by: STATE.appUser.id,
-  });
+  await supabase.rpc("upsert_product_stock", { p_product_id: bom.finished_product_id, p_branch_id: STATE.branch.id, p_quantity: finishedStock - disassembleQty });
+  await supabase.rpc("insert_stock_movement", { p_business_id: STATE.business.id, p_branch_id: STATE.branch.id, p_product_id: bom.finished_product_id, p_type: "out", p_quantity: disassembleQty, p_notes: `Disassembled ${disassembleQty}x ${bom.name || "recipe"}`, p_created_by: STATE.appUser.id });
 
   // Return components
   for (const item of bom.items) {
     const returned = item.quantity * disassembleQty;
-    const { data: stock } = await supabase
-      .from("product_stock")
-      .select("quantity")
-      .eq("product_id", item.component_product_id)
-      .eq("branch_id", STATE.branch.id)
-      .single();
-
-    await supabase.from("product_stock").upsert(
-      {
-        product_id: item.component_product_id,
-        branch_id: STATE.branch.id,
-        quantity: Number(stock?.quantity || 0) + returned,
-      },
-      { onConflict: "product_id,branch_id" },
-    );
-
-    await supabase.from("stock_movements").insert({
-      business_id: STATE.business.id,
-      branch_id: STATE.branch.id,
-      product_id: item.component_product_id,
-      type: "in",
-      quantity: returned,
-      notes: `Disassembled ${disassembleQty}x ${bom.name || "recipe"}`,
-      created_by: STATE.appUser.id,
-    });
+    const current = stockFor(item.component_product_id);
+    await supabase.rpc("upsert_product_stock", { p_product_id: item.component_product_id, p_branch_id: STATE.branch.id, p_quantity: current + returned });
+    await supabase.rpc("insert_stock_movement", { p_business_id: STATE.business.id, p_branch_id: STATE.branch.id, p_product_id: item.component_product_id, p_type: "in", p_quantity: returned, p_notes: `Disassembled ${disassembleQty}x ${bom.name || "recipe"}`, p_created_by: STATE.appUser.id });
   }
 
   await supabase.from("production_logs").insert({

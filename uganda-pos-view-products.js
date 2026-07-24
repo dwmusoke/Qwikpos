@@ -279,9 +279,9 @@ async function openProductModal(productId) {
         // Initial stock for new products
         if (!editing && STATE.branch) {
           const initStock = parseFloat($('pf-stock').value) || 0;
-          if (initStock > 0) {
-            await supabase.from('product_stock').upsert({ product_id: saved.id, branch_id: STATE.branch.id, quantity: initStock });
-            await supabase.from('stock_movements').insert({ business_id: STATE.business.id, branch_id: STATE.branch.id, product_id: saved.id, type: 'in', quantity: initStock, notes: 'Initial stock' });
+          if (initStock > 0 && saved?.id) {
+            await supabase.rpc('upsert_product_stock', { p_product_id: saved.id, p_branch_id: STATE.branch.id, p_quantity: initStock });
+            await supabase.rpc('insert_stock_movement', { p_business_id: STATE.business.id, p_branch_id: STATE.branch.id, p_product_id: saved.id, p_type: 'in', p_quantity: initStock, p_notes: 'Initial stock', p_created_by: STATE.appUser?.id });
           }
         }
 
@@ -764,9 +764,9 @@ function openStockModal(productId) {
       else newQty = qty;
 
       if (!STATE.branch?.id) { toast('No branch selected. Ensure your account has a business.', 'error'); return; }
-      const { error: upsertErr } = await supabase.from('product_stock').upsert({ product_id: productId, branch_id: STATE.branch.id, quantity: newQty });
+      const { error: upsertErr } = await supabase.rpc('upsert_product_stock', { p_product_id: productId, p_branch_id: STATE.branch.id, p_quantity: newQty });
       if (upsertErr) { toast('Stock error: ' + upsertErr.message, 'error'); return; }
-      const { error: movErr } = await supabase.from('stock_movements').insert({ business_id: STATE.business.id, branch_id: STATE.branch.id, product_id: productId, type, quantity: qty, notes: note || null });
+      const { error: movErr } = await supabase.rpc('insert_stock_movement', { p_business_id: STATE.business.id, p_branch_id: STATE.branch.id, p_product_id: productId, p_type: type, p_quantity: qty, p_notes: note || null, p_created_by: STATE.appUser?.id });
       if (movErr) { toast('Movement error: ' + movErr.message, 'error'); return; }
       STATE.stockByProduct[productId] = newQty;
       toast('Stock updated', 'success'); closeModal(); renderTab();
@@ -856,19 +856,47 @@ function openImportModal() {
         const price = parseFloat(cols[priceIdx]);
         if (!name || isNaN(price)) continue;
 
-        const record = {
-          business_id: STATE.business.id, name, selling_price: price,
-          sku: cols[headers.indexOf('sku')]?.trim() || null,
-          barcode: cols[headers.indexOf('barcode')]?.trim() || null,
-          unit: cols[headers.indexOf('unit')]?.trim() || 'pc',
-          cost_price: parseFloat(cols[headers.indexOf('cost_price')]) || 0,
-          wholesale_price: parseFloat(cols[headers.indexOf('wholesale_price')]) || null,
-          reorder_level: parseFloat(cols[headers.indexOf('reorder_level')]) || 5,
-          tax_category_code: cols[headers.indexOf('tax_category')]?.trim() || 'STD',
-        };
-        await supabase.from('products').insert(record);
-        count++;
-      }
+        let saved;
+        if (editing) {
+          const { data, error } = await supabase.rpc('upsert_product', {
+            p_business_id: STATE.business.id,
+            p_name: name, p_sku: $('pf-sku').value.trim() || null,
+            p_barcode: $('pf-barcode').value.trim() || null,
+            p_category_id: $('pf-category').value || null,
+            p_brand_id: $('pf-brand').value || null,
+            p_unit: unitVal || 'pc',
+            p_cost_price: parseFloat($('pf-cost').value) || 0,
+            p_selling_price: price,
+            p_wholesale_price: parseFloat($('pf-wholesale').value) || null,
+            p_tax_category_code: $('pf-tax').value || 'STD',
+            p_reorder_level: parseFloat($('pf-reorder').value) || 0,
+            p_id: productId,
+          });
+          if (error) { toast('Failed: ' + error.message, 'error'); return; }
+          saved = { id: productId };
+          logAuditAction({ action: 'update', entityType: 'product', entityId: productId, entityName: name, newValue: record });
+        } else {
+          const { data, error } = await supabase.rpc('upsert_product', {
+            p_business_id: STATE.business.id,
+            p_name, p_sku: $('pf-sku').value.trim() || null,
+            p_barcode: $('pf-barcode').value.trim() || null,
+            p_description: null,
+            p_category_id: $('pf-category').value || null,
+            p_supplier_id: null,
+            p_unit: unitVal || 'pc',
+            p_cost_price: parseFloat($('pf-cost').value) || 0,
+            p_selling_price: price,
+            p_wholesale_price: parseFloat($('pf-wholesale').value) || null,
+            p_tax_category_code: $('pf-tax').value || 'STD',
+            p_reorder_level: parseFloat($('pf-reorder').value) || 0,
+            p_is_active: true,
+            p_brand_id: $('pf-brand').value || null,
+            p_id: null,
+          });
+          if (error) { toast('Failed: ' + error.message, 'error'); return; }
+          saved = data;
+          logAuditAction({ action: 'create', entityType: 'product', entityId: saved?.id, entityName: name, newValue: record });
+        }
       toast(`Imported ${count} products`, 'success');
       await refreshProducts();
       closeModal(); renderTab();
