@@ -377,23 +377,39 @@ create trigger trg_apply_sale_stock after insert on sale_items
 drop policy if exists business_isolation_po_items on purchase_order_items;
 
 -- expenses: v2 granular policies (INSERT/UPDATE/DELETE) never dropped
-drop policy if exists business_insert_expenses on expenses;
-drop policy if exists business_update_expenses on expenses;
-drop policy if exists business_delete_expenses on expenses;
+do $$ begin
+  if exists (select 1 from information_schema.tables where table_name = 'expenses') then
+    drop policy if exists business_insert_expenses on expenses;
+    drop policy if exists business_update_expenses on expenses;
+    drop policy if exists business_delete_expenses on expenses;
+  end if;
+end $$;
 
 -- notifications: v3 granular policies never dropped
-drop policy if exists business_insert_notifications on notifications;
-drop policy if exists business_update_notifications on notifications;
-drop policy if exists business_delete_notifications on notifications;
+do $$ begin
+  if exists (select 1 from information_schema.tables where table_name = 'notifications') then
+    drop policy if exists business_insert_notifications on notifications;
+    drop policy if exists business_update_notifications on notifications;
+    drop policy if exists business_delete_notifications on notifications;
+  end if;
+end $$;
 
 -- efris_invoices: billing.sql used different name than v8c
-drop policy if exists business_isolation_efris on efris_invoices;
+do $$ begin
+  if exists (select 1 from information_schema.tables where table_name = 'efris_invoices') then
+    drop policy if exists business_isolation_efris on efris_invoices;
+  end if;
+end $$;
 
 -- orders: drop granular policies that overlap with the ALL policy
-drop policy if exists orders_select on orders;
-drop policy if exists orders_insert on orders;
-drop policy if exists orders_update on orders;
-drop policy if exists orders_delete on orders;
+do $$ begin
+  if exists (select 1 from information_schema.tables where table_name = 'orders') then
+    drop policy if exists orders_select on orders;
+    drop policy if exists orders_insert on orders;
+    drop policy if exists orders_update on orders;
+    drop policy if exists orders_delete on orders;
+  end if;
+end $$;
 
 -- leads: v6 old policy never dropped
 do $$ begin
@@ -410,8 +426,12 @@ do $$ begin
 end $$;
 
 -- categories: v8 granular policies redundant with v8c ALL policy
-drop policy if exists categories_select on categories;
-drop policy if exists categories_insert on categories;
+do $$ begin
+  if exists (select 1 from information_schema.tables where table_name = 'categories') then
+    drop policy if exists categories_select on categories;
+    drop policy if exists categories_insert on categories;
+  end if;
+end $$;
 
 -- brands: v5 and v8 overlapping policies
 do $$ begin
@@ -422,9 +442,13 @@ do $$ begin
     drop policy brands_anon on brands;
   end if;
 end $$;
-drop policy if exists brands_select on brands;
-drop policy if exists brands_insert on brands;
-drop policy if exists brands_update on brands;
+do $$ begin
+  if exists (select 1 from information_schema.tables where table_name = 'brands') then
+    drop policy if exists brands_select on brands;
+    drop policy if exists brands_insert on brands;
+    drop policy if exists brands_update on brands;
+  end if;
+end $$;
 
 -- units: v5 and v8 overlapping policies
 do $$ begin
@@ -435,8 +459,12 @@ do $$ begin
     drop policy units_anon on units;
   end if;
 end $$;
-drop policy if exists units_select on units;
-drop policy if exists units_insert on units;
+do $$ begin
+  if exists (select 1 from information_schema.tables where table_name = 'units') then
+    drop policy if exists units_select on units;
+    drop policy if exists units_insert on units;
+  end if;
+end $$;
 
 -- Suppliers
 drop policy if exists business_isolation_suppliers on suppliers;
