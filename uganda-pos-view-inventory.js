@@ -290,9 +290,6 @@ function openProductModal(productId) {
             toast("Product name and selling price are required", "error");
             return;
           }
-
-          const name = $("pf-name").value.trim();
-          const price = parseFloat($("pf-price").value);
           const unitVal = $("pf-unit").value.trim() || "pc";
           let efrisCat = null, efrisUnit = null, efrisReset = false;
           if (STATE.business.efris_live_enabled) {
@@ -321,6 +318,9 @@ function openProductModal(productId) {
               p_is_active: true,
               p_brand_id: null,
               p_id: editing ? productId : null,
+              p_efris_commodity_category_id: efrisCat,
+              p_efris_measure_unit: efrisUnit,
+              p_reset_efris_registration: efrisReset,
             },
           );
           if (error) {

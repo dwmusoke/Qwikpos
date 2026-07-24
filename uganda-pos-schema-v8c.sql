@@ -227,7 +227,10 @@ create or replace function upsert_product(
   p_image_url text default null,
   p_is_active boolean default true,
   p_brand_id uuid default null,
-  p_id uuid default null
+  p_id uuid default null,
+  p_efris_commodity_category_id text default null,
+  p_efris_measure_unit text default null,
+  p_reset_efris_registration boolean default false
 ) returns jsonb
 language plpgsql security definer as $$
 declare
@@ -235,9 +238,11 @@ declare
 begin
   if p_id is null then
     insert into products (business_id, name, sku, barcode, description, category_id, supplier_id, unit,
-      cost_price, selling_price, wholesale_price, tax_category_code, reorder_level, image_url, is_active, brand_id)
+      cost_price, selling_price, wholesale_price, tax_category_code, reorder_level, image_url, is_active, brand_id,
+      efris_commodity_category_id, efris_measure_unit)
     values (p_business_id, p_name, p_sku, p_barcode, p_description, p_category_id, p_supplier_id, p_unit,
-      p_cost_price, p_selling_price, p_wholesale_price, p_tax_category_code, p_reorder_level, p_image_url, p_is_active, p_brand_id)
+      p_cost_price, p_selling_price, p_wholesale_price, p_tax_category_code, p_reorder_level, p_image_url, p_is_active, p_brand_id,
+      p_efris_commodity_category_id, p_efris_measure_unit)
     returning to_jsonb(products.*) into v_product;
   else
     update products set
@@ -245,13 +250,17 @@ begin
       category_id = p_category_id, supplier_id = p_supplier_id, unit = p_unit,
       cost_price = p_cost_price, selling_price = p_selling_price, wholesale_price = p_wholesale_price,
       tax_category_code = p_tax_category_code, reorder_level = p_reorder_level,
-      image_url = p_image_url, is_active = p_is_active, brand_id = p_brand_id
+      image_url = p_image_url, is_active = p_is_active, brand_id = p_brand_id,
+      efris_commodity_category_id = p_efris_commodity_category_id,
+      efris_measure_unit = p_efris_measure_unit,
+      efris_registered_at = case when p_reset_efris_registration then null else efris_registered_at end
     where id = p_id
     returning to_jsonb(products.*) into v_product;
   end if;
   return v_product;
 end;
 $$;
+grant execute on function upsert_product(uuid, text, text, text, text, uuid, uuid, text, numeric, numeric, numeric, text, numeric, text, boolean, uuid, uuid, text, text, boolean) to authenticated;
 
 -- Orders table (referenced by uganda-pos-view-orders.js, not in base schema)
 create table if not exists orders (
