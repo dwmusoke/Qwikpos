@@ -578,11 +578,16 @@ export async function refreshSuppliers() {
 
 export async function refreshCoupons() {
   if (!STATE.business) return;
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("coupons")
     .select("*")
     .eq("business_id", STATE.business.id)
     .eq("is_active", true);
+  if (error && error.message?.includes("does not exist")) {
+    console.warn("coupons table not found — run uganda-pos-schema-v8d.sql");
+    STATE.coupons = [];
+    return;
+  }
   STATE.coupons = data || [];
 }
 
