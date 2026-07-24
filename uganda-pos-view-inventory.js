@@ -355,31 +355,6 @@ function openProductModal(productId) {
               await supabase.rpc("insert_stock_movement", { p_business_id: STATE.business.id, p_branch_id: STATE.branch.id, p_product_id: saved.id, p_type: "in", p_quantity: initStock, p_notes: "Initial stock", p_created_by: STATE.appUser.id });
             }
           }
-          }
-
-          // Set initial stock for new products
-          if (!editing && STATE.branch) {
-            const initStock = parseFloat($("pf-stock").value) || 0;
-            if (initStock > 0) {
-              await supabase.from("product_stock").upsert(
-                {
-                  product_id: saved.id,
-                  branch_id: STATE.branch.id,
-                  quantity: initStock,
-                },
-                { onConflict: "product_id,branch_id" },
-              );
-              await supabase.from("stock_movements").insert({
-                business_id: STATE.business.id,
-                branch_id: STATE.branch.id,
-                product_id: saved.id,
-                type: "in",
-                quantity: initStock,
-                notes: "Initial stock",
-                created_by: STATE.appUser.id,
-              });
-            }
-          }
 
           toast(editing ? "Product updated" : "Product added", "success");
           closeModal();
