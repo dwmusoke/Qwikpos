@@ -333,6 +333,39 @@ alter table businesses add column if not exists whatsapp_api_key text;
 alter table businesses add column if not exists whatsapp_enabled boolean default false;
 
 -- ═══════════════════════════════════════════════════════════════════════
+-- STOCK TRIGGER: must be SECURITY DEFINER to bypass RLS on product_stock
+-- and stock_movements when deducting stock after a sale
+-- ═══════════════════════════════════════════════════════════════════════
+create or replace function apply_sale_stock() returns trigger as $$
+declare
+  v_branch uuid;
+  v_business uuid;
+  v_sale_type text;
+begin
+  select branch_id, business_id, sale_type into v_branch, v_business, v_sale_type from sales where id = new.sale_id;
+
+  if v_sale_type = 'quotation' then
+    return new;
+  end if;
+
+  insert into product_stock (product_id, branch_id, quantity)
+  values (new.product_id, v_branch, -new.quantity)
+  on conflict (product_id, branch_id)
+  do update set quantity = product_stock.quantity - new.quantity;
+
+  insert into stock_movements (business_id, branch_id, product_id, type, quantity, reference, created_at)
+  values (v_business, v_branch, new.product_id, 'sale', new.quantity, new.sale_id::text, now());
+
+  return new;
+end;
+$$ language plpgsql security definer;
+
+-- Ensure trigger exists on sale_items
+drop trigger if exists trg_apply_sale_stock on sale_items;
+create trigger trg_apply_sale_stock after insert on sale_items
+  for each row execute function apply_sale_stock();
+
+-- ═══════════════════════════════════════════════════════════════════════
 -- FIX ALL RLS POLICIES: inline superadmin check instead of unreliable
 -- is_superadmin() function (PostgREST schema cache often returns stale)
 -- ═══════════════════════════════════════════════════════════════════════
