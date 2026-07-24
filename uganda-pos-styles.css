@@ -432,6 +432,7 @@ a { color: inherit; text-decoration: none; }
 .view {
   padding: 24px;
   flex: 1;
+  min-width: 0;
   animation: fadeInUp var(--dur) var(--ease-out);
 }
 .view-header {
@@ -2689,6 +2690,13 @@ a:focus-visible {
   .modal-overlay { padding: 8px; align-items: flex-end; }
   .modal { border-radius: 16px 16px 0 0; max-width: 100%; }
   .modal.modal-lg { border-radius: 16px 16px 0 0; }
+  .topbar { gap: 8px; }
+  .topbar .user-chip span:last-child { display: none; }
+}
+
+/* Table minimum width so columns don't collapse on mobile */
+.table-wrap table {
+  min-width: 600px;
 }
 
 /* Prevent pull-to-refresh / overscroll on mobile */
