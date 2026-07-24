@@ -114,6 +114,57 @@ CREATE POLICY "product_images_all" ON storage.objects
   FOR ALL USING (bucket_id = 'product-images')
   WITH CHECK (bucket_id = 'product-images');
 
+-- Fix product_stock RLS policy (inline superadmin check — more reliable)
+alter table product_stock enable row level security;
+drop policy if exists business_isolation_product_stock on product_stock;
+create policy business_isolation_product_stock on product_stock
+  for all using (
+    branch_id in (select id from branches where business_id = auth_business_id())
+    or exists (select 1 from app_users where id = auth.uid() and role = 'superadmin' and is_active = true)
+  )
+  with check (
+    branch_id in (select id from branches where business_id = auth_business_id())
+    or exists (select 1 from app_users where id = auth.uid() and role = 'superadmin' and is_active = true)
+  );
+
+-- Fix stock_movements RLS policy
+alter table stock_movements enable row level security;
+drop policy if exists business_isolation_stock_movements on stock_movements;
+create policy business_isolation_stock_movements on stock_movements
+  for all using (
+    business_id in (select id from businesses)
+    or exists (select 1 from app_users where id = auth.uid() and role = 'superadmin' and is_active = true)
+  )
+  with check (
+    business_id in (select id from businesses)
+    or exists (select 1 from app_users where id = auth.uid() and role = 'superadmin' and is_active = true)
+  );
+
+-- SECURITY DEFINER stock upsert — bypasses RLS on product_stock
+create or replace function upsert_product_stock(p_product_id uuid, p_branch_id uuid, p_quantity numeric)
+returns void
+language plpgsql security definer as $$
+begin
+  insert into product_stock (product_id, branch_id, quantity)
+  values (p_product_id, p_branch_id, p_quantity)
+  on conflict (product_id, branch_id) do update set quantity = p_quantity;
+end;
+$$;
+grant execute on function upsert_product_stock(uuid, uuid, numeric) to authenticated;
+
+-- SECURITY DEFINER stock movement insert — bypasses RLS on stock_movements
+create or replace function insert_stock_movement(
+  p_business_id uuid, p_branch_id uuid, p_product_id uuid,
+  p_type text, p_quantity numeric, p_notes text, p_created_by uuid
+) returns void
+language plpgsql security definer as $$
+begin
+  insert into stock_movements (business_id, branch_id, product_id, type, quantity, notes, created_by)
+  values (p_business_id, p_branch_id, p_product_id, p_type, p_quantity, p_notes, p_created_by);
+end;
+$$;
+grant execute on function insert_stock_movement(uuid, uuid, uuid, text, numeric, text, uuid) to authenticated;
+
 -- Orders table (referenced by uganda-pos-view-orders.js, not in base schema)
 create table if not exists orders (
   id uuid primary key default gen_random_uuid(),

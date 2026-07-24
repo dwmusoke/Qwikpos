@@ -472,29 +472,24 @@ function openStockModal(productId) {
 
           const newQty = branchStock + delta;
 
-          const { error: stockErr } = await supabase
-            .from("product_stock")
-            .upsert(
-              {
-                product_id: productId,
-                branch_id: branchId,
-                quantity: newQty,
-              },
-              { onConflict: "product_id,branch_id" },
-            );
+          const { error: stockErr } = await supabase.rpc('upsert_product_stock', {
+            p_product_id: productId,
+            p_branch_id: branchId,
+            p_quantity: newQty,
+          });
           if (stockErr) {
             toast("Stock update failed: " + stockErr.message, "error");
             return;
           }
 
-          await supabase.from("stock_movements").insert({
-            business_id: STATE.business.id,
-            branch_id: branchId,
-            product_id: productId,
-            type,
-            quantity: type === "adjustment" ? delta : qty,
-            notes: $("sm-notes").value || null,
-            created_by: STATE.appUser.id,
+          await supabase.rpc('insert_stock_movement', {
+            p_business_id: STATE.business.id,
+            p_branch_id: branchId,
+            p_product_id: productId,
+            p_type: type,
+            p_quantity: type === "adjustment" ? delta : qty,
+            p_notes: $("sm-notes").value || null,
+            p_created_by: STATE.appUser.id,
           });
 
           toast("Stock updated", "success");
