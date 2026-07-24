@@ -36,7 +36,7 @@
   --surface: #ffffff;
   --surface-2: #f1f5f9;
   --surface-3: #e9eef3;
-  --sidebar-bg: #0d392e;
+  --sidebar-bg: #1a5c47;
   --border: #e2e8f0;
   --border-strong: #cbd5e1;
   --text: #0f172a;
@@ -101,7 +101,7 @@
   --bg: #0a0f1a;
   --surface: #111827;
   --surface-2: #1a2332;
-  --sidebar-bg: #0b1818;
+  --sidebar-bg: #14352e;
   --surface-3: #243044;
   --border: #1e293b;
   --border-strong: #334155;
@@ -218,7 +218,7 @@ a { color: inherit; text-decoration: none; }
   gap: 11px;
   padding: 10px 12px;
   border-radius: var(--radius-sm);
-  color: #c5d5ce;
+  color: #d5e5dd;
   text-decoration: none;
   cursor: pointer;
   font-size: 13.5px;
