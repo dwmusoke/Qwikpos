@@ -3,25 +3,20 @@
 -- Add missing columns, tables, and fix RLS policies
 -- =====================================================================
 
--- Ensure is_superadmin() exists (needed for RLS policies)
-drop function if exists is_superadmin();
+-- Use CREATE OR REPLACE (never DROP) for functions with dependent policies
 create or replace function is_superadmin() returns boolean
 language sql security definer stable as $$
   select exists (
     select 1 from app_users where id = auth.uid() and role = 'superadmin' and is_active = true
   );
 $$;
-grant execute on function is_superadmin() to authenticated, anon;
 
--- Ensure auth_business_id() exists
-drop function if exists auth_business_id();
 create or replace function auth_business_id() returns uuid
 language sql security definer stable as $$
   select business_id from app_users where id = auth.uid()
 $$;
 
 -- SECURITY DEFINER branch creation — bypasses RLS completely
-drop function if exists create_branch(text, text, text, text, text, text, uuid);
 create or replace function create_branch(
   p_business_id uuid,
   p_name text,
@@ -44,7 +39,6 @@ $$;
 grant execute on function create_branch(uuid, text, text, text, text, text, text) to authenticated;
 
 -- SECURITY DEFINER branch update — bypasses RLS completely
-drop function if exists update_branch(uuid, text, text, text, text, text, text);
 create or replace function update_branch(
   p_branch_id uuid,
   p_name text,
@@ -73,7 +67,6 @@ $$;
 grant execute on function update_branch(uuid, text, text, text, text, text, text) to authenticated;
 
 -- SECURITY DEFINER branch delete — bypasses RLS completely
-drop function if exists delete_branch(uuid);
 create or replace function delete_branch(
   p_branch_id uuid
 ) returns void
