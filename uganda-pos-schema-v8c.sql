@@ -376,14 +376,14 @@ create policy business_isolation_purchase_order_items on purchase_order_items
   with check (exists (select 1 from purchase_orders po where po.id = purchase_order_items.po_id and (po.business_id = auth_business_id()
     or exists (select 1 from app_users where id = auth.uid() and role = 'superadmin' and is_active = true))));
 
--- Supplier payments
+-- Supplier payments (no business_id — link via suppliers)
 drop policy if exists business_isolation_supplier_payments on supplier_payments;
 create policy business_isolation_supplier_payments on supplier_payments
   for all
-  using (business_id = auth_business_id()
-    or exists (select 1 from app_users where id = auth.uid() and role = 'superadmin' and is_active = true))
-  with check (business_id = auth_business_id()
-    or exists (select 1 from app_users where id = auth.uid() and role = 'superadmin' and is_active = true));
+  using (exists (select 1 from suppliers s where s.id = supplier_payments.supplier_id and (s.business_id = auth_business_id()
+    or exists (select 1 from app_users where id = auth.uid() and role = 'superadmin' and is_active = true))))
+  with check (exists (select 1 from suppliers s where s.id = supplier_payments.supplier_id and (s.business_id = auth_business_id()
+    or exists (select 1 from app_users where id = auth.uid() and role = 'superadmin' and is_active = true))));
 
 -- Products
 drop policy if exists business_isolation_products on products;
@@ -403,7 +403,7 @@ create policy business_isolation_sales on sales
   with check (business_id = auth_business_id()
     or exists (select 1 from app_users where id = auth.uid() and role = 'superadmin' and is_active = true));
 
--- Sale items
+-- Sale items (no business_id — link via sales)
 drop policy if exists business_isolation_sale_items on sale_items;
 create policy business_isolation_sale_items on sale_items
   for all
@@ -421,14 +421,14 @@ create policy business_isolation_customers on customers
   with check (business_id = auth_business_id()
     or exists (select 1 from app_users where id = auth.uid() and role = 'superadmin' and is_active = true));
 
--- Payments
+-- Payments (no business_id — link via sales)
 drop policy if exists business_isolation_payments on payments;
 create policy business_isolation_payments on payments
   for all
-  using (business_id = auth_business_id()
-    or exists (select 1 from app_users where id = auth.uid() and role = 'superadmin' and is_active = true))
-  with check (business_id = auth_business_id()
-    or exists (select 1 from app_users where id = auth.uid() and role = 'superadmin' and is_active = true));
+  using (exists (select 1 from sales s where s.id = payments.sale_id and (s.business_id = auth_business_id()
+    or exists (select 1 from app_users where id = auth.uid() and role = 'superadmin' and is_active = true))))
+  with check (exists (select 1 from sales s where s.id = payments.sale_id and (s.business_id = auth_business_id()
+    or exists (select 1 from app_users where id = auth.uid() and role = 'superadmin' and is_active = true))));
 
 -- Expenses
 drop policy if exists business_isolation_expenses on expenses;
