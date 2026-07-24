@@ -36,7 +36,7 @@
   --surface: #ffffff;
   --surface-2: #f1f5f9;
   --surface-3: #e9eef3;
-  --sidebar-bg: #3a9e7a;
+  --sidebar-bg: #3d2c6b;
   --border: #e2e8f0;
   --border-strong: #cbd5e1;
   --text: #0f172a;
@@ -101,7 +101,7 @@
   --bg: #0a0f1a;
   --surface: #111827;
   --surface-2: #1a2332;
-  --sidebar-bg: #14352e;
+  --sidebar-bg: #2a1f50;
   --surface-3: #243044;
   --border: #1e293b;
   --border-strong: #334155;
@@ -189,11 +189,11 @@ a { color: inherit; text-decoration: none; }
   font-size: 15px;
   line-height: 1.2;
   letter-spacing: -0.01em;
-  color: #f1f5f9;
+  color: #ede8f5;
 }
 .brand-row .brand-sub {
   font-size: 11px;
-  color: #a3b8b0;
+  color: #b0a3c9;
   margin-top: 2px;
 }
 
@@ -201,7 +201,7 @@ a { color: inherit; text-decoration: none; }
   font-size: 10.5px;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: #8aaea2;
+  color: #9a8db8;
   padding: 16px 12px 6px;
   font-weight: 700;
   border-top: 1px solid rgba(255,255,255,0.06);
@@ -218,7 +218,7 @@ a { color: inherit; text-decoration: none; }
   gap: 11px;
   padding: 10px 12px;
   border-radius: var(--radius-sm);
-  color: #d5e5dd;
+  color: #d8cfe8;
   text-decoration: none;
   cursor: pointer;
   font-size: 13.5px;
@@ -238,7 +238,7 @@ a { color: inherit; text-decoration: none; }
   background: rgba(255,255,255,0.12);
   color: #fff;
   font-weight: 600;
-  box-shadow: inset 3px 0 0 var(--brand);
+  box-shadow: inset 3px 0 0 var(--accent);
 }
 .nav-link .icon {
   width: 20px;
