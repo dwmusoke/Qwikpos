@@ -65,7 +65,7 @@ function renderSupListTab(el) {
     </div>
     <div class="table-wrap">
       <table>
-        <thead><tr><th>Name</th><th>Contact</th><th>Phone</th><th>Email</th><th>TIN</th><th>Balance Owed</th><th>POs</th><th></th></tr></thead>
+        <thead><tr><th>Name</th><th>Phone</th><th>Email</th><th>Address</th><th>TIN</th><th>Balance</th><th>POs</th><th></th></tr></thead>
         <tbody id="sup-table-body"></tbody>
       </table>
     </div>
@@ -106,6 +106,7 @@ async function renderSupTable() {
       <td style="font-size:12px;">${escapeHtml(s.phone || "—")}</td>
       <td style="font-size:12px;">${escapeHtml(s.email || "—")}</td>
       <td style="font-size:12px;">${escapeHtml(s.address || "—")}</td>
+      <td style="font-size:12px;">${escapeHtml(s.tin || "—")}</td>
       <td><span class="badge ${Number(s.balance) > 0 ? "badge-yellow" : "badge-green"}">${fmtMoney(s.balance || 0)}</span></td>
       <td>${poMap[s.id] || 0}</td>
       <td>
