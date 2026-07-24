@@ -390,8 +390,8 @@ function openProductModal(productId) {
 // STOCK IN / OUT / ADJUSTMENT
 // ---------------------------------------------------------------------
 function openStockModal(productId) {
-  if (!STATE.branch) {
-    toast("No branch selected. Go to Settings → Warehouses to create a branch first.", "error", 5000);
+  if (!STATE.branch && !STATE.branches.length) {
+    toast("No branches found. Go to Settings > Warehouses to create one first.", "error", 5000);
     return;
   }
   const p = STATE.products.find((x) => x.id === productId);
@@ -400,7 +400,14 @@ function openStockModal(productId) {
   openModal(
     `
     <div class="modal-title-row"><h3>Adjust Stock — ${escapeHtml(p.name)}</h3></div>
-    <p class="help-text">Current stock at ${escapeHtml(STATE.branch?.name || "this branch")}: <b>${currentStock} ${escapeHtml(p.unit || "pc")}</b></p>
+    ${STATE.branches.length > 1 ? `
+    <div class="field">
+      <label>Branch</label>
+      <select id="sm-branch">
+        ${STATE.branches.map((b) => `<option value="${b.id}" ${b.id === STATE.branch?.id ? "selected" : ""}>${escapeHtml(b.name)}</option>`).join("")}
+      </select>
+    </div>` : ""}
+    <p class="help-text" id="sm-stock-info">Current stock: <b>${currentStock} ${escapeHtml(p.unit || "pc")}</b></p>
     <div class="field">
       <label>Movement Type</label>
       <select id="sm-type">
@@ -420,6 +427,21 @@ function openStockModal(productId) {
   `,
     {
       onMount: () => {
+        // When branch changes, fetch and display that branch's stock
+        const branchSel = $("sm-branch");
+        if (branchSel) {
+          branchSel.addEventListener("change", async () => {
+            const { data } = await supabase
+              .from("product_stock")
+              .select("quantity")
+              .eq("product_id", productId)
+              .eq("branch_id", branchSel.value)
+              .maybeSingle();
+            const qty = Number(data?.quantity || 0);
+            $("sm-stock-info").innerHTML = `Current stock: <b>${qty} ${escapeHtml(p.unit || "pc")}</b>`;
+          });
+        }
+
         $("save-stock-btn").addEventListener("click", async () => {
           const type = $("sm-type").value;
           const qty = parseFloat($("sm-qty").value);
@@ -428,19 +450,34 @@ function openStockModal(productId) {
             return;
           }
 
+          const branchId = $("sm-branch")?.value || STATE.branch?.id;
+          if (!branchId) {
+            toast("No branch selected. Create a branch in Settings first.", "error");
+            return;
+          }
+
+          // Fetch current stock for the selected branch
+          const { data: stockRow } = await supabase
+            .from("product_stock")
+            .select("quantity")
+            .eq("product_id", productId)
+            .eq("branch_id", branchId)
+            .maybeSingle();
+          const branchStock = Number(stockRow?.quantity || 0);
+
           let delta = 0;
           if (type === "in" || type === "return") delta = qty;
           else if (type === "out" || type === "damaged") delta = -qty;
-          else if (type === "adjustment") delta = qty - currentStock;
+          else if (type === "adjustment") delta = qty - branchStock;
 
-          const newQty = currentStock + delta;
+          const newQty = branchStock + delta;
 
           const { error: stockErr } = await supabase
             .from("product_stock")
             .upsert(
               {
                 product_id: productId,
-                branch_id: STATE.branch.id,
+                branch_id: branchId,
                 quantity: newQty,
               },
               { onConflict: "product_id,branch_id" },
@@ -452,7 +489,7 @@ function openStockModal(productId) {
 
           await supabase.from("stock_movements").insert({
             business_id: STATE.business.id,
-            branch_id: STATE.branch.id,
+            branch_id: branchId,
             product_id: productId,
             type,
             quantity: type === "adjustment" ? delta : qty,
