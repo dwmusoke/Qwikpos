@@ -832,11 +832,32 @@ function openTransferModal() {
             return;
           }
 
+          // Fetch actual stock from both branches
+          const { data: fromStockData } = await supabase
+            .from("product_stock")
+            .select("quantity")
+            .eq("product_id", productId)
+            .eq("branch_id", fromId)
+            .maybeSingle();
+          const fromStockQty = Number(fromStockData?.quantity || 0);
+
+          const { data: toStockData } = await supabase
+            .from("product_stock")
+            .select("quantity")
+            .eq("product_id", productId)
+            .eq("branch_id", toId)
+            .maybeSingle();
+          const toStockQty = Number(toStockData?.quantity || 0);
+
+          if (qty > fromStockQty) {
+            toast(`Insufficient stock at source. Available: ${fromStockQty}`, "error");
+            return;
+          }
+
           // Deduct from source
-          await supabase.rpc("upsert_product_stock", { p_product_id: productId, p_branch_id: fromId, p_quantity: (stockFor(productId) - qty) });
+          await supabase.rpc("upsert_product_stock", { p_product_id: productId, p_branch_id: fromId, p_quantity: fromStockQty - qty });
           // Add to destination
-          const destQty = stockFor(productId) || 0;
-          await supabase.rpc("upsert_product_stock", { p_product_id: productId, p_branch_id: toId, p_quantity: (destQty + qty) });
+          await supabase.rpc("upsert_product_stock", { p_product_id: productId, p_branch_id: toId, p_quantity: toStockQty + qty });
 
           // Record movements
           await supabase.rpc("insert_stock_movement", { p_business_id: STATE.business.id, p_branch_id: fromId, p_product_id: productId, p_type: "transfer", p_quantity: -qty, p_notes: "Transfer to " + (STATE.branches.find(b => b.id === toId)?.name || "branch") + (notes ? ": " + notes : ""), p_created_by: STATE.appUser.id });

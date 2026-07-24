@@ -337,8 +337,73 @@ alter table businesses add column if not exists whatsapp_enabled boolean default
 -- is_superadmin() function (PostgREST schema cache often returns stale)
 -- ═══════════════════════════════════════════════════════════════════════
 
--- Helper: inline superadmin check (avoids function cache issues)
--- Pattern: exists (select 1 from app_users where id = auth.uid() and role = 'superadmin' and is_active = true)
+-- STEP 1: Drop ALL orphaned/overlapping policies from earlier schema files
+-- These old policy names were never cleaned up when v8c renamed/consolidated them.
+
+-- purchase_order_items: old v2 name never dropped
+drop policy if exists business_isolation_po_items on purchase_order_items;
+
+-- expenses: v2 granular policies (INSERT/UPDATE/DELETE) never dropped
+drop policy if exists business_insert_expenses on expenses;
+drop policy if exists business_update_expenses on expenses;
+drop policy if exists business_delete_expenses on expenses;
+
+-- notifications: v3 granular policies never dropped
+drop policy if exists business_insert_notifications on notifications;
+drop policy if exists business_update_notifications on notifications;
+drop policy if exists business_delete_notifications on notifications;
+
+-- efris_invoices: billing.sql used different name than v8c
+drop policy if exists business_isolation_efris on efris_invoices;
+
+-- orders: drop granular policies that overlap with the ALL policy
+drop policy if exists orders_select on orders;
+drop policy if exists orders_insert on orders;
+drop policy if exists orders_update on orders;
+drop policy if exists orders_delete on orders;
+
+-- leads: v6 old policy never dropped
+do $$ begin
+  if exists (select 1 from pg_policies where policyname = 'leads_all' and tablename = 'leads') then
+    drop policy leads_all on leads;
+  end if;
+end $$;
+
+-- deliveries: v6 old policy never dropped
+do $$ begin
+  if exists (select 1 from pg_policies where policyname = 'deliveries_all' and tablename = 'deliveries') then
+    drop policy deliveries_all on deliveries;
+  end if;
+end $$;
+
+-- categories: v8 granular policies redundant with v8c ALL policy
+drop policy if exists categories_select on categories;
+drop policy if exists categories_insert on categories;
+
+-- brands: v5 and v8 overlapping policies
+do $$ begin
+  if exists (select 1 from pg_policies where policyname = 'brands_isolated' and tablename = 'brands') then
+    drop policy brands_isolated on brands;
+  end if;
+  if exists (select 1 from pg_policies where policyname = 'brands_anon' and tablename = 'brands') then
+    drop policy brands_anon on brands;
+  end if;
+end $$;
+drop policy if exists brands_select on brands;
+drop policy if exists brands_insert on brands;
+drop policy if exists brands_update on brands;
+
+-- units: v5 and v8 overlapping policies
+do $$ begin
+  if exists (select 1 from pg_policies where policyname = 'units_isolated' and tablename = 'units') then
+    drop policy units_isolated on units;
+  end if;
+  if exists (select 1 from pg_policies where policyname = 'units_anon' and tablename = 'units') then
+    drop policy units_anon on units;
+  end if;
+end $$;
+drop policy if exists units_select on units;
+drop policy if exists units_insert on units;
 
 -- Suppliers
 drop policy if exists business_isolation_suppliers on suppliers;
@@ -546,6 +611,48 @@ begin
         or exists (select 1 from app_users where id = auth.uid() and role = ''superadmin'' and is_active = true))';
   end if;
 end $$;
+
+-- ═══════════════════════════════════════════════════════════════════════
+-- BRANDS & UNITS: clean slate with superadmin check (after dropping orphans above)
+-- ═══════════════════════════════════════════════════════════════════════
+
+alter table brands enable row level security;
+drop policy if exists business_isolation_brands on brands;
+create policy business_isolation_brands on brands
+  for all
+  using (business_id = auth_business_id()
+    or exists (select 1 from app_users where id = auth.uid() and role = 'superadmin' and is_active = true))
+  with check (business_id = auth_business_id()
+    or exists (select 1 from app_users where id = auth.uid() and role = 'superadmin' and is_active = true));
+
+alter table units enable row level security;
+drop policy if exists business_isolation_units on units;
+create policy business_isolation_units on units
+  for all
+  using (business_id = auth_business_id()
+    or exists (select 1 from app_users where id = auth.uid() and role = 'superadmin' and is_active = true))
+  with check (business_id = auth_business_id()
+    or exists (select 1 from app_users where id = auth.uid() and role = 'superadmin' and is_active = true));
+
+-- ═══════════════════════════════════════════════════════════════════════
+-- AUDIT LOG: enable RLS if not already enabled
+-- ═══════════════════════════════════════════════════════════════════════
+alter table audit_log enable row level security;
+do $$
+begin
+  if not exists (select 1 from pg_policies where policyname = 'business_isolation_audit_log' and tablename = 'audit_log') then
+    create policy business_isolation_audit_log on audit_log
+      for all
+      using (business_id = auth_business_id()
+        or exists (select 1 from app_users where id = auth.uid() and role = 'superadmin' and is_active = true))
+      with check (business_id = auth_business_id()
+        or exists (select 1 from app_users where id = auth.uid() and role = 'superadmin' and is_active = true));
+  end if;
+end $$;
+
+-- ═══════════════════════════════════════════════════════════════════════
+-- REFRESH POSTGREST SCHEMA CACHE
+-- ═══════════════════════════════════════════════════════════════════════
 
 -- Refresh PostgREST schema cache so new RPC functions are immediately available
 notify pgrst, 'reload schema';

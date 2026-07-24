@@ -249,16 +249,51 @@ async function openProductModal(productId) {
 
         let saved;
         if (editing) {
-          const { error } = await supabase.from('products').update(record).eq('id', productId);
+          const { data, error } = await supabase.rpc('upsert_product', {
+            p_business_id: STATE.business.id,
+            p_name: name,
+            p_sku: record.sku,
+            p_barcode: record.barcode,
+            p_description: null,
+            p_category_id: record.category_id,
+            p_supplier_id: null,
+            p_unit: record.unit,
+            p_cost_price: record.cost_price,
+            p_selling_price: record.selling_price,
+            p_wholesale_price: record.wholesale_price,
+            p_tax_category_code: record.tax_category_code,
+            p_reorder_level: record.reorder_level,
+            p_image_url: null,
+            p_is_active: true,
+            p_brand_id: record.brand_id,
+            p_id: productId,
+          });
           if (error) { toast('Failed: ' + error.message, 'error'); return; }
           saved = { id: productId };
-          logAuditAction({ action: 'update', entityType: 'product', entityId: productId, entityName: record.name, newValue: record });
+          logAuditAction({ action: 'update', entityType: 'product', entityId: productId, entityName: name, newValue: record });
         } else {
-          record.business_id = STATE.business.id;
-          const { data, error } = await supabase.from('products').insert(record).select().single();
+          const { data, error } = await supabase.rpc('upsert_product', {
+            p_business_id: STATE.business.id,
+            p_name: name,
+            p_sku: record.sku,
+            p_barcode: record.barcode,
+            p_description: null,
+            p_category_id: record.category_id,
+            p_supplier_id: null,
+            p_unit: record.unit,
+            p_cost_price: record.cost_price,
+            p_selling_price: record.selling_price,
+            p_wholesale_price: record.wholesale_price,
+            p_tax_category_code: record.tax_category_code,
+            p_reorder_level: record.reorder_level,
+            p_image_url: null,
+            p_is_active: true,
+            p_brand_id: record.brand_id,
+            p_id: null,
+          });
           if (error) { toast('Failed: ' + error.message, 'error'); return; }
           saved = data;
-          logAuditAction({ action: 'create', entityType: 'product', entityId: saved.id, entityName: record.name, newValue: record });
+          logAuditAction({ action: 'create', entityType: 'product', entityId: saved?.id, entityName: name, newValue: record });
         }
 
         // Upload image
@@ -272,7 +307,7 @@ async function openProductModal(productId) {
             toast("Image upload failed: " + uploadErr.message, "error");
           } else {
             const { data: urlData } = supabase.storage.from('product-images').getPublicUrl(path);
-            await supabase.from('products').update({ image_url: urlData.publicUrl }).eq('id', saved.id);
+            await supabase.rpc('upsert_product', { p_id: saved.id, p_image_url: urlData.publicUrl, p_business_id: STATE.business.id, p_name: name, p_selling_price: price, p_unit: unitVal });
           }
         }
 

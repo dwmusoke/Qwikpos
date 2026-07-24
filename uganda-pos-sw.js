@@ -3,7 +3,7 @@
 // carts, drafting sales) when the connection drops — sales sync to Supabase
 // automatically once back online (see app.js -> flushOfflineQueue).
 
-const CACHE_NAME = "uganda-pos-v41";
+const CACHE_NAME = "uganda-pos-v42";
 const APP_SHELL = [
   "./",
   "./index.html",
