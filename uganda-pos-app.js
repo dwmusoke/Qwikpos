@@ -227,6 +227,18 @@ function wireShell() {
   });
   $("sidebar-backdrop").addEventListener("click", closeSidebarOnMobile);
 
+  // Sidebar collapse toggle (desktop)
+  const savedCollapsed = localStorage.getItem("ugpos_sidebar_collapsed") === "true";
+  if (savedCollapsed) document.body.classList.add("sidebar-collapsed");
+
+  $("sidebar-collapse-btn").addEventListener("click", () => {
+    document.body.classList.toggle("sidebar-collapsed");
+    const isCollapsed = document.body.classList.contains("sidebar-collapsed");
+    localStorage.setItem("ugpos_sidebar_collapsed", isCollapsed);
+    $("sidebar-collapse-btn").textContent = isCollapsed ? "▶" : "◀";
+  });
+  $("sidebar-collapse-btn").textContent = document.body.classList.contains("sidebar-collapsed") ? "▶" : "◀";
+
   $("theme-toggle").addEventListener("click", () => {
     const html = document.documentElement;
     const next = html.dataset.theme === "dark" ? "light" : "dark";

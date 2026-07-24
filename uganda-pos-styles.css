@@ -60,6 +60,7 @@
 
   /* Layout */
   --sidebar-w: 252px;
+  --sidebar-collapsed-w: 64px;
   --topbar-h: 60px;
 
   /* Motion */
@@ -169,7 +170,7 @@ a { color: inherit; text-decoration: none; }
   height: 100vh;
   overflow-y: auto;
   z-index: 40;
-  transition: transform var(--dur) var(--ease), background-color 0.6s var(--ease);
+  transition: transform var(--dur) var(--ease), background-color 0.6s var(--ease), width 0.3s var(--ease);
 }
 
 /* Brand glow overlay at the top of sidebar */
@@ -298,6 +299,102 @@ a { color: inherit; text-decoration: none; }
 .sidebar > * {
   position: relative;
   z-index: 1;
+}
+
+/* ── Sidebar collapse toggle ── */
+.sidebar-collapse-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-sm);
+  border: none;
+  background: rgba(255,255,255,0.1);
+  color: rgba(255,255,255,0.6);
+  cursor: pointer;
+  transition: all var(--dur-fast) var(--ease);
+  flex-shrink: 0;
+  font-size: 14px;
+}
+.sidebar-collapse-btn:hover {
+  background: rgba(255,255,255,0.2);
+  color: #fff;
+}
+
+/* ── Collapsed sidebar (via body class) ── */
+@media (min-width: 861px) {
+  body.sidebar-collapsed .sidebar {
+    width: var(--sidebar-collapsed-w);
+    padding: 20px 8px;
+  }
+  body.sidebar-collapsed .sidebar .brand-row {
+    justify-content: center;
+    padding: 4px 0 20px;
+  }
+  body.sidebar-collapsed .sidebar .brand-row > div { display: none; }
+  body.sidebar-collapsed .sidebar .brand-row img { margin: 0; }
+  body.sidebar-collapsed .sidebar .nav-group-label {
+    font-size: 0;
+    padding: 8px 0 4px;
+    text-align: center;
+  }
+  body.sidebar-collapsed .sidebar .nav-group-label::after {
+    content: "—";
+    font-size: 10px;
+    color: rgba(255,255,255,0.25);
+  }
+  body.sidebar-collapsed .sidebar .nav-link {
+    justify-content: center;
+    padding: 10px;
+    gap: 0;
+    position: relative;
+  }
+  body.sidebar-collapsed .sidebar .nav-link > span:not(.icon):not(.nav-badge) { display: none; }
+  body.sidebar-collapsed .sidebar .nav-badge {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    margin: 0;
+    min-width: 16px;
+    height: 16px;
+    padding: 0 4px;
+    font-size: 9px;
+    line-height: 16px;
+  }
+  body.sidebar-collapsed .sidebar .nav-link.active { box-shadow: none; }
+  body.sidebar-collapsed .sidebar .sidebar-footer .btn {
+    padding: 10px;
+    font-size: 0;
+  }
+  body.sidebar-collapsed .sidebar .sidebar-footer .btn::after {
+    content: "🚪";
+    font-size: 16px;
+  }
+  body.sidebar-collapsed .sidebar .nav-link::before {
+    content: attr(data-tooltip);
+    position: absolute;
+    left: calc(100% + 10px);
+    top: 50%;
+    transform: translateY(-50%);
+    background: var(--surface);
+    color: var(--text);
+    padding: 6px 12px;
+    border-radius: var(--radius-sm);
+    font-size: 12px;
+    font-weight: 500;
+    white-space: nowrap;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity var(--dur-fast) var(--ease);
+    box-shadow: var(--shadow-md);
+    z-index: 100;
+    border: 1px solid var(--border);
+  }
+  body.sidebar-collapsed .sidebar .nav-link:hover::before {
+    opacity: 1;
+  }
+}
 }
 .offline-pill {
   display: none;
@@ -2692,6 +2789,21 @@ a:focus-visible {
   .modal.modal-lg { border-radius: 16px 16px 0 0; }
   .topbar { gap: 8px; }
   .topbar .user-chip span:last-child { display: none; }
+  .sidebar-collapse-btn { display: none; }
+  /* On mobile, sidebar is always full width when opened */
+  body.sidebar-collapsed .sidebar {
+    width: var(--sidebar-w);
+    padding: 20px 14px;
+  }
+  body.sidebar-collapsed .sidebar .brand-row > div { display: block; }
+  body.sidebar-collapsed .sidebar .nav-group-label { font-size: 10.5px; padding: 16px 12px 6px; }
+  body.sidebar-collapsed .sidebar .nav-group-label::after { content: none; }
+  body.sidebar-collapsed .sidebar .nav-link { justify-content: flex-start; padding: 10px 12px; gap: 11px; }
+  body.sidebar-collapsed .sidebar .nav-link > span:not(.icon):not(.nav-badge) { display: inline; }
+  body.sidebar-collapsed .sidebar .nav-badge { position: static; margin-left: auto; min-width: auto; height: auto; padding: 1px 7px; font-size: 10.5px; line-height: 18px; }
+  body.sidebar-collapsed .sidebar .sidebar-footer .btn { padding: 10px 12px; font-size: 13.5px; }
+  body.sidebar-collapsed .sidebar .sidebar-footer .btn::after { content: none; }
+  body.sidebar-collapsed .sidebar .nav-link::before { display: none; }
 }
 
 /* Table minimum width so columns don't collapse on mobile */
