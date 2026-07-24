@@ -332,6 +332,193 @@ alter table businesses add column if not exists whatsapp_provider text;
 alter table businesses add column if not exists whatsapp_api_key text;
 alter table businesses add column if not exists whatsapp_enabled boolean default false;
 
+-- ═══════════════════════════════════════════════════════════════════════
+-- FIX ALL RLS POLICIES: inline superadmin check instead of unreliable
+-- is_superadmin() function (PostgREST schema cache often returns stale)
+-- ═══════════════════════════════════════════════════════════════════════
+
+-- Helper: inline superadmin check (avoids function cache issues)
+-- Pattern: exists (select 1 from app_users where id = auth.uid() and role = 'superadmin' and is_active = true)
+
+-- Suppliers
+drop policy if exists business_isolation_suppliers on suppliers;
+create policy business_isolation_suppliers on suppliers
+  for all
+  using (business_id = auth_business_id()
+    or exists (select 1 from app_users where id = auth.uid() and role = 'superadmin' and is_active = true))
+  with check (business_id = auth_business_id()
+    or exists (select 1 from app_users where id = auth.uid() and role = 'superadmin' and is_active = true));
+
+-- Categories
+drop policy if exists business_isolation_categories on categories;
+create policy business_isolation_categories on categories
+  for all
+  using (business_id = auth_business_id()
+    or exists (select 1 from app_users where id = auth.uid() and role = 'superadmin' and is_active = true))
+  with check (business_id = auth_business_id()
+    or exists (select 1 from app_users where id = auth.uid() and role = 'superadmin' and is_active = true));
+
+-- Purchase orders
+drop policy if exists business_isolation_purchase_orders on purchase_orders;
+create policy business_isolation_purchase_orders on purchase_orders
+  for all
+  using (business_id = auth_business_id()
+    or exists (select 1 from app_users where id = auth.uid() and role = 'superadmin' and is_active = true))
+  with check (business_id = auth_business_id()
+    or exists (select 1 from app_users where id = auth.uid() and role = 'superadmin' and is_active = true));
+
+-- Purchase order items
+drop policy if exists business_isolation_purchase_order_items on purchase_order_items;
+create policy business_isolation_purchase_order_items on purchase_order_items
+  for all
+  using (exists (select 1 from purchase_orders po where po.id = purchase_order_items.po_id and (po.business_id = auth_business_id()
+    or exists (select 1 from app_users where id = auth.uid() and role = 'superadmin' and is_active = true))))
+  with check (exists (select 1 from purchase_orders po where po.id = purchase_order_items.po_id and (po.business_id = auth_business_id()
+    or exists (select 1 from app_users where id = auth.uid() and role = 'superadmin' and is_active = true))));
+
+-- Supplier payments
+drop policy if exists business_isolation_supplier_payments on supplier_payments;
+create policy business_isolation_supplier_payments on supplier_payments
+  for all
+  using (business_id = auth_business_id()
+    or exists (select 1 from app_users where id = auth.uid() and role = 'superadmin' and is_active = true))
+  with check (business_id = auth_business_id()
+    or exists (select 1 from app_users where id = auth.uid() and role = 'superadmin' and is_active = true));
+
+-- Products
+drop policy if exists business_isolation_products on products;
+create policy business_isolation_products on products
+  for all
+  using (business_id = auth_business_id()
+    or exists (select 1 from app_users where id = auth.uid() and role = 'superadmin' and is_active = true))
+  with check (business_id = auth_business_id()
+    or exists (select 1 from app_users where id = auth.uid() and role = 'superadmin' and is_active = true));
+
+-- Sales
+drop policy if exists business_isolation_sales on sales;
+create policy business_isolation_sales on sales
+  for all
+  using (business_id = auth_business_id()
+    or exists (select 1 from app_users where id = auth.uid() and role = 'superadmin' and is_active = true))
+  with check (business_id = auth_business_id()
+    or exists (select 1 from app_users where id = auth.uid() and role = 'superadmin' and is_active = true));
+
+-- Sale items
+drop policy if exists business_isolation_sale_items on sale_items;
+create policy business_isolation_sale_items on sale_items
+  for all
+  using (exists (select 1 from sales s where s.id = sale_items.sale_id and (s.business_id = auth_business_id()
+    or exists (select 1 from app_users where id = auth.uid() and role = 'superadmin' and is_active = true))))
+  with check (exists (select 1 from sales s where s.id = sale_items.sale_id and (s.business_id = auth_business_id()
+    or exists (select 1 from app_users where id = auth.uid() and role = 'superadmin' and is_active = true))));
+
+-- Customers
+drop policy if exists business_isolation_customers on customers;
+create policy business_isolation_customers on customers
+  for all
+  using (business_id = auth_business_id()
+    or exists (select 1 from app_users where id = auth.uid() and role = 'superadmin' and is_active = true))
+  with check (business_id = auth_business_id()
+    or exists (select 1 from app_users where id = auth.uid() and role = 'superadmin' and is_active = true));
+
+-- Payments
+drop policy if exists business_isolation_payments on payments;
+create policy business_isolation_payments on payments
+  for all
+  using (business_id = auth_business_id()
+    or exists (select 1 from app_users where id = auth.uid() and role = 'superadmin' and is_active = true))
+  with check (business_id = auth_business_id()
+    or exists (select 1 from app_users where id = auth.uid() and role = 'superadmin' and is_active = true));
+
+-- Expenses
+drop policy if exists business_isolation_expenses on expenses;
+create policy business_isolation_expenses on expenses
+  for all
+  using (business_id = auth_business_id()
+    or exists (select 1 from app_users where id = auth.uid() and role = 'superadmin' and is_active = true))
+  with check (business_id = auth_business_id()
+    or exists (select 1 from app_users where id = auth.uid() and role = 'superadmin' and is_active = true));
+
+-- Notifications
+drop policy if exists business_isolation_notifications on notifications;
+create policy business_isolation_notifications on notifications
+  for all
+  using (business_id = auth_business_id()
+    or exists (select 1 from app_users where id = auth.uid() and role = 'superadmin' and is_active = true))
+  with check (business_id = auth_business_id()
+    or exists (select 1 from app_users where id = auth.uid() and role = 'superadmin' and is_active = true));
+
+-- EFRIS invoices
+drop policy if exists business_isolation_efris_invoices on efris_invoices;
+create policy business_isolation_efris_invoices on efris_invoices
+  for all
+  using (business_id = auth_business_id()
+    or exists (select 1 from app_users where id = auth.uid() and role = 'superadmin' and is_active = true))
+  with check (business_id = auth_business_id()
+    or exists (select 1 from app_users where id = auth.uid() and role = 'superadmin' and is_active = true));
+
+-- BOM
+drop policy if exists business_isolation_bom on bom;
+create policy business_isolation_bom on bom
+  for all
+  using (business_id = auth_business_id()
+    or exists (select 1 from app_users where id = auth.uid() and role = 'superadmin' and is_active = true))
+  with check (business_id = auth_business_id()
+    or exists (select 1 from app_users where id = auth.uid() and role = 'superadmin' and is_active = true));
+
+-- Coupons
+drop policy if exists business_isolation_coupons on coupons;
+create policy business_isolation_coupons on coupons
+  for all
+  using (business_id = auth_business_id()
+    or exists (select 1 from app_users where id = auth.uid() and role = 'superadmin' and is_active = true))
+  with check (business_id = auth_business_id()
+    or exists (select 1 from app_users where id = auth.uid() and role = 'superadmin' and is_active = true));
+
+-- Orders
+drop policy if exists business_isolation_orders on orders;
+create policy business_isolation_orders on orders
+  for all
+  using (business_id = auth_business_id()
+    or exists (select 1 from app_users where id = auth.uid() and role = 'superadmin' and is_active = true))
+  with check (business_id = auth_business_id()
+    or exists (select 1 from app_users where id = auth.uid() and role = 'superadmin' and is_active = true));
+
+-- Audit log
+drop policy if exists business_isolation_audit_log on audit_log;
+create policy business_isolation_audit_log on audit_log
+  for all
+  using (business_id = auth_business_id()
+    or exists (select 1 from app_users where id = auth.uid() and role = 'superadmin' and is_active = true))
+  with check (business_id = auth_business_id()
+    or exists (select 1 from app_users where id = auth.uid() and role = 'superadmin' and is_active = true));
+
+-- Lead management
+do $$
+begin
+  if exists (select 1 from information_schema.tables where table_name = 'leads') then
+    execute 'drop policy if exists business_isolation_leads on leads';
+    execute 'create policy business_isolation_leads on leads for all
+      using (business_id = auth_business_id()
+        or exists (select 1 from app_users where id = auth.uid() and role = ''superadmin'' and is_active = true))
+      with check (business_id = auth_business_id()
+        or exists (select 1 from app_users where id = auth.uid() and role = ''superadmin'' and is_active = true))';
+  end if;
+end $$;
+
+-- Deliveries
+do $$
+begin
+  if exists (select 1 from information_schema.tables where table_name = 'deliveries') then
+    execute 'drop policy if exists business_isolation_deliveries on deliveries';
+    execute 'create policy business_isolation_deliveries on deliveries for all
+      using (business_id = auth_business_id()
+        or exists (select 1 from app_users where id = auth.uid() and role = ''superadmin'' and is_active = true))
+      with check (business_id = auth_business_id()
+        or exists (select 1 from app_users where id = auth.uid() and role = ''superadmin'' and is_active = true))';
+  end if;
+end $$;
+
 -- Refresh PostgREST schema cache so new RPC functions are immediately available
 notify pgrst, 'reload schema';
 
