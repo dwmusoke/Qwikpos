@@ -1276,6 +1276,7 @@ function openPOModal() {
             .from("purchase_orders")
             .insert({
               business_id: STATE.business.id,
+              branch_id: STATE.branch?.id || null,
               supplier_id: supplierId,
               po_number: poNumber,
               status: "draft",

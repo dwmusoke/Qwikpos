@@ -71,7 +71,8 @@ export async function renderTemplateSettings(root) {
 
         <div class="field">
           <label>Business Logo URL</label>
-          <input id="tpl-logo" value="${escapeHtml(tpl.logoUrl)}" placeholder="https://..." />
+          <input id="tpl-logo" value="${escapeHtml(tpl.logoUrl)}" placeholder="Uses profile logo if empty" />
+          ${!tpl.logoUrl && STATE.business?.logo_url ? `<div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Using profile logo: <a href="${escapeHtml(STATE.business.logo_url)}" target="_blank" style="color:var(--brand);">${escapeHtml(STATE.business.logo_url)}</a></div>` : ""}
         </div>
 
         <div class="field-row">
@@ -314,10 +315,11 @@ export async function renderTemplateSettings(root) {
 
 function renderPreview(tpl) {
   const b = STATE.business || {};
+  const logoSrc = tpl.logoUrl || b.logo_url || "";
   const width = tpl.paperWidth === "58" ? "220px" : "300px";
   return `
     <div style="width:${width}; background:white; padding:12px; font-family:monospace; font-size:${tpl.fontSize}px; color:${tpl.secondaryColor}; border:1px solid #ddd; border-radius:4px; box-shadow:0 2px 8px rgba(0,0,0,0.1);">
-      ${tpl.showLogo && tpl.logoUrl ? `<div style="text-align:center; margin-bottom:8px;"><img src="${escapeHtml(tpl.logoUrl)}" style="max-height:40px; max-width:100%;" /></div>` : ""}
+      ${tpl.showLogo && logoSrc ? `<div style="text-align:center; margin-bottom:8px;"><img src="${escapeHtml(logoSrc)}" style="max-height:40px; max-width:100%;" /></div>` : ""}
       ${tpl.headerText ? `<div style="text-align:center; font-size:10px; color:#999;">${escapeHtml(tpl.headerText)}</div>` : ""}
       ${tpl.showBusinessName ? `<div style="text-align:center; font-weight:bold; font-size:${parseInt(tpl.fontSize) + 3}px; color:${tpl.primaryColor};">${escapeHtml(b.name || "Business Name")}</div>` : ""}
       ${tpl.showAddress && b.address ? `<div style="text-align:center; font-size:11px;">${escapeHtml(b.address)}</div>` : ""}
@@ -353,6 +355,7 @@ function renderPreview(tpl) {
 
 function generateReceiptHtml(settings, sale, lines, totals) {
   const b = STATE.business || {};
+  const logoSrc = settings.logoUrl || b.logo_url || "";
   const w = settings.paperWidth === "58" ? "220px" : "300px";
   return `<!DOCTYPE html>
 <html><head><title>${escapeHtml(settings.invoiceTitle)} — ${escapeHtml(sale.sale_number)}</title>
@@ -369,7 +372,7 @@ function generateReceiptHtml(settings, sale, lines, totals) {
 </style></head>
 <body>
 <div class="receipt">
-  ${settings.showLogo && settings.logoUrl ? `<div class="center"><img src="${escapeHtml(settings.logoUrl)}" style="max-height:50px; max-width:100%;" /></div>` : ""}
+  ${settings.showLogo && logoSrc ? `<div class="center"><img src="${escapeHtml(logoSrc)}" style="max-height:50px; max-width:100%;" /></div>` : ""}
   ${settings.headerText ? `<div class="center" style="font-size:10px; color:#999;">${escapeHtml(settings.headerText)}</div>` : ""}
   ${settings.showBusinessName ? `<div class="center" style="font-weight:bold; font-size:${parseInt(settings.fontSize) + 4}px; color:${settings.primaryColor};">${escapeHtml(b.name || "")}</div>` : ""}
   ${settings.showAddress && b.address ? `<div class="center">${escapeHtml(b.address)}</div>` : ""}

@@ -14,6 +14,7 @@ import {
 export async function renderDashboard(root) {
   root.innerHTML = `<div class="empty-state">Loading dashboard…</div>`;
 
+  const baseCurrency = STATE.business?.base_currency || "UGX";
   const since = new Date();
   since.setDate(since.getDate() - 90);
 
@@ -257,9 +258,9 @@ export async function renderDashboard(root) {
                 (r) => `
               <tr>
                 <td><b>${escapeHtml(r.name)}</b></td>
-                <td>${fmtMoney(r.total)}</td>
+                <td>${fmtMoney(r.total, baseCurrency)}</td>
                 <td>${r.count}</td>
-                <td>${fmtMoney(r.vat)}</td>
+                <td>${fmtMoney(r.vat, baseCurrency)}</td>
                 <td><span class="badge badge-green">${r.paid}</span></td>
                 <td><span class="badge badge-yellow">${r.credit}</span></td>
               </tr>`,
@@ -277,7 +278,7 @@ export async function renderDashboard(root) {
         <div class="kpi-icon">🧾</div>
         <div class="kpi-content">
           <div class="label">Today's Sales</div>
-          <div class="value">${fmtMoney(todayTotal)}</div>
+          <div class="value">${fmtMoney(todayTotal, baseCurrency)}</div>
           <div class="delta ${todayTrend !== null ? (Number(todayTrend) >= 0 ? "up" : "down") : ""}">
             ${todayTrend !== null ? `${Number(todayTrend) >= 0 ? "↑" : "↓"} ${Math.abs(Number(todayTrend))}% vs yday` : "First sale today"}
           </div>
@@ -287,7 +288,7 @@ export async function renderDashboard(root) {
         <div class="kpi-icon">📅</div>
         <div class="kpi-content">
           <div class="label">This Month</div>
-          <div class="value">${fmtMoney(monthTotal)}</div>
+          <div class="value">${fmtMoney(monthTotal, baseCurrency)}</div>
           <div class="delta up">${monthSales.length} txns</div>
         </div>
       </div>
@@ -295,7 +296,7 @@ export async function renderDashboard(root) {
         <div class="kpi-icon">📊</div>
         <div class="kpi-content">
           <div class="label">This Year</div>
-          <div class="value">${fmtMoney(yearTotal)}</div>
+          <div class="value">${fmtMoney(yearTotal, baseCurrency)}</div>
           <div class="delta up">${yearSales.length} txns</div>
         </div>
       </div>
@@ -303,14 +304,14 @@ export async function renderDashboard(root) {
         <div class="kpi-icon">🏛️</div>
         <div class="kpi-content">
           <div class="label">VAT (Month)</div>
-          <div class="value">${fmtMoney(monthVat)}</div>
+          <div class="value">${fmtMoney(monthVat, baseCurrency)}</div>
         </div>
       </div>
       <div class="kpi-card kpi-accent-teal">
         <div class="kpi-icon">📦</div>
         <div class="kpi-content">
           <div class="label">Inventory</div>
-          <div class="value">${fmtMoney(inventoryValue)}</div>
+          <div class="value">${fmtMoney(inventoryValue, baseCurrency)}</div>
           <div class="delta">${STATE.products.length} SKUs</div>
         </div>
       </div>
@@ -325,14 +326,14 @@ export async function renderDashboard(root) {
         <div class="kpi-icon">👥</div>
         <div class="kpi-content">
           <div class="label">Outstanding</div>
-          <div class="value">${fmtMoney(outstandingBalance)}</div>
+          <div class="value">${fmtMoney(outstandingBalance, baseCurrency)}</div>
         </div>
       </div>
       <div class="kpi-card kpi-accent-indigo">
         <div class="kpi-icon">🏛️</div>
         <div class="kpi-content">
           <div class="label">YTD VAT</div>
-          <div class="value">${fmtMoney(monthVat)}</div>
+          <div class="value">${fmtMoney(monthVat, baseCurrency)}</div>
         </div>
       </div>
     </div>
@@ -382,7 +383,7 @@ export async function renderDashboard(root) {
               <tr>
                 <td>${escapeHtml(s.sale_number)}</td>
                 <td>${fmtDate(s.created_at)}</td>
-                <td>${fmtMoney(s.grand_total_base)}</td>
+                <td>${fmtMoney(s.grand_total_base, baseCurrency)}</td>
                 <td><span class="badge ${s.payment_status === "paid" ? "badge-green" : s.payment_status === "credit" ? "badge-yellow" : "badge-gray"}">${s.payment_status}</span></td>
               </tr>`,
               )

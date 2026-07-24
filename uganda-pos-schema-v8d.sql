@@ -1,7 +1,10 @@
 -- =====================================================================
 -- QWICKPOS — SCHEMA V8D
--- Create missing tables: coupons, gift_cards, leads, deliveries
+-- Create missing tables, add missing columns, fix stock trigger
 -- =====================================================================
+
+-- Add branch_id to purchase_orders (missing from original schema)
+alter table purchase_orders add column if not exists branch_id uuid references branches(id);
 
 -- Coupons
 create table if not exists coupons (

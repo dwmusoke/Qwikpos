@@ -1360,7 +1360,7 @@ export function receiptHtml(sale, opts = {}) {
   const fontSize = tpl.fontSize || "13";
   return `
     <div class="receipt" id="receipt-print-area" style="font-size:${fontSize}px; color:${textColor};">
-      ${tpl.showLogo && tpl.logoUrl ? `<div class="center"><img src="${escapeHtml(tpl.logoUrl)}" style="max-height:50px; max-width:100%;" /></div>` : ""}
+      ${tpl.showLogo && (tpl.logoUrl || business.logo_url) ? `<div class="center"><img src="${escapeHtml(tpl.logoUrl || business.logo_url || "")}" style="max-height:50px; max-width:100%;" /></div>` : ""}
       ${tpl.headerText ? `<div class="center" style="font-size:10px; color:#999;">${escapeHtml(tpl.headerText)}</div>` : ""}
       ${tpl.showBusinessName ? `<div class="center"><b style="color:${color}; font-size:${parseInt(fontSize) + 3}px;">${escapeHtml(business.name)}</b></div>` : ""}
       ${tpl.showAddress ? `<div class="center">${escapeHtml(business.address || "")}</div>` : ""}
