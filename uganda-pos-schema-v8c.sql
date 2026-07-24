@@ -84,28 +84,31 @@ create policy business_isolation_branches on branches
   for all using (business_id = auth_business_id() or is_superadmin())
   with check (business_id = auth_business_id() or is_superadmin());
 
--- Create storage buckets (if not exists)
--- Uses DO block to safely create buckets that may already exist
+-- Create storage buckets (if not exists) and ensure public
 DO $$
 BEGIN
   INSERT INTO storage.buckets (id, name, public) VALUES ('logos', 'logos', true)
-    ON CONFLICT (id) DO NOTHING;
+    ON CONFLICT (id) DO UPDATE SET public = true;
   INSERT INTO storage.buckets (id, name, public) VALUES ('product-images', 'product-images', true)
-    ON CONFLICT (id) DO NOTHING;
+    ON CONFLICT (id) DO UPDATE SET public = true;
 END $$;
 
--- Storage RLS policies for logos bucket
+-- Storage RLS policies for logos bucket (open to all authenticated + public read)
 DROP POLICY IF EXISTS "logos_public_select" ON storage.objects;
 CREATE POLICY "logos_public_select" ON storage.objects
   FOR SELECT USING (bucket_id = 'logos');
 
 DROP POLICY IF EXISTS "logos_insert_auth" ON storage.objects;
 CREATE POLICY "logos_insert_auth" ON storage.objects
-  FOR INSERT WITH CHECK (bucket_id = 'logos' AND auth.role() = 'authenticated');
+  FOR INSERT WITH CHECK (bucket_id = 'logos');
 
 DROP POLICY IF EXISTS "logos_delete_auth" ON storage.objects;
 CREATE POLICY "logos_delete_auth" ON storage.objects
-  FOR DELETE USING (bucket_id = 'logos' AND auth.role() = 'authenticated');
+  FOR DELETE USING (bucket_id = 'logos');
+
+DROP POLICY IF EXISTS "logos_update_auth" ON storage.objects;
+CREATE POLICY "logos_update_auth" ON storage.objects
+  FOR UPDATE USING (bucket_id = 'logos');
 
 -- Storage RLS policies for product-images bucket
 DROP POLICY IF EXISTS "product_images_public_select" ON storage.objects;
@@ -114,11 +117,15 @@ CREATE POLICY "product_images_public_select" ON storage.objects
 
 DROP POLICY IF EXISTS "product_images_insert_auth" ON storage.objects;
 CREATE POLICY "product_images_insert_auth" ON storage.objects
-  FOR INSERT WITH CHECK (bucket_id = 'product-images' AND auth.role() = 'authenticated');
+  FOR INSERT WITH CHECK (bucket_id = 'product-images');
 
 DROP POLICY IF EXISTS "product_images_delete_auth" ON storage.objects;
 CREATE POLICY "product_images_delete_auth" ON storage.objects
-  FOR DELETE USING (bucket_id = 'product-images' AND auth.role() = 'authenticated');
+  FOR DELETE USING (bucket_id = 'product-images');
+
+DROP POLICY IF EXISTS "product_images_update_auth" ON storage.objects;
+CREATE POLICY "product_images_update_auth" ON storage.objects
+  FOR UPDATE USING (bucket_id = 'product-images');
 
 -- Orders table (referenced by uganda-pos-view-orders.js, not in base schema)
 create table if not exists orders (
