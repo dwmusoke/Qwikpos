@@ -479,8 +479,24 @@ export function applyTheme() {
   root.style.setProperty("--brand-light", color + "18");
   root.style.setProperty("--brand-lighter", color + "0a");
   root.style.setProperty("--brand-glow", color + "1e");
+
+  // Derive sidebar background from the brand color
+  const isDark = root.dataset.theme === "dark";
+  const sidebarBg = isDark ? shadeColor(color, -65) : shadeColor(color, -50);
+  root.style.setProperty("--sidebar-bg", sidebarBg);
+  root.style.setProperty("--sidebar-bg-glow", sidebarBg + "cc");
+
   const fontSize = STATE.business?.theme_font_size || localStorage.getItem("ugpos_theme_font_size") || "15px";
   root.style.fontSize = fontSize;
+
+  // Flash the sidebar with the new brand color
+  const sidebar = document.getElementById("sidebar");
+  if (sidebar) {
+    sidebar.classList.remove("sidebar-flash");
+    void sidebar.offsetWidth; // Trigger reflow to restart animation
+    sidebar.classList.add("sidebar-flash");
+    setTimeout(() => sidebar.classList.remove("sidebar-flash"), 800);
+  }
 }
 
 function shadeColor(col, pct) {

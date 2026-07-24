@@ -234,6 +234,7 @@ function wireShell() {
     STATE.theme = next;
     localStorage.setItem("ugpos_theme", next);
     $("theme-toggle").textContent = next === "dark" ? "☀️" : "🌙";
+    applyTheme();
   });
   document.documentElement.dataset.theme = STATE.theme;
   $("theme-toggle").textContent = STATE.theme === "dark" ? "☀️" : "🌙";
