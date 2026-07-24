@@ -430,68 +430,96 @@ create policy business_isolation_payments on payments
   with check (exists (select 1 from sales s where s.id = payments.sale_id and (s.business_id = auth_business_id()
     or exists (select 1 from app_users where id = auth.uid() and role = 'superadmin' and is_active = true))));
 
--- Expenses
-drop policy if exists business_isolation_expenses on expenses;
-create policy business_isolation_expenses on expenses
-  for all
-  using (business_id = auth_business_id()
-    or exists (select 1 from app_users where id = auth.uid() and role = 'superadmin' and is_active = true))
-  with check (business_id = auth_business_id()
-    or exists (select 1 from app_users where id = auth.uid() and role = 'superadmin' and is_active = true));
+-- Expenses (may not exist yet)
+do $$
+begin
+  if exists (select 1 from information_schema.tables where table_name = 'expenses') then
+    execute 'drop policy if exists business_isolation_expenses on expenses';
+    execute 'create policy business_isolation_expenses on expenses for all
+      using (business_id = auth_business_id()
+        or exists (select 1 from app_users where id = auth.uid() and role = ''superadmin'' and is_active = true))
+      with check (business_id = auth_business_id()
+        or exists (select 1 from app_users where id = auth.uid() and role = ''superadmin'' and is_active = true))';
+  end if;
+end $$;
 
--- Notifications
-drop policy if exists business_isolation_notifications on notifications;
-create policy business_isolation_notifications on notifications
-  for all
-  using (business_id = auth_business_id()
-    or exists (select 1 from app_users where id = auth.uid() and role = 'superadmin' and is_active = true))
-  with check (business_id = auth_business_id()
-    or exists (select 1 from app_users where id = auth.uid() and role = 'superadmin' and is_active = true));
+-- Notifications (may not exist yet)
+do $$
+begin
+  if exists (select 1 from information_schema.tables where table_name = 'notifications') then
+    execute 'drop policy if exists business_isolation_notifications on notifications';
+    execute 'create policy business_isolation_notifications on notifications for all
+      using (business_id = auth_business_id()
+        or exists (select 1 from app_users where id = auth.uid() and role = ''superadmin'' and is_active = true))
+      with check (business_id = auth_business_id()
+        or exists (select 1 from app_users where id = auth.uid() and role = ''superadmin'' and is_active = true))';
+  end if;
+end $$;
 
--- EFRIS invoices
-drop policy if exists business_isolation_efris_invoices on efris_invoices;
-create policy business_isolation_efris_invoices on efris_invoices
-  for all
-  using (business_id = auth_business_id()
-    or exists (select 1 from app_users where id = auth.uid() and role = 'superadmin' and is_active = true))
-  with check (business_id = auth_business_id()
-    or exists (select 1 from app_users where id = auth.uid() and role = 'superadmin' and is_active = true));
+-- EFRIS invoices (may not exist yet)
+do $$
+begin
+  if exists (select 1 from information_schema.tables where table_name = 'efris_invoices') then
+    execute 'drop policy if exists business_isolation_efris_invoices on efris_invoices';
+    execute 'create policy business_isolation_efris_invoices on efris_invoices for all
+      using (business_id = auth_business_id()
+        or exists (select 1 from app_users where id = auth.uid() and role = ''superadmin'' and is_active = true))
+      with check (business_id = auth_business_id()
+        or exists (select 1 from app_users where id = auth.uid() and role = ''superadmin'' and is_active = true))';
+  end if;
+end $$;
 
--- BOM
-drop policy if exists business_isolation_bom on bom;
-create policy business_isolation_bom on bom
-  for all
-  using (business_id = auth_business_id()
-    or exists (select 1 from app_users where id = auth.uid() and role = 'superadmin' and is_active = true))
-  with check (business_id = auth_business_id()
-    or exists (select 1 from app_users where id = auth.uid() and role = 'superadmin' and is_active = true));
+-- BOM (may not exist yet)
+do $$
+begin
+  if exists (select 1 from information_schema.tables where table_name = 'bom') then
+    execute 'drop policy if exists business_isolation_bom on bom';
+    execute 'create policy business_isolation_bom on bom for all
+      using (business_id = auth_business_id()
+        or exists (select 1 from app_users where id = auth.uid() and role = ''superadmin'' and is_active = true))
+      with check (business_id = auth_business_id()
+        or exists (select 1 from app_users where id = auth.uid() and role = ''superadmin'' and is_active = true))';
+  end if;
+end $$;
 
--- Coupons
-drop policy if exists business_isolation_coupons on coupons;
-create policy business_isolation_coupons on coupons
-  for all
-  using (business_id = auth_business_id()
-    or exists (select 1 from app_users where id = auth.uid() and role = 'superadmin' and is_active = true))
-  with check (business_id = auth_business_id()
-    or exists (select 1 from app_users where id = auth.uid() and role = 'superadmin' and is_active = true));
+-- Coupons (may not exist yet)
+do $$
+begin
+  if exists (select 1 from information_schema.tables where table_name = 'coupons') then
+    execute 'drop policy if exists business_isolation_coupons on coupons';
+    execute 'create policy business_isolation_coupons on coupons for all
+      using (business_id = auth_business_id()
+        or exists (select 1 from app_users where id = auth.uid() and role = ''superadmin'' and is_active = true))
+      with check (business_id = auth_business_id()
+        or exists (select 1 from app_users where id = auth.uid() and role = ''superadmin'' and is_active = true))';
+  end if;
+end $$;
 
--- Orders
-drop policy if exists business_isolation_orders on orders;
-create policy business_isolation_orders on orders
-  for all
-  using (business_id = auth_business_id()
-    or exists (select 1 from app_users where id = auth.uid() and role = 'superadmin' and is_active = true))
-  with check (business_id = auth_business_id()
-    or exists (select 1 from app_users where id = auth.uid() and role = 'superadmin' and is_active = true));
+-- Orders (may not exist yet)
+do $$
+begin
+  if exists (select 1 from information_schema.tables where table_name = 'orders') then
+    execute 'drop policy if exists business_isolation_orders on orders';
+    execute 'create policy business_isolation_orders on orders for all
+      using (business_id = auth_business_id()
+        or exists (select 1 from app_users where id = auth.uid() and role = ''superadmin'' and is_active = true))
+      with check (business_id = auth_business_id()
+        or exists (select 1 from app_users where id = auth.uid() and role = ''superadmin'' and is_active = true))';
+  end if;
+end $$;
 
--- Audit log
-drop policy if exists business_isolation_audit_log on audit_log;
-create policy business_isolation_audit_log on audit_log
-  for all
-  using (business_id = auth_business_id()
-    or exists (select 1 from app_users where id = auth.uid() and role = 'superadmin' and is_active = true))
-  with check (business_id = auth_business_id()
-    or exists (select 1 from app_users where id = auth.uid() and role = 'superadmin' and is_active = true));
+-- Audit log (may not exist yet)
+do $$
+begin
+  if exists (select 1 from information_schema.tables where table_name = 'audit_log') then
+    execute 'drop policy if exists business_isolation_audit_log on audit_log';
+    execute 'create policy business_isolation_audit_log on audit_log for all
+      using (business_id = auth_business_id()
+        or exists (select 1 from app_users where id = auth.uid() and role = ''superadmin'' and is_active = true))
+      with check (business_id = auth_business_id()
+        or exists (select 1 from app_users where id = auth.uid() and role = ''superadmin'' and is_active = true))';
+  end if;
+end $$;
 
 -- Lead management
 do $$
