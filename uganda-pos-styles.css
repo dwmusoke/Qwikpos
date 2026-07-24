@@ -32,10 +32,11 @@
   --success-glow: rgba(22, 163, 74, 0.12);
 
   /* Neutrals — warm-cool gray scale */
-  --bg: #f6f8fa;
+  --bg: #f0f4f8;
   --surface: #ffffff;
   --surface-2: #f1f5f9;
   --surface-3: #e9eef3;
+  --sidebar-bg: #0d392e;
   --border: #e2e8f0;
   --border-strong: #cbd5e1;
   --text: #0f172a;
@@ -100,6 +101,7 @@
   --bg: #0a0f1a;
   --surface: #111827;
   --surface-2: #1a2332;
+  --sidebar-bg: #0b1818;
   --surface-3: #243044;
   --border: #1e293b;
   --border-strong: #334155;
@@ -157,8 +159,8 @@ a { color: inherit; text-decoration: none; }
 .sidebar {
   width: var(--sidebar-w);
   flex-shrink: 0;
-  background: var(--surface);
-  border-right: 1px solid var(--border);
+  background: var(--sidebar-bg);
+  border-right: 1px solid rgba(255,255,255,0.06);
   display: flex;
   flex-direction: column;
   padding: 20px 14px;
@@ -187,10 +189,11 @@ a { color: inherit; text-decoration: none; }
   font-size: 15px;
   line-height: 1.2;
   letter-spacing: -0.01em;
+  color: #f1f5f9;
 }
 .brand-row .brand-sub {
   font-size: 11px;
-  color: var(--text-muted);
+  color: #a3b8b0;
   margin-top: 2px;
 }
 
@@ -198,10 +201,10 @@ a { color: inherit; text-decoration: none; }
   font-size: 10.5px;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: var(--text-faint);
+  color: #8aaea2;
   padding: 16px 12px 6px;
   font-weight: 700;
-  border-top: 1px solid var(--border);
+  border-top: 1px solid rgba(255,255,255,0.06);
   margin-top: 8px;
 }
 .nav-group-label:first-of-type {
@@ -215,7 +218,7 @@ a { color: inherit; text-decoration: none; }
   gap: 11px;
   padding: 10px 12px;
   border-radius: var(--radius-sm);
-  color: var(--text-muted);
+  color: #c5d5ce;
   text-decoration: none;
   cursor: pointer;
   font-size: 13.5px;
@@ -228,12 +231,12 @@ a { color: inherit; text-decoration: none; }
   position: relative;
 }
 .nav-link:hover {
-  background: var(--surface-2);
-  color: var(--text);
+  background: rgba(255,255,255,0.08);
+  color: #fff;
 }
 .nav-link.active {
-  background: var(--brand-light);
-  color: var(--brand);
+  background: rgba(255,255,255,0.12);
+  color: #fff;
   font-weight: 600;
   box-shadow: inset 3px 0 0 var(--brand);
 }

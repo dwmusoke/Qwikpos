@@ -856,47 +856,27 @@ function openImportModal() {
         const price = parseFloat(cols[priceIdx]);
         if (!name || isNaN(price)) continue;
 
-        let saved;
-        if (editing) {
-          const { data, error } = await supabase.rpc('upsert_product', {
-            p_business_id: STATE.business.id,
-            p_name: name, p_sku: $('pf-sku').value.trim() || null,
-            p_barcode: $('pf-barcode').value.trim() || null,
-            p_category_id: $('pf-category').value || null,
-            p_brand_id: $('pf-brand').value || null,
-            p_unit: unitVal || 'pc',
-            p_cost_price: parseFloat($('pf-cost').value) || 0,
-            p_selling_price: price,
-            p_wholesale_price: parseFloat($('pf-wholesale').value) || null,
-            p_tax_category_code: $('pf-tax').value || 'STD',
-            p_reorder_level: parseFloat($('pf-reorder').value) || 0,
-            p_id: productId,
-          });
-          if (error) { toast('Failed: ' + error.message, 'error'); return; }
-          saved = { id: productId };
-          logAuditAction({ action: 'update', entityType: 'product', entityId: productId, entityName: name, newValue: record });
-        } else {
-          const { data, error } = await supabase.rpc('upsert_product', {
-            p_business_id: STATE.business.id,
-            p_name, p_sku: $('pf-sku').value.trim() || null,
-            p_barcode: $('pf-barcode').value.trim() || null,
-            p_description: null,
-            p_category_id: $('pf-category').value || null,
-            p_supplier_id: null,
-            p_unit: unitVal || 'pc',
-            p_cost_price: parseFloat($('pf-cost').value) || 0,
-            p_selling_price: price,
-            p_wholesale_price: parseFloat($('pf-wholesale').value) || null,
-            p_tax_category_code: $('pf-tax').value || 'STD',
-            p_reorder_level: parseFloat($('pf-reorder').value) || 0,
-            p_is_active: true,
-            p_brand_id: $('pf-brand').value || null,
-            p_id: null,
-          });
-          if (error) { toast('Failed: ' + error.message, 'error'); return; }
-          saved = data;
-          logAuditAction({ action: 'create', entityType: 'product', entityId: saved?.id, entityName: name, newValue: record });
-        }
+        const { error } = await supabase.rpc('upsert_product', {
+          p_business_id: STATE.business.id,
+          p_name,
+          p_sku: cols[headers.indexOf('sku')]?.trim() || null,
+          p_barcode: cols[headers.indexOf('barcode')]?.trim() || null,
+          p_description: null,
+          p_category_id: null,
+          p_supplier_id: null,
+          p_unit: cols[headers.indexOf('unit')]?.trim() || 'pc',
+          p_cost_price: parseFloat(cols[headers.indexOf('cost_price')]) || 0,
+          p_selling_price: price,
+          p_wholesale_price: parseFloat(cols[headers.indexOf('wholesale_price')]) || null,
+          p_tax_category_code: cols[headers.indexOf('tax_category')]?.trim() || 'STD',
+          p_reorder_level: parseFloat(cols[headers.indexOf('reorder_level')]) || 5,
+          p_is_active: true,
+          p_brand_id: null,
+          p_id: null,
+        });
+        if (error) continue;
+        count++;
+      }
       toast(`Imported ${count} products`, 'success');
       await refreshProducts();
       closeModal(); renderTab();
