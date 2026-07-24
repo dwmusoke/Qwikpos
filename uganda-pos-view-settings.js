@@ -803,13 +803,14 @@ export async function renderSettings(root) {
       $('br-save').addEventListener('click', async () => {
         const name = $('br-name').value.trim();
         if (!name) { toast("Branch name is required", "error"); return; }
-        const { error } = await supabase.from('branches').insert({
-          business_id: STATE.business.id, name, is_main: false, is_active: true,
-          phone: $('br-phone').value.trim() || null,
-          email: $('br-email').value.trim() || null,
-          address: $('br-address').value.trim() || null,
-          location: $('br-location').value.trim() || null,
-          contact_person: $('br-contact').value.trim() || null,
+        const { data, error } = await supabase.rpc('create_branch', {
+          p_business_id: STATE.business.id,
+          p_name: name,
+          p_phone: $('br-phone').value.trim() || null,
+          p_email: $('br-email').value.trim() || null,
+          p_address: $('br-address').value.trim() || null,
+          p_location: $('br-location').value.trim() || null,
+          p_contact_person: $('br-contact').value.trim() || null,
         });
         if (error) { toast('Failed: ' + error.message, 'error'); return; }
         toast('Branch created', 'success');
@@ -846,11 +847,15 @@ export async function renderSettings(root) {
       $('eb-save').addEventListener('click', async () => {
         const name = $('eb-name').value.trim();
         if (!name) { toast("Name is required", "error"); return; }
-        const { error } = await supabase.from('branches').update({
-          name, phone: $('eb-phone').value.trim() || null, email: $('eb-email').value.trim() || null,
-          address: $('eb-address').value.trim() || null, location: $('eb-location').value.trim() || null,
-          contact_person: $('eb-contact').value.trim() || null,
-        }).eq('id', b.id);
+        const { data, error } = await supabase.rpc('update_branch', {
+          p_branch_id: b.id,
+          p_name: name,
+          p_phone: $('eb-phone').value.trim() || null,
+          p_email: $('eb-email').value.trim() || null,
+          p_address: $('eb-address').value.trim() || null,
+          p_location: $('eb-location').value.trim() || null,
+          p_contact_person: $('eb-contact').value.trim() || null,
+        });
         if (error) { toast('Failed: ' + error.message, 'error'); return; }
         toast('Branch updated', 'success');
         closeModal();
@@ -864,7 +869,7 @@ export async function renderSettings(root) {
   // Warehouses: delete
   qsa('[data-delete-branch]').forEach(btn => btn.addEventListener("click", async () => {
     if (!confirm("Delete this branch? This cannot be undone.")) return;
-    const { error } = await supabase.from('branches').delete().eq('id', btn.dataset.deleteBranch);
+    const { error } = await supabase.rpc('delete_branch', { p_branch_id: btn.dataset.deleteBranch });
     if (error) { toast('Delete failed: ' + error.message, 'error'); return; }
     toast('Branch deleted', 'success');
     const { data: branches } = await supabase.from('branches').select('*').eq('business_id', STATE.business.id);

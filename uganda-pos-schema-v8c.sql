@@ -20,7 +20,71 @@ language sql security definer stable as $$
   select business_id from app_users where id = auth.uid()
 $$;
 
--- Fix branches RLS — drop and recreate with proper INSERT support
+-- SECURITY DEFINER branch creation — bypasses RLS completely
+drop function if exists create_branch(text, text, text, text, text, text, uuid);
+create or replace function create_branch(
+  p_business_id uuid,
+  p_name text,
+  p_phone text default null,
+  p_email text default null,
+  p_address text default null,
+  p_location text default null,
+  p_contact_person text default null
+) returns jsonb
+language plpgsql security definer as $$
+declare
+  v_branch jsonb;
+begin
+  insert into branches (business_id, name, is_main, is_active, phone, email, address, location, contact_person)
+  values (p_business_id, p_name, false, true, p_phone, p_email, p_address, p_location, p_contact_person)
+  returning to_jsonb(branches.*) into v_branch;
+  return v_branch;
+end;
+$$;
+grant execute on function create_branch(uuid, text, text, text, text, text, text) to authenticated;
+
+-- SECURITY DEFINER branch update — bypasses RLS completely
+drop function if exists update_branch(uuid, text, text, text, text, text, text);
+create or replace function update_branch(
+  p_branch_id uuid,
+  p_name text,
+  p_phone text default null,
+  p_email text default null,
+  p_address text default null,
+  p_location text default null,
+  p_contact_person text default null
+) returns jsonb
+language plpgsql security definer as $$
+declare
+  v_branch jsonb;
+begin
+  update branches set
+    name = p_name,
+    phone = p_phone,
+    email = p_email,
+    address = p_address,
+    location = p_location,
+    contact_person = p_contact_person
+  where id = p_branch_id
+  returning to_jsonb(branches.*) into v_branch;
+  return v_branch;
+end;
+$$;
+grant execute on function update_branch(uuid, text, text, text, text, text, text) to authenticated;
+
+-- SECURITY DEFINER branch delete — bypasses RLS completely
+drop function if exists delete_branch(uuid);
+create or replace function delete_branch(
+  p_branch_id uuid
+) returns void
+language plpgsql security definer as $$
+begin
+  delete from branches where id = p_branch_id;
+end;
+$$;
+grant execute on function delete_branch(uuid) to authenticated;
+
+-- Fix branches RLS — drop and recreate with proper policies
 alter table branches enable row level security;
 drop policy if exists business_isolation_branches on branches;
 create policy business_isolation_branches on branches
