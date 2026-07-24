@@ -55,13 +55,29 @@ async function loadOrders() {
       <td><span class="order-status-badge order-status-${o.status}">${o.status}</span></td>
       <td style="font-size:12px;color:var(--text-muted);">${fmtDate(o.created_at)}</td>
       <td>
-        <button class="btn btn-sm btn-outline" data-action="view" data-id="${o.id}">View</button>
+        <div style="display:flex;gap:4px;flex-wrap:wrap;">
+          <button class="btn btn-sm btn-outline" data-action="view" data-id="${o.id}">View</button>
+          <button class="btn btn-sm btn-outline" data-action="edit" data-id="${o.id}">Edit</button>
+          <button class="btn btn-sm btn-danger" data-action="delete" data-id="${o.id}">Delete</button>
+        </div>
       </td>
     </tr>
   `).join("");
 
   qsa("[data-action=\"view\"]").forEach((btn) => {
     btn.addEventListener("click", () => viewOrder(orders.find((o) => o.id === btn.dataset.id)));
+  });
+  qsa("[data-action=\"edit\"]").forEach((btn) => {
+    btn.addEventListener("click", () => editOrder(orders.find((o) => o.id === btn.dataset.id)));
+  });
+  qsa("[data-action=\"delete\"]").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      if (!confirm("Delete this order? This cannot be undone.")) return;
+      const { error } = await supabase.from("orders").delete().eq("id", btn.dataset.id);
+      if (error) { toast(error.message, "error"); return; }
+      toast("Order deleted", "success");
+      await loadOrders();
+    });
   });
 }
 
@@ -142,17 +158,70 @@ function viewOrder(order) {
       <button class="btn btn-outline" data-action="processing" data-id="${order.id}">Mark Processing</button>
       <button class="btn btn-primary" data-action="completed" data-id="${order.id}">Mark Completed</button>
       <button class="btn btn-danger" data-action="cancelled" data-id="${order.id}">Cancel</button>
+      <button class="btn btn-outline" data-action="delete" data-id="${order.id}" style="color:var(--danger);">Delete</button>
     </div>
   `);
 
   qsa("[data-action]").forEach((btn) => {
     if (btn.dataset.closeModal !== undefined) return;
     btn.addEventListener("click", async () => {
-      const { error } = await supabase.from("orders").update({ status: btn.dataset.action }).eq("id", btn.dataset.id);
-      if (error) { toast(error.message, "error"); return; }
-      toast("Order updated", "success");
+      const action = btn.dataset.action;
+      if (action === "delete") {
+        if (!confirm("Delete this order? This cannot be undone.")) return;
+        const { error } = await supabase.from("orders").delete().eq("id", btn.dataset.id);
+        if (error) { toast(error.message, "error"); return; }
+        toast("Order deleted", "success");
+      } else {
+        const { error } = await supabase.from("orders").update({ status: action }).eq("id", btn.dataset.id);
+        if (error) { toast(error.message, "error"); return; }
+        toast("Order updated", "success");
+      }
       closeModal();
       await loadOrders();
     });
+  });
+}
+
+function editOrder(order) {
+  const customers = STATE.customers;
+  const products = STATE.products;
+  openModal(`
+    <div class="modal-title-row"><h3>✏️ Edit Order — ${escapeHtml(order.order_number || order.id.slice(0, 8))}</h3><button class="btn btn-ghost" data-close-modal>&times;</button></div>
+    <form id="order-edit-form">
+      <div class="field">
+        <label>Customer</label>
+        <select id="oe-customer">
+          <option value="">Walk-in Customer</option>
+          ${customers.map((c) => `<option value="${c.id}" ${c.id === order.customer_id ? "selected" : ""}>${escapeHtml(c.name)}</option>`).join("")}
+        </select>
+      </div>
+      <div class="field-row">
+        <div class="field"><label>Quantity</label><input id="oe-qty" type="number" min="1" value="${order.items_count || 1}" /></div>
+        <div class="field"><label>Status</label>
+          <select id="oe-status">
+            ${["pending","processing","completed","cancelled"].map(s => `<option value="${s}" ${order.status === s ? "selected" : ""}>${s.charAt(0).toUpperCase() + s.slice(1)}</option>`).join("")}
+          </select>
+        </div>
+      </div>
+      <div class="field"><label>Total (${escapeHtml(STATE.business.base_currency)})</label><input id="oe-total" type="number" step="0.01" min="0" value="${order.total_base || 0}" /></div>
+      <div class="flex gap" style="margin-top:14px;">
+        <button class="btn btn-outline btn-block" data-close-modal>Cancel</button>
+        <button class="btn btn-primary btn-block" type="submit">Save Changes</button>
+      </div>
+    </form>
+  `);
+
+  $("order-edit-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const { error } = await supabase.from("orders").update({
+      customer_id: $("oe-customer").value || null,
+      items_count: parseInt($("oe-qty").value) || 1,
+      status: $("oe-status").value,
+      total_base: parseFloat($("oe-total").value) || 0,
+    }).eq("id", order.id);
+    if (error) { toast(error.message, "error"); return; }
+    toast("Order updated", "success");
+    closeModal();
+    await loadOrders();
   });
 }
