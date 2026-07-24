@@ -149,6 +149,25 @@ async function navigateTo(route) {
   const root = $("view-root");
   root.innerHTML = `<div class="empty-state">Loading…</div>`;
   try {
+    if (!STATE.business && route !== "admin" && route !== "billing" && route !== "profile") {
+      const sectionName = ROUTES[route]?.title || route;
+      root.innerHTML = `<div class="empty-state" style="padding:40px 24px;">
+        <span class="big-icon" style="font-size:48px;display:block;margin-bottom:12px;">🏢</span>
+        <h3 style="margin:0 0 6px;font-size:19px;font-weight:700;">${escapeHtml(sectionName)}</h3>
+        <p style="color:var(--text-muted);max-width:400px;margin:0 auto 8px;line-height:1.5;">No business account linked yet.</p>
+        <p style="color:var(--text-muted);max-width:400px;margin:0 auto 20px;line-height:1.5;font-size:13px;">Impersonate a tenant from the <b>Platform Admin</b>, or ensure your account is linked to a business.</p>
+        <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;">
+          <button class="btn btn-primary" onclick="document.querySelector('[data-route=&quot;admin&quot;]')?.click()">Platform Admin</button>
+          <button class="btn btn-outline" onclick="document.querySelector('[data-route=&quot;billing&quot;]')?.click()">Billing</button>
+        </div>
+        <div style="margin-top:28px;display:flex;flex-direction:column;gap:8px;max-width:500px;margin-left:auto;margin-right:auto;">
+          <div class="skeleton" style="height:32px;width:100%;"></div>
+          <div class="skeleton" style="height:80px;width:100%;"></div>
+          <div class="skeleton" style="height:120px;width:100%;"></div>
+        </div>
+      </div>`;
+      return;
+    }
     if (route === "billing" && !STATE.isSuperadmin && !isSubscriptionActive()) {
       await renderBilling(root, { paywall: true });
     } else {
@@ -156,7 +175,12 @@ async function navigateTo(route) {
     }
   } catch (e) {
     console.error("Render failed for", route, e);
-    root.innerHTML = `<div class="empty-state"><span class="big-icon" style="font-size:48px;display:block;margin-bottom:12px;">⚠️</span><h3 style="margin:0 0 8px;font-size:17px;font-weight:700;">Page Error</h3><p style="color:var(--text-muted);max-width:380px;margin:0 auto;line-height:1.5;font-size:13px;">${escapeHtml(e.message || "Something went wrong")}</p></div>`;
+    root.innerHTML = `<div class="empty-state" style="padding:60px 24px;">
+      <span class="big-icon" style="font-size:48px;display:block;margin-bottom:12px;">⚠️</span>
+      <h3 style="margin:0 0 8px;font-size:17px;font-weight:700;">Page Error</h3>
+      <p style="color:var(--text-muted);max-width:380px;margin:0 auto;line-height:1.5;font-size:13px;">${escapeHtml(e.message || "Something went wrong")}. <b>Impersonate a tenant</b> from Platform Admin to access this section.</p>
+      <button class="btn btn-primary" style="margin-top:16px;" onclick="document.querySelector('[data-route=&quot;admin&quot;]')?.click()">Go to Platform Admin</button>
+    </div>`;
   }
   try {
     translatePage();

@@ -20,10 +20,10 @@ let _activeTab = "overview";
 export async function renderAdmin(root) {
   root.innerHTML = `<div class="empty-state">Loading platform data…</div>`;
 
-  let businesses, subs, users, plans, payments, branches, salesCount, products;
+  let businesses, subs, users, plans, payments, branches, salesCount, products, platformSettings;
   let rpcError = null;
   try {
-    const [bizRes, subRes, userRes, planRes, payRes, branchRes, salesRes, prodRes] = await Promise.all([
+    const [bizRes, subRes, userRes, planRes, payRes, branchRes, salesRes, prodRes, settingsRes] = await Promise.all([
       supabase.rpc("admin_get_businesses"),
       supabase.rpc("admin_get_subscriptions"),
       supabase.rpc("admin_get_users"),
@@ -32,6 +32,7 @@ export async function renderAdmin(root) {
       supabase.rpc("admin_get_branches"),
       supabase.rpc("admin_get_sales_summary"),
       supabase.rpc("admin_get_products_summary"),
+      supabase.rpc("admin_get_platform_settings"),
     ]);
     if (bizRes.error) throw bizRes.error;
     businesses = bizRes.data || [];
@@ -42,6 +43,7 @@ export async function renderAdmin(root) {
     branches = branchRes.data || [];
     salesCount = salesRes.data || [];
     products = prodRes.data || [];
+    platformSettings = settingsRes.data || [];
   } catch (e) {
     console.error("Admin RPC error:", e);
     rpcError = e.message || e.toString();
@@ -90,8 +92,10 @@ export async function renderAdmin(root) {
       <button class="admin-tab ${_activeTab === "overview" ? "active" : ""}" data-tab="overview">Overview</button>
       <button class="admin-tab ${_activeTab === "vendors" ? "active" : ""}" data-tab="vendors">Vendors</button>
       <button class="admin-tab ${_activeTab === "users" ? "active" : ""}" data-tab="users">Users</button>
+      <button class="admin-tab ${_activeTab === "subscriptions" ? "active" : ""}" data-tab="subscriptions">Subscriptions</button>
       <button class="admin-tab ${_activeTab === "branches" ? "active" : ""}" data-tab="branches">Branches</button>
       <button class="admin-tab ${_activeTab === "plans" ? "active" : ""}" data-tab="plans">Plans & Payments</button>
+      <button class="admin-tab ${_activeTab === "settings" ? "active" : ""}" data-tab="settings">Settings</button>
       <button class="admin-tab ${_activeTab === "roles" ? "active" : ""}" data-tab="roles">Roles & Permissions</button>
     </div>
 
@@ -128,10 +132,14 @@ export async function renderAdmin(root) {
       });
     else if (_activeTab === "users")
       renderUsers(el, { users, businesses, businessById });
+    else if (_activeTab === "subscriptions")
+      renderSubscriptions(el, { subs, businesses, businessById, plans });
     else if (_activeTab === "branches")
       renderBranches(el, { branches, businesses, businessById });
     else if (_activeTab === "plans")
       renderPlans(el, { plans, payments, businesses, businessById, subByBusiness });
+    else if (_activeTab === "settings")
+      renderPlatformSettings(el, { platformSettings });
     else if (_activeTab === "roles") renderRoles(el);
   }
 
@@ -935,6 +943,68 @@ function renderPlans(el, d) {
       toast("Plan updated", "success");
     }),
   );
+}
+
+// ---------------------------------------------------------------------
+// SUBSCRIPTIONS TAB
+// ---------------------------------------------------------------------
+function renderSubscriptions(el, d) {
+  const list = d.subs || [];
+  el.innerHTML = `
+    <div class="card">
+      <div class="card-title">All Subscriptions (${list.length})</div>
+      <div class="table-wrap" style="max-height:600px;overflow-y:auto">
+        <table>
+          <thead><tr><th>Business</th><th>Plan</th><th>Status</th><th>Period Start</th><th>Period End</th><th>Auto Renew</th></tr></thead>
+          <tbody>
+            ${list.length ? list.map((s) => `
+              <tr>
+                <td><b>${escapeHtml(d.businessById[s.business_id]?.name || "—")}</b></td>
+                <td>${escapeHtml(s.plans?.name || "—")}</td>
+                <td>${vendorStatusBadge(s, new Date())}</td>
+                <td>${s.current_period_start ? fmtDate(s.current_period_start) : "—"}</td>
+                <td>${s.current_period_end ? fmtDate(s.current_period_end) : "—"}</td>
+                <td>${s.auto_renew ? '<span class="badge badge-green">Auto</span>' : '<span class="badge badge-gray">Manual</span>'}</td>
+              </tr>
+            `).join("") : '<tr><td colspan="6"><div class="empty-state">No subscriptions yet</div></td></tr>'}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+}
+
+// ---------------------------------------------------------------------
+// PLATFORM SETTINGS TAB
+// ---------------------------------------------------------------------
+function renderPlatformSettings(el, d) {
+  const list = d.platformSettings || [];
+  el.innerHTML = `
+    <div class="card">
+      <div class="card-title">Platform Settings</div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Key</th><th>Value</th><th>Updated</th></tr></thead>
+          <tbody>
+            ${list.length ? list.map((s) => `
+              <tr>
+                <td><b>${escapeHtml(s.key)}</b></td>
+                <td><input data-setting-key="${escapeHtml(s.key)}" value="${escapeHtml(s.value || "")}" style="width:100%;padding:6px 8px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text);" /></td>
+                <td style="font-size:12px;color:var(--text-muted)">${s.updated_at ? fmtDate(s.updated_at) : "—"}</td>
+              </tr>
+            `).join("") : '<tr><td colspan="3"><div class="empty-state">No settings loaded</div></td></tr>'}
+          </tbody>
+        </table>
+      </div>
+      <button class="btn btn-primary btn-sm" id="settings-save-btn" style="margin-top:14px;">Save Settings</button>
+    </div>
+  `;
+  $("settings-save-btn")?.addEventListener("click", async () => {
+    for (const input of qsa("[data-setting-key]", el)) {
+      await supabase.from("platform_settings").update({ value: input.value }).eq("key", input.dataset.settingKey);
+    }
+    toast("Settings saved", "success");
+  });
 }
 
 // ---------------------------------------------------------------------

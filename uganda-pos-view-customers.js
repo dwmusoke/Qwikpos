@@ -27,7 +27,7 @@ export async function renderCustomers(root) {
     </div>
     <div class="table-wrap">
       <table>
-        <thead><tr><th>Name</th><th>Phone</th><th>TIN</th><th>Credit Limit</th><th>Balance</th><th></th></tr></thead>
+        <thead><tr><th>Name</th><th>Phone</th><th>TIN</th><th>Address</th><th>Balance</th><th>Actions</th></tr></thead>
         <tbody id="cust-table-body"></tbody>
       </table>
     </div>
@@ -51,14 +51,23 @@ function renderTable() {
     .map(
       (c) => `
     <tr>
-      <td><b>${escapeHtml(c.name)}</b></td>
-      <td>${escapeHtml(c.phone || "—")}</td>
-      <td>${escapeHtml(c.tin || "—")}</td>
-      <td>${fmtMoney(c.credit_limit || 0)}</td>
+      <td>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <div style="width:32px;height:32px;border-radius:50%;background:var(--brand-light);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;color:var(--brand);">${escapeHtml((c.name || "?")[0])}</div>
+          <div><b style="font-size:13px;">${escapeHtml(c.name)}</b><br><span style="font-size:11px;color:var(--text-muted);">${escapeHtml(c.email || c.phone || "—")}</span></div>
+        </div>
+      </td>
+      <td style="font-size:12px;">${escapeHtml(c.phone || "—")}</td>
+      <td style="font-size:12px;">${escapeHtml(c.tin || "—")}</td>
+      <td style="font-size:12px;">${escapeHtml(c.address || "—")}</td>
       <td><span class="badge ${Number(c.balance) > 0 ? "badge-yellow" : "badge-green"}">${fmtMoney(c.balance || 0)}</span></td>
-      <td class="flex gap">
-        <button class="btn btn-outline btn-sm" data-edit="${c.id}">Edit</button>
-        <button class="btn btn-outline btn-sm" data-statement="${c.id}">Statement</button>
+      <td>
+        <div style="display:flex;gap:4px;flex-wrap:wrap;">
+          <button class="btn btn-outline btn-sm" data-edit="${c.id}" title="Edit">✏️</button>
+          <button class="btn btn-outline btn-sm" data-statement="${c.id}" title="Statement">📄</button>
+          <button class="btn btn-outline btn-sm" data-share="${c.id}" title="Share">📋</button>
+          <button class="btn btn-outline btn-sm" data-delete-cust="${c.id}" title="Delete" style="color:var(--danger);">🗑️</button>
+        </div>
       </td>
     </tr>`,
     )
@@ -70,6 +79,20 @@ function renderTable() {
   qsa("[data-statement]", tbody).forEach((b) =>
     b.addEventListener("click", () => openStatementModal(b.dataset.statement)),
   );
+  qsa("[data-share]", tbody).forEach((b) => b.addEventListener("click", () => {
+    const c = STATE.customers.find((x) => x.id === b.dataset.share);
+    if (!c) return;
+    const info = `Customer: ${c.name}\nPhone: ${c.phone || "—"}\nEmail: ${c.email || "—"}\nTIN: ${c.tin || "—"}\nAddress: ${c.address || "—"}\nBalance: ${fmtMoney(c.balance || 0)}`;
+    navigator.clipboard?.writeText(info).then(() => toast("Customer info copied", "success"));
+  }));
+  qsa("[data-delete-cust]", tbody).forEach((b) => b.addEventListener("click", async () => {
+    if (!confirm("Delete this customer? This cannot be undone.")) return;
+    const { error } = await supabase.from("customers").delete().eq("id", b.dataset.deleteCust);
+    if (error) { toast("Delete failed: " + error.message, "error"); return; }
+    toast("Customer deleted", "success");
+    await refreshCustomers();
+    renderTable();
+  }));
 }
 
 function openCustomerModal(customerId) {

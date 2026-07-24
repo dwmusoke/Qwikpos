@@ -237,7 +237,7 @@ async function renderReturnsTab(body) {
           const current = stockFor(item.product_id);
           await supabase.from('product_stock').upsert({ product_id: item.product_id, branch_id: STATE.branch.id, quantity: current + Number(item.quantity || 0) });
           STATE.stockByProduct[item.product_id] = current + Number(item.quantity || 0);
-          await supabase.from('stock_movements').insert({ business_id: STATE.business.id, branch_id: STATE.branch.id, product_id: item.product_id, type: 'return', quantity: item.quantity, note: `Return ${ret.return_number}` });
+          await supabase.from('stock_movements').insert({ business_id: STATE.business.id, branch_id: STATE.branch.id, product_id: item.product_id, type: 'return', quantity: item.quantity, notes: `Return ${ret.return_number}` });
         }
       }
       await supabase.from('sales_returns').update({ status: 'completed' }).eq('id', ret.id);

@@ -929,6 +929,151 @@ tbody tr:hover {
 }
 .product-emoji { font-size: 28px; }
 
+/* Product card qty badge (when item is in cart) */
+.product-card .qty-badge {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  background: var(--brand);
+  color: white;
+  font-size: 11px;
+  font-weight: 700;
+  min-width: 22px;
+  height: 22px;
+  border-radius: 11px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 5px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+  z-index: 2;
+  animation: badge-pop 0.2s ease;
+}
+@keyframes badge-pop {
+  0% { transform: scale(0.5); }
+  70% { transform: scale(1.15); }
+  100% { transform: scale(1); }
+}
+.product-card { position: relative; }
+
+/* Quantity picker modal */
+.qty-picker-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.5);
+  z-index: 9000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: fade-in 0.15s ease;
+}
+.qty-picker {
+  background: var(--surface);
+  border-radius: var(--radius);
+  padding: 24px;
+  min-width: 280px;
+  max-width: 90vw;
+  box-shadow: var(--shadow-lg);
+  animation: slide-up 0.2s ease;
+}
+.qty-picker h3 {
+  margin: 0 0 4px;
+  font-size: 16px;
+  font-weight: 700;
+}
+.qty-picker .qp-price {
+  color: var(--text-muted);
+  font-size: 13px;
+  margin-bottom: 16px;
+}
+.qty-picker .qp-stepper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.qty-picker .qp-stepper button {
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius-sm);
+  border: 2px solid var(--border);
+  background: var(--surface-2);
+  cursor: pointer;
+  font-size: 24px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--dur-fast);
+  color: var(--brand);
+}
+.qty-picker .qp-stepper button:hover {
+  border-color: var(--brand);
+  background: var(--brand-light);
+}
+.qty-picker .qp-stepper button:active { transform: scale(0.92); }
+.qty-picker .qp-stepper .qp-qty {
+  font-size: 28px;
+  font-weight: 800;
+  min-width: 60px;
+  text-align: center;
+}
+.qty-picker .qp-actions {
+  display: flex;
+  gap: 8px;
+}
+.qty-picker .qp-actions button {
+  flex: 1;
+}
+
+/* Customer search dropdown */
+.pos-customer-opt:hover {
+  background: var(--brand-light);
+}
+.pos-customer-opt:last-child {
+  border-bottom: none;
+}
+
+/* Delivery toggle */
+#pos-delivery-toggle {
+  accent-color: var(--brand);
+  cursor: pointer;
+}
+
+/* Order success modal CTA buttons */
+.modal .btn {
+  min-height: 44px;
+  font-size: 13px;
+}
+.modal .btn-danger {
+  background: var(--danger);
+  color: white;
+  border-color: var(--danger);
+}
+.modal .btn-danger:hover {
+  background: color-mix(in srgb, var(--danger) 80%, black);
+}
+
+/* Cart panel fields compact */
+.cart-panel .field {
+  margin-bottom: 0;
+}
+.cart-panel .field label {
+  font-size: 11px;
+  margin-bottom: 4px;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+.cart-panel .field input,
+.cart-panel .field select {
+  padding: 8px 10px;
+  font-size: 13px;
+}
+.cart-panel .field input::placeholder {
+  font-size: 12px;
+}
+
 /* Cart panel */
 .cart-panel {
   background: var(--surface);
@@ -985,38 +1130,64 @@ tbody tr:hover {
 .qty-stepper {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 2px;
 }
 .qty-stepper button {
-  width: 28px;
-  height: 28px;
+  width: 34px;
+  height: 34px;
   border-radius: var(--radius-xs);
-  border: 1px solid var(--border);
-  background: var(--surface-2);
+  border: none;
+  background: transparent;
   cursor: pointer;
-  font-size: 15px;
+  font-size: 18px;
   font-weight: 700;
   display: flex;
   align-items: center;
   justify-content: center;
   transition: all var(--dur-fast);
   -webkit-tap-highlight-color: transparent;
+  color: var(--brand);
 }
 .qty-stepper button:hover {
-  background: var(--brand-light);
-  border-color: var(--brand);
-  color: var(--brand);
+  background: var(--brand);
+  color: white;
 }
 .qty-stepper button:active { transform: scale(0.90); }
 .qty-stepper .qty-val {
-  min-width: 30px;
+  min-width: 36px;
   text-align: center;
   font-weight: 700;
-  font-size: 14px;
+  font-size: 15px;
+  cursor: pointer;
+  padding: 4px 2px;
+  border-radius: var(--radius-xs);
+  transition: background var(--dur-fast);
+}
+.qty-stepper .qty-val:hover {
+  background: var(--surface-2);
+}
+.qty-stepper .qty-val editing {
+  background: var(--surface-2);
+  outline: 2px solid var(--brand);
+}
+.qty-input-inline {
+  width: 50px;
+  text-align: center;
+  font-weight: 700;
+  font-size: 15px;
+  border: 2px solid var(--brand);
+  border-radius: var(--radius-xs);
+  padding: 4px 2px;
+  background: var(--surface);
+  outline: none;
 }
 @media (max-width: 640px) {
-  .qty-stepper button { width: 36px; height: 36px; font-size: 17px; }
-  .qty-stepper .qty-val { font-size: 16px; min-width: 34px; }
+  .qty-stepper button { width: 40px; height: 40px; font-size: 20px; }
+  .qty-stepper .qty-val { font-size: 16px; min-width: 40px; }
   .cart-row { padding: 12px 4px; }
   .cart-row .line-total { font-size: 14px; }
 }

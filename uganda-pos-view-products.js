@@ -267,13 +267,21 @@ async function openProductModal(productId) {
           const path = `${STATE.business.id}/${saved.id}.${ext}`;
           const { error: uploadErr } = await supabase.storage.from('product-images').upload(path, pendingImageFile, { upsert: true });
           if (uploadErr?.message?.includes("Bucket not found")) {
-            await supabase.storage.createBucket("product-images", { public: true });
-            const retry = await supabase.storage.from('product-images').upload(path, pendingImageFile, { upsert: true });
-            if (!retry.error) {
-              const { data: urlData } = supabase.storage.from('product-images').getPublicUrl(path);
-              await supabase.from('products').update({ image_url: urlData.publicUrl }).eq('id', saved.id);
+            try {
+              await supabase.storage.createBucket("product-images", { public: true });
+              const retry = await supabase.storage.from('product-images').upload(path, pendingImageFile, { upsert: true });
+              if (!retry.error) {
+                const { data: urlData } = supabase.storage.from('product-images').getPublicUrl(path);
+                await supabase.from('products').update({ image_url: urlData.publicUrl }).eq('id', saved.id);
+              } else {
+                toast("Image upload failed: " + retry.error.message, "error");
+              }
+            } catch (e2) {
+              toast("Create 'product-images' bucket in Supabase Storage (public)", "error", 5000);
             }
-          } else if (!uploadErr) {
+          } else if (uploadErr) {
+            toast("Image upload failed: " + uploadErr.message, "error");
+          } else {
             const { data: urlData } = supabase.storage.from('product-images').getPublicUrl(path);
             await supabase.from('products').update({ image_url: urlData.publicUrl }).eq('id', saved.id);
           }
@@ -781,13 +789,37 @@ function openStockModal(productId) {
 function openSingleLabelModal(productId) {
   const p = STATE.products.find((x) => x.id === productId);
   openModal(`
-    <div class="modal-title-row"><h3>Print Label — ${escapeHtml(p.name)}</h3></div>
-    <div class="field"><label>Number of Labels</label><input type="number" min="1" value="1" id="sl-count" /></div>
-    <button class="btn btn-primary btn-block" id="sl-print" style="margin-top:14px;">🖨️ Print</button>
+    <div class="modal-title-row"><h3>🏷️ Print Label — ${escapeHtml(p.name)}</h3></div>
+    <div style="padding:8px 0;">
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;">
+        <span style="font-size:13px;color:var(--text-muted);">Barcode:</span>
+        <code style="font-size:13px;background:var(--surface-2);padding:2px 8px;border-radius:4px;">${escapeHtml(p.barcode || p.sku || "—")}</code>
+      </div>
+      <div class="field-row">
+        <div class="field" style="margin-bottom:0;">
+          <label>Number of Labels</label>
+          <input type="number" min="1" value="1" id="sl-count" />
+        </div>
+        <div class="field" style="margin-bottom:0;">
+          <label>Label Size</label>
+          <select id="sl-size">
+            <option value="small">Small (50×30mm)</option>
+            <option value="medium" selected>Medium (50×40mm)</option>
+            <option value="large">Large (70×50mm)</option>
+            <option value="xl">Extra Large (100×60mm)</option>
+          </select>
+        </div>
+      </div>
+    </div>
+    <div class="flex gap" style="margin-top:14px;">
+      <button class="btn btn-outline btn-block" data-close-modal>Cancel</button>
+      <button class="btn btn-primary btn-block" id="sl-print">🖨️ Print</button>
+    </div>
   `, { onMount: () => {
     $('sl-print').addEventListener('click', () => {
       const count = parseInt($('sl-count').value) || 1;
-      printBarcodeLabels([{ name: p.name, barcode: p.barcode || p.sku || '', price: p.selling_price, count }]);
+      const size = $('sl-size').value || 'medium';
+      printBarcodeLabels([{ productId: p.id, count }], size);
       closeModal();
     });
   }});
@@ -878,28 +910,94 @@ async function loadUnits() {
 }
 
 // ── BARCODE LABEL PRINTER ────────────────────────────────────────────
-function printBarcodeLabels(items) {
-  const w = window.open('', '_blank', 'width=800,height=600');
-  const labelsHtml = items.flatMap((item) => Array(item.count).fill(item)).map((item) => `
-    <div class="label">
-      <div class="biz-name">${escapeHtml(STATE.business?.name || '')}</div>
-      <div class="prod-name">${escapeHtml(item.name)}</div>
-      <svg class="barcode" jsbarcode-value="${escapeHtml(item.barcode || 'N/A')}" jsbarcode-height="40" jsbarcode-displayvalue="true" jsbarcode-textmargin="2" jsbarcode-fontsize="10"></svg>
-      <div class="price">${fmtMoney(item.price)}</div>
-    </div>`).join('');
+const JSBARCODE_CDN = "https://cdnjs.cloudflare.com/ajax/libs/JsBarcode/3.11.5/JsBarcode.all.min.js";
 
-  w.document.write(`<!DOCTYPE html><html><head><title>Labels</title>
-    <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"><\/script>
+function printBarcodeLabels(items, size = "medium") {
+  const normalized = items
+    .map((it) => {
+      if (typeof it === "string") return { productId: it, count: 1 };
+      return it;
+    })
+    .filter((it) => (it.count || 0) > 0);
+  if (!normalized.length) {
+    toast("Nothing to print", "error");
+    return;
+  }
+
+  const labels = [];
+  normalized.forEach((it) => {
+    const p = STATE.products.find((x) => x.id === (it.productId || it.id));
+    if (!p) return;
+    const code = String(p.barcode || p.sku || p.id)
+      .replace(/[^A-Za-z0-9\-]/g, "")
+      .slice(0, 40) || p.id;
+    const count = it.count || 1;
+    for (let i = 0; i < count; i++)
+      labels.push({ id: `bc-${labels.length}`, product: p, code });
+  });
+  if (!labels.length) {
+    toast("Could not find those products", "error");
+    return;
+  }
+
+  const sizes = {
+    small: { width: "50mm", height: "30mm", barcodeH: 30, fontSize: 9, nameSize: 8, priceSize: 10, bizSize: 7 },
+    medium: { width: "50mm", height: "40mm", barcodeH: 40, fontSize: 10, nameSize: 10, priceSize: 12, bizSize: 8 },
+    large: { width: "70mm", height: "50mm", barcodeH: 50, fontSize: 12, nameSize: 12, priceSize: 14, bizSize: 9 },
+    xl: { width: "100mm", height: "60mm", barcodeH: 55, fontSize: 14, nameSize: 14, priceSize: 16, bizSize: 10 },
+  };
+  const s = sizes[size] || sizes.medium;
+
+  const w = window.open("", "_blank", "width=800,height=600");
+  if (!w) {
+    toast("Allow pop-ups to print labels", "error");
+    return;
+  }
+
+  w.document.write(`<!DOCTYPE html><html><head><title>Barcode Labels — ${escapeHtml(STATE.business?.name || "")}</title>
     <style>
-      body { font-family: Arial, sans-serif; margin: 10px; }
-      .label { width: 50mm; height: 30mm; border: 1px solid #ccc; padding: 3mm; text-align: center; display: inline-block; margin: 1mm; page-break-inside: avoid; }
-      .biz-name { font-size: 7pt; color: #666; }
-      .prod-name { font-size: 8pt; font-weight: bold; margin: 1mm 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 44mm; }
-      .price { font-size: 9pt; font-weight: bold; margin-top: 1mm; }
-      svg.barcode { width: 40mm; }
-      @media print { .label { border: 1px solid #000; } }
-    </style></head><body>${labelsHtml}
-    <script>JsBarcode('.barcode').catch(()=>{}); setTimeout(()=>window.print(), 500);<\/script>
+      * { box-sizing: border-box; }
+      body { font-family: Arial, Helvetica, sans-serif; margin: 0; padding: 12px; background: #fff; }
+      .header { text-align: center; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid #ddd; }
+      .header h2 { margin: 0; font-size: 14px; color: #333; }
+      .header p { margin: 4px 0 0; font-size: 11px; color: #888; }
+      .sheet { display: flex; flex-wrap: wrap; gap: 4px; justify-content: flex-start; }
+      .label {
+        width: ${s.width}; height: ${s.height}; border: 1px dashed #ccc; border-radius: 4px;
+        padding: 3mm; text-align: center; display: inline-flex; flex-direction: column;
+        justify-content: center; align-items: center; page-break-inside: avoid; background: #fff;
+      }
+      .label .biz { font-size: ${s.bizSize}pt; color: #666; margin-bottom: 1mm; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+      .label .name { font-size: ${s.nameSize}pt; font-weight: 700; margin: 1mm 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+      .label svg { width: 90%; height: auto; margin: 1mm 0; }
+      .label .price { font-size: ${s.priceSize}pt; font-weight: 800; color: #222; margin-top: 1mm; }
+      .label .sku { font-size: 7pt; color: #999; }
+      @media print { body { padding: 0; } .header { display: none; } .label { border: 1px solid #000; } }
+    </style></head><body>
+    <div class="header">
+      <h2>${escapeHtml(STATE.business?.name || "Barcode Labels")}</h2>
+      <p>${labels.length} labels · ${new Date().toLocaleDateString()}</p>
+    </div>
+    <div class="sheet">
+      ${labels.map((l) => `
+        <div class="label">
+          <div class="biz">${escapeHtml(STATE.business?.name || "")}</div>
+          <div class="name">${escapeHtml(l.product.name)}</div>
+          <svg id="${l.id}"></svg>
+          <div class="price">${fmtMoney(l.product.selling_price)}</div>
+          <div class="sku">${escapeHtml(l.code)}</div>
+        </div>
+      `).join("")}
+    </div>
+    <script src="${JSBARCODE_CDN}"><\/script>
+    <script>
+      try {
+        document.querySelectorAll('svg').forEach(svg => {
+          JsBarcode(svg, svg.id.replace('bc-', ''), { format: 'CODE128', height: ${s.barcodeH}, fontSize: ${s.fontSize}, margin: 2, displayValue: true, background: '#fff', lineColor: '#000' });
+        });
+      } catch(e) { console.warn(e); }
+      setTimeout(() => window.print(), 500);
+    <\/script>
   </body></html>`);
   w.document.close();
 }

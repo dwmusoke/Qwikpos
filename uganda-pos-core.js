@@ -42,6 +42,8 @@ export const STATE = {
   units: [],
   cart: [], // { productId, name, qty, unitPriceBase, taxCode, discount }
   cartCustomerId: null,
+  cartCouponCode: null,
+  cartCouponDiscount: 0,
   displayCurrency: "UGX",
   theme: localStorage.getItem("ugpos_theme") || "light",
   route: "dashboard",
@@ -444,6 +446,7 @@ export async function loadBootstrapData() {
     ),
     refreshBrands().catch((e) => console.warn("refreshBrands failed:", e)),
     refreshUnits().catch((e) => console.warn("refreshUnits failed:", e)),
+    refreshCoupons().catch((e) => console.warn("refreshCoupons failed:", e)),
     loadSubscription().catch((e) =>
       console.warn("loadSubscription failed:", e),
     ),
@@ -555,6 +558,16 @@ export async function refreshSuppliers() {
     .eq("business_id", STATE.business.id)
     .order("name");
   STATE.suppliers = data || [];
+}
+
+export async function refreshCoupons() {
+  if (!STATE.business) return;
+  const { data } = await supabase
+    .from("coupons")
+    .select("*")
+    .eq("business_id", STATE.business.id)
+    .eq("is_active", true);
+  STATE.coupons = data || [];
 }
 
 export async function refreshBrands() {

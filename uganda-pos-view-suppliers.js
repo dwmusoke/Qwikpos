@@ -97,17 +97,25 @@ async function renderSupTable() {
     .map(
       (s) => `
     <tr>
-      <td><b>${escapeHtml(s.name)}</b></td>
-      <td>${escapeHtml(s.contact_person || "—")}</td>
-      <td>${escapeHtml(s.phone || "—")}</td>
-      <td>${escapeHtml(s.email || "—")}</td>
-      <td>${escapeHtml(s.tin || "—")}</td>
+      <td>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <div style="width:32px;height:32px;border-radius:50%;background:var(--brand-light);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;color:var(--brand);">${escapeHtml((s.name || "?")[0])}</div>
+          <div><b style="font-size:13px;">${escapeHtml(s.name)}</b><br><span style="font-size:11px;color:var(--text-muted);">${escapeHtml(s.contact_person || "—")}</span></div>
+        </div>
+      </td>
+      <td style="font-size:12px;">${escapeHtml(s.phone || "—")}</td>
+      <td style="font-size:12px;">${escapeHtml(s.email || "—")}</td>
+      <td style="font-size:12px;">${escapeHtml(s.address || "—")}</td>
       <td><span class="badge ${Number(s.balance) > 0 ? "badge-yellow" : "badge-green"}">${fmtMoney(s.balance || 0)}</span></td>
       <td>${poMap[s.id] || 0}</td>
-      <td class="flex gap">
-        <button class="btn btn-outline btn-sm" data-edit="${s.id}">Edit</button>
-        <button class="btn btn-outline btn-sm" data-pay="${s.id}">Record Payment</button>
-        <button class="btn btn-sm btn-primary" data-view-sup="${s.id}">View</button>
+      <td>
+        <div style="display:flex;gap:4px;flex-wrap:wrap;">
+          <button class="btn btn-outline btn-sm" data-edit="${s.id}" title="Edit">✏️</button>
+          <button class="btn btn-outline btn-sm" data-pay="${s.id}" title="Record Payment">💰</button>
+          <button class="btn btn-sm btn-primary" data-view-sup="${s.id}" title="View">👁️</button>
+          <button class="btn btn-outline btn-sm" data-share-sup="${s.id}" title="Share">📋</button>
+          <button class="btn btn-outline btn-sm" data-delete-sup="${s.id}" title="Delete" style="color:var(--danger);">🗑️</button>
+        </div>
       </td>
     </tr>`,
     )
@@ -122,6 +130,20 @@ async function renderSupTable() {
   qsa("[data-view-sup]", tbody).forEach((b) =>
     b.addEventListener("click", () => openSupplierDetail(b.dataset.viewSup)),
   );
+  qsa("[data-share-sup]", tbody).forEach((b) => b.addEventListener("click", () => {
+    const s = STATE.suppliers.find((x) => x.id === b.dataset.shareSup);
+    if (!s) return;
+    const info = `Supplier: ${s.name}\nContact: ${s.contact_person || "—"}\nPhone: ${s.phone || "—"}\nEmail: ${s.email || "—"}\nTIN: ${s.tin || "—"}\nAddress: ${s.address || "—"}\nBalance: ${fmtMoney(s.balance || 0)}`;
+    navigator.clipboard?.writeText(info).then(() => toast("Supplier info copied", "success"));
+  }));
+  qsa("[data-delete-sup]", tbody).forEach((b) => b.addEventListener("click", async () => {
+    if (!confirm("Delete this supplier? This cannot be undone.")) return;
+    const { error } = await supabase.from("suppliers").delete().eq("id", b.dataset.deleteSup);
+    if (error) { toast("Delete failed: " + error.message, "error"); return; }
+    toast("Supplier deleted", "success");
+    await refreshSuppliers();
+    renderTable();
+  }));
 }
 
 function openSupplierModal(supplierId) {

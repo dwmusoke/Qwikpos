@@ -337,7 +337,22 @@ function openProductModal(productId) {
             const { error: uploadErr } = await supabase.storage
               .from("product-images")
               .upload(path, pendingImageFile, { upsert: true });
-            if (!uploadErr) {
+            if (uploadErr?.message?.includes("Bucket not found")) {
+              try {
+                await supabase.storage.createBucket("product-images", { public: true });
+                const retry = await supabase.storage.from("product-images").upload(path, pendingImageFile, { upsert: true });
+                if (!retry.error) {
+                  const { data: urlData } = supabase.storage.from("product-images").getPublicUrl(path);
+                  await supabase.from("products").update({ image_url: urlData.publicUrl }).eq("id", saved.id);
+                } else {
+                  toast("Image upload failed: " + retry.error.message, "error");
+                }
+              } catch (e2) {
+                toast("Create 'product-images' bucket in Supabase Storage (public)", "error", 5000);
+              }
+            } else if (uploadErr) {
+              toast("Image upload failed: " + uploadErr.message, "error");
+            } else {
               const { data: urlData } = supabase.storage
                 .from("product-images")
                 .getPublicUrl(path);
@@ -982,22 +997,20 @@ function renderStockCountTab(el) {
   // Save adjustments
   $("count-save-btn")?.addEventListener("click", async () => {
     let adjusted = 0;
+    let lastErr = null;
     for (const p of STATE.products) {
-      const sys = countData[p.id].system;
-      const counted = countData[p.id].counted;
-      if (counted === sys) continue;
+      const sys = countData[p.id]?.system;
+      const counted = countData[p.id]?.counted;
+      if (counted === undefined || counted === sys) continue;
 
       const delta = counted - sys;
-      await supabase.from("product_stock").upsert(
-        {
-          product_id: p.id,
-          branch_id: STATE.branch.id,
-          quantity: counted,
-        },
+      const { error: upsertErr } = await supabase.from("product_stock").upsert(
+        { product_id: p.id, branch_id: STATE.branch.id, quantity: counted },
         { onConflict: "product_id,branch_id" },
       );
+      if (upsertErr) { lastErr = upsertErr; continue; }
 
-      await supabase.from("stock_movements").insert({
+      const { error: movErr } = await supabase.from("stock_movements").insert({
         business_id: STATE.business.id,
         branch_id: STATE.branch.id,
         product_id: p.id,
@@ -1006,12 +1019,13 @@ function renderStockCountTab(el) {
         notes: `Stock count: ${sys} → ${counted}`,
         created_by: STATE.appUser.id,
       });
+      if (movErr) { lastErr = movErr; continue; }
       adjusted++;
     }
-    toast(
-      `Adjusted ${adjusted} products`,
-      adjusted > 0 ? "success" : "default",
-    );
+    if (lastErr) {
+      toast("Stock save error: " + lastErr.message, "error");
+    }
+    toast(`Adjusted ${adjusted} products`, adjusted > 0 ? "success" : "default");
     await refreshProducts();
     renderStockCountTab(el);
   });
@@ -1399,73 +1413,171 @@ function openCategoriesModal() {
 function openBulkLabelsModal() {
   openModal(
     `
-    <div class="modal-title-row"><h3>Print Barcode Labels</h3></div>
-    <p class="help-text">Set how many copies to print for each product, then print the sheet. Products without a
-      barcode print their SKU (or a system code) instead — add a real barcode in the product form for scannable labels.</p>
-    <div style="max-height:360px; overflow-y:auto;">
-      <table>
-        <thead><tr><th>Product</th><th>Code</th><th style="width:90px;">Copies</th></tr></thead>
-        <tbody>
-          ${
-            STATE.products
-              .map(
-                (p) => `
+    <div class="modal-title-row"><h3>🏷️ Print Barcode Labels</h3></div>
+    <p class="help-text">Select products and set the number of labels to print. Products without a barcode use their SKU.</p>
+
+    <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
+      <div class="field" style="margin-bottom:0;flex:1;min-width:120px;">
+        <label>Label Size</label>
+        <select id="lbl-size">
+          <option value="small">Small (50×30mm) — Jewelry, small items</option>
+          <option value="medium" selected>Medium (50×40mm) — Standard</option>
+          <option value="large">Large (70×50mm) — Large products</option>
+          <option value="xl">Extra Large (100×60mm) — Shelf labels</option>
+        </select>
+      </div>
+      <div class="field" style="margin-bottom:0;flex:0.5;min-width:80px;">
+        <label>Quick Set</label>
+        <select id="lbl-quick">
+          <option value="0">All: 0</option>
+          <option value="1">All: 1</option>
+          <option value="5">All: 5</option>
+          <option value="10">All: 10</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="field" style="margin-bottom:8px;">
+      <input id="lbl-search" placeholder="🔍 Search products by name, SKU, barcode…" />
+    </div>
+
+    <div style="max-height:380px; overflow-y:auto; border:1px solid var(--border); border-radius:var(--radius-sm);">
+      <table style="width:100%;">
+        <thead style="position:sticky;top:0;background:var(--surface);z-index:1;">
           <tr>
-            <td>${escapeHtml(p.name)}</td>
-            <td class="text-muted">${escapeHtml(p.barcode || p.sku || "—")}</td>
-            <td><input type="number" min="0" step="1" value="0" data-copies="${p.id}" style="width:70px;" /></td>
-          </tr>`,
-              )
-              .join("") ||
-            '<tr><td colspan="3"><div class="empty-state">No products yet.</div></td></tr>'
-          }
-        </tbody>
+            <th style="width:36px;"><input type="checkbox" id="lbl-select-all" /></th>
+            <th>Product</th>
+            <th style="width:100px;">Barcode</th>
+            <th style="width:80px;">Price</th>
+            <th style="width:80px;">Copies</th>
+          </tr>
+        </thead>
+        <tbody id="lbl-tbody"></tbody>
       </table>
     </div>
-    <div class="flex gap" style="margin-top:14px;">
-      <button class="btn btn-outline btn-block" data-close-modal>Cancel</button>
-      <button class="btn btn-primary btn-block" id="print-labels-confirm-btn">Print Labels</button>
+
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px;">
+      <span id="lbl-count-info" style="font-size:12px;color:var(--text-muted);"></span>
+      <button class="btn btn-primary" id="lbl-print-btn">🖨️ Print Labels</button>
     </div>
   `,
     {
       large: true,
       onMount: (modalRoot) => {
-        $("print-labels-confirm-btn").addEventListener("click", () => {
-          const items = qsa("[data-copies]", modalRoot)
-            .map((inp) => ({
-              productId: inp.dataset.copies,
-              copies: parseInt(inp.value, 10) || 0,
-            }))
-            .filter((it) => it.copies > 0);
+        let labelCounts = {};
+
+        function renderRows(search) {
+          let list = STATE.products.filter((p) => p.is_active !== false);
+          if (search) {
+            list = list.filter(
+              (p) =>
+                p.name.toLowerCase().includes(search) ||
+                (p.sku || "").toLowerCase().includes(search) ||
+                (p.barcode || "").includes(search),
+            );
+          }
+          const tbody = $("lbl-tbody");
+          tbody.innerHTML = list
+            .map(
+              (p) => `
+          <tr>
+            <td><input type="checkbox" class="lbl-check" data-pid="${p.id}" /></td>
+            <td style="font-size:13px;font-weight:600;">${escapeHtml(p.name)}<br><span style="font-size:11px;color:var(--text-muted);">SKU: ${escapeHtml(p.sku || "—")}</span></td>
+            <td style="font-size:12px;font-family:monospace;">${escapeHtml(p.barcode || p.sku || "—")}</td>
+            <td style="font-size:12px;">${fmtMoney(p.selling_price)}</td>
+            <td><input type="number" min="0" value="${labelCounts[p.id] || 0}" data-lbl-count="${p.id}" style="width:60px;padding:6px;font-size:13px;" /></td>
+          </tr>`,
+            )
+            .join("");
+
+          tbody.querySelectorAll("[data-lbl-count]").forEach((inp) => {
+            inp.addEventListener("change", () => {
+              labelCounts[inp.dataset.lblCount] = parseInt(inp.value) || 0;
+              updateInfo();
+            });
+          });
+          tbody.querySelectorAll(".lbl-check").forEach((cb) => {
+            cb.addEventListener("change", updateInfo);
+          });
+        }
+
+        function updateInfo() {
+          const checked = qsa(".lbl-check:checked", modalRoot).length;
+          let totalLabels = 0;
+          qsa(".lbl-check:checked", modalRoot).forEach((cb) => {
+            totalLabels += labelCounts[cb.dataset.pid] || 0;
+          });
+          const info = $("lbl-count-info");
+          if (info) info.textContent = `${checked} selected · ${totalLabels} labels total`;
+        }
+
+        renderRows("");
+        updateInfo();
+
+        $("lbl-search")?.addEventListener("input", (e) =>
+          renderRows(e.target.value.toLowerCase()),
+        );
+
+        $("lbl-select-all")?.addEventListener("change", (e) => {
+          qsa(".lbl-check", modalRoot).forEach((cb) => {
+            cb.checked = e.target.checked;
+          });
+          updateInfo();
+        });
+
+        $("lbl-quick")?.addEventListener("change", (e) => {
+          const val = parseInt(e.target.value) || 0;
+          qsa("[data-lbl-count]", modalRoot).forEach((inp) => {
+            inp.value = val;
+            labelCounts[inp.dataset.lblCount] = val;
+          });
+          updateInfo();
+        });
+
+        $("lbl-print-btn")?.addEventListener("click", () => {
+          const items = [];
+          qsa(".lbl-check:checked", modalRoot).forEach((cb) => {
+            const p = STATE.products.find((x) => x.id === cb.dataset.pid);
+            const count = labelCounts[cb.dataset.pid] || 0;
+            if (p && count > 0)
+              items.push({
+                productId: p.id,
+                name: p.name,
+                barcode: p.barcode || p.sku || "",
+                price: p.selling_price,
+                copies: count,
+              });
+          });
           if (!items.length) {
-            toast("Set at least one copy count above 0", "error");
+            toast("Select products and set copy counts", "error");
             return;
           }
+          const size = $("lbl-size")?.value || "medium";
           closeModal();
-          printBarcodeLabels(items);
+          printBarcodeLabels(items, size);
         });
       },
     },
   );
 }
 
-function printBarcodeLabels(items) {
+function printBarcodeLabels(items, size = "medium") {
   const normalized = items
     .map((it) => (typeof it === "string" ? { productId: it, copies: 1 } : it))
-    .filter((it) => it.copies > 0);
+    .filter((it) => (it.copies || it.count || 0) > 0);
   if (!normalized.length) {
     toast("Nothing to print", "error");
     return;
   }
 
   const labels = [];
-  normalized.forEach(({ productId, copies }) => {
-    const p = STATE.products.find((x) => x.id === productId);
+  normalized.forEach((it) => {
+    const p = STATE.products.find((x) => x.id === (it.productId || it.id));
     if (!p) return;
-    const code =
-      String(p.barcode || p.sku || p.id)
-        .replace(/[^A-Za-z0-9\-]/g, "")
-        .slice(0, 40) || p.id;
+    const code = String(p.barcode || p.sku || p.id)
+      .replace(/[^A-Za-z0-9\-]/g, "")
+      .slice(0, 40) || p.id;
+    const copies = it.copies || it.count || 1;
     for (let i = 0; i < copies; i++)
       labels.push({ id: `bc-${labels.length}`, product: p, code });
   });
@@ -1474,33 +1586,61 @@ function printBarcodeLabels(items) {
     return;
   }
 
+  const sizes = {
+    small: { width: "50mm", height: "30mm", barcodeH: 30, fontSize: 9, nameSize: 8, priceSize: 10, bizSize: 7 },
+    medium: { width: "50mm", height: "40mm", barcodeH: 40, fontSize: 10, nameSize: 10, priceSize: 12, bizSize: 8 },
+    large: { width: "70mm", height: "50mm", barcodeH: 50, fontSize: 12, nameSize: 12, priceSize: 14, bizSize: 9 },
+    xl: { width: "100mm", height: "60mm", barcodeH: 55, fontSize: 14, nameSize: 14, priceSize: 16, bizSize: 10 },
+  };
+  const s = sizes[size] || sizes.medium;
+
   const win = window.open("", "_blank", "width=820,height=640");
   if (!win) {
     toast("Allow pop-ups for this site to print labels", "error");
     return;
   }
 
-  win.document.write(`<html><head><title>Barcode Labels</title>
+  win.document.write(`<html><head><title>Barcode Labels — ${STATE.business?.name || ""}</title>
     <style>
-      body { font-family: Arial, sans-serif; margin: 0; padding: 10px; }
-      .label-sheet { display: flex; flex-wrap: wrap; gap: 6px; }
-      .label { width: 190px; border: 1px dashed #999; border-radius: 4px; padding: 8px; text-align: center; box-sizing: border-box; }
-      .label .biz { font-size: 9px; color: #555; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-      .label .name { font-size: 11.5px; font-weight: 700; margin: 2px 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-      .label .price { font-size: 13px; font-weight: 800; margin-top: 2px; }
-      svg { width: 100%; height: auto; }
-      @media print { .label { border: none; } }
+      * { box-sizing: border-box; }
+      body { font-family: Arial, Helvetica, sans-serif; margin: 0; padding: 12px; background: #fff; }
+      .header { text-align: center; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid #ddd; }
+      .header h2 { margin: 0; font-size: 14px; color: #333; }
+      .header p { margin: 4px 0 0; font-size: 11px; color: #888; }
+      .sheet { display: flex; flex-wrap: wrap; gap: 4px; justify-content: flex-start; }
+      .label {
+        width: ${s.width}; height: ${s.height}; border: 1px dashed #ccc; border-radius: 4px;
+        padding: 3mm; text-align: center; display: inline-flex; flex-direction: column;
+        justify-content: center; align-items: center; page-break-inside: avoid;
+        background: #fff;
+      }
+      .label .biz { font-size: ${s.bizSize}pt; color: #666; margin-bottom: 1mm; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+      .label .name { font-size: ${s.nameSize}pt; font-weight: 700; margin: 1mm 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+      .label svg { width: 90%; height: auto; margin: 1mm 0; }
+      .label .price { font-size: ${s.priceSize}pt; font-weight: 800; color: #222; margin-top: 1mm; }
+      .label .sku { font-size: 7pt; color: #999; }
+      @media print {
+        body { padding: 0; }
+        .header { display: none; }
+        .label { border: 1px solid #000; }
+        .sheet { gap: 2mm; }
+      }
     </style>
   </head><body>
-    <div class="label-sheet">
+    <div class="header">
+      <h2>${escapeHtml(STATE.business?.name || "Barcode Labels")}</h2>
+      <p>${labels.length} labels · ${size} size · ${new Date().toLocaleDateString()}</p>
+    </div>
+    <div class="sheet">
       ${labels
         .map(
           (l) => `
         <div class="label">
-          <div class="biz">${escapeHtml(STATE.business.name)}</div>
+          <div class="biz">${escapeHtml(STATE.business?.name || "")}</div>
           <div class="name">${escapeHtml(l.product.name)}</div>
           <svg id="${l.id}"></svg>
           <div class="price">${fmtMoney(l.product.selling_price)}</div>
+          <div class="sku">${escapeHtml(l.code)}</div>
         </div>
       `,
         )
@@ -1516,19 +1656,30 @@ function printBarcodeLabels(items) {
       try {
         win.JsBarcode(win.document.getElementById(l.id), l.code, {
           format: "CODE128",
-          height: 40,
-          fontSize: 11,
+          height: s.barcodeH,
+          fontSize: s.fontSize,
           margin: 2,
           displayValue: true,
+          background: "#fff",
+          lineColor: "#000",
         });
       } catch (e) {
         console.warn("Barcode render failed for", l.code, e);
+        // Fallback: show code as text
+        const svg = win.document.getElementById(l.id);
+        if (svg) svg.outerHTML = `<div style="font-size:${s.fontSize}pt;font-family:monospace;">${escapeHtml(l.code)}</div>`;
       }
     });
-    win.focus();
-    win.print();
+    // Auto-print after a short delay
+    setTimeout(() => {
+      win.focus();
+      win.print();
+    }, 600);
   };
-  script.onerror = () => toast("Could not load the barcode library", "error");
+  script.onerror = () => {
+    toast("Could not load the barcode library", "error");
+    win.close();
+  };
   win.document.body.appendChild(script);
 }
 

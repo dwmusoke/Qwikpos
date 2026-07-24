@@ -1,7 +1,7 @@
 // =====================================================================
 // QWICKPOS — SETTINGS VIEW
 // =====================================================================
-import { supabase, STATE, $, qsa, escapeHtml, toast, hasRole, applyTheme, openModal } from './uganda-pos-core.js';
+import { supabase, STATE, $, qsa, escapeHtml, toast, hasRole, applyTheme, openModal, closeModal } from './uganda-pos-core.js';
 
 export async function renderSettings(root) {
   const { data: users } = await supabase.from('app_users').select('*').eq('business_id', STATE.business.id);
@@ -119,21 +119,38 @@ export async function renderSettings(root) {
     </div>
 
     <div class="card">
-      <div class="card-title">Team Members</div>
+      <div class="card-title" style="display:flex;justify-content:space-between;align-items:center;">
+        <span>👥 Team Members (${(users || []).length})</span>
+        <button class="btn btn-primary btn-sm" id="tm-add-user">+ Add User</button>
+      </div>
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Name</th><th>Role</th><th>Active</th><th></th></tr></thead>
+          <thead><tr><th>User</th><th>Phone</th><th>Role</th><th>Status</th><th>Actions</th></tr></thead>
           <tbody>
             ${(users || []).map((u) => `
               <tr>
-                <td>${escapeHtml(u.full_name)}</td>
                 <td>
-                  <select data-role-user="${u.id}" ${u.id === STATE.appUser.id ? 'disabled' : ''}>
-                    ${['admin', 'manager', 'cashier', 'inventory_clerk', 'accountant'].map((r) => `<option value="${r}" ${u.role === r ? 'selected' : ''}>${r}</option>`).join('')}
+                  <div style="display:flex;align-items:center;gap:8px;">
+                    <div style="width:32px;height:32px;border-radius:50%;background:var(--brand-light);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;color:var(--brand);">${escapeHtml((u.full_name || "?")[0])}</div>
+                    <div><b style="font-size:13px;">${escapeHtml(u.full_name)}</b>${u.id === STATE.appUser.id ? ' <span class="badge badge-blue" style="font-size:10px;">you</span>' : ''}<br><span style="font-size:11px;color:var(--text-muted);">${escapeHtml(u.email || "no email")}</span></div>
+                  </div>
+                </td>
+                <td style="font-size:12px;">${escapeHtml(u.phone || "—")}</td>
+                <td>
+                  <select data-role-user="${u.id}" ${u.id === STATE.appUser.id ? 'disabled' : ''} style="padding:4px 8px;font-size:12px;">
+                    ${['admin', 'manager', 'cashier', 'inventory_clerk', 'accountant'].map((r) => `<option value="${r}" ${u.role === r ? 'selected' : ''}>${r.replace('_', ' ')}</option>`).join('')}
                   </select>
                 </td>
                 <td>${u.is_active ? '<span class="badge badge-green">active</span>' : '<span class="badge badge-gray">inactive</span>'}</td>
-                <td>${u.id === STATE.appUser.id ? '<span class="text-muted">you</span>' : `<button class="btn btn-outline btn-sm" data-toggle-user="${u.id}">${u.is_active ? 'Deactivate' : 'Activate'}</button>`}</td>
+                <td>
+                  <div style="display:flex;gap:4px;">
+                    ${u.id !== STATE.appUser.id ? `
+                      <button class="btn btn-outline btn-sm" data-edit-user="${u.id}" title="Edit">✏️</button>
+                      <button class="btn btn-outline btn-sm" data-toggle-user="${u.id}" title="${u.is_active ? 'Deactivate' : 'Activate'}">${u.is_active ? '🔒' : '🔓'}</button>
+                      <button class="btn btn-outline btn-sm" data-share-user="${u.id}" title="Copy user info">📋</button>
+                    ` : '<span class="text-muted" style="font-size:11px;">you</span>'}
+                  </div>
+                </td>
               </tr>`).join('')}
           </tbody>
         </table>
@@ -286,6 +303,61 @@ export async function renderSettings(root) {
     renderSettings(root);
   }));
 
+  qsa('[data-edit-user]').forEach((btn) => btn.addEventListener('click', () => {
+    const u = (users || []).find((x) => x.id === btn.dataset.editUser);
+    if (!u) return;
+    openEditUserModal(u, root);
+  }));
+
+  qsa('[data-share-user]').forEach((btn) => btn.addEventListener('click', () => {
+    const u = (users || []).find((x) => x.id === btn.dataset.shareUser);
+    if (!u) return;
+    const info = `Name: ${u.full_name}\nPhone: ${u.phone || "—"}\nEmail: ${u.email || "—"}\nRole: ${u.role}\nStatus: ${u.is_active ? "Active" : "Inactive"}`;
+    navigator.clipboard?.writeText(info).then(() => toast("User info copied to clipboard", "success"));
+  }));
+
+  $('tm-add-user')?.addEventListener('click', () => {
+    openModal(`
+      <div class="modal-title-row"><h3>➕ Add Team Member</h3></div>
+      <p class="help-text">This creates an auth account in Supabase and links them to your business.</p>
+      <div class="field"><label>Full Name *</label><input id="tm-name" placeholder="John Doe" /></div>
+      <div class="field-row">
+        <div class="field"><label>Email *</label><input id="tm-email" type="email" placeholder="john@example.com" /></div>
+        <div class="field"><label>Phone</label><input id="tm-phone" type="tel" placeholder="+2567xxxxxxxx" /></div>
+      </div>
+      <div class="field-row">
+        <div class="field"><label>Role</label>
+          <select id="tm-role">${['admin', 'manager', 'cashier', 'inventory_clerk', 'accountant'].map((r) => `<option value="${r}">${r.replace('_', ' ')}</option>`).join('')}</select>
+        </div>
+        <div class="field"><label>Password *</label><input id="tm-pw" type="password" minlength="8" placeholder="Min 8 characters" /></div>
+      </div>
+      <div class="flex gap" style="margin-top:14px;">
+        <button class="btn btn-outline btn-block" data-close-modal>Cancel</button>
+        <button class="btn btn-primary btn-block" id="tm-save">Create User</button>
+      </div>
+    `, { onMount: () => {
+      $('tm-save').addEventListener('click', async () => {
+        const name = $('tm-name').value.trim();
+        const email = $('tm-email').value.trim();
+        const phone = $('tm-phone').value.trim();
+        const role = $('tm-role').value;
+        const pw = $('tm-pw').value;
+        if (!name || !email || pw.length < 8) { toast("Name, email, and password (8+ chars) required", "error"); return; }
+        const { data: authData, error: authErr } = await supabase.auth.admin.createUser({ email, password: pw, email_confirm: true });
+        if (authErr) { toast("Auth error: " + authErr.message, "error"); return; }
+        const branch = STATE.branches[0];
+        const { error: userErr } = await supabase.from("app_users").insert({
+          id: authData.user.id, business_id: STATE.business.id, branch_id: branch?.id,
+          full_name: name, phone: phone || null, role, is_active: true,
+        });
+        if (userErr) { toast("DB error: " + userErr.message, "error"); return; }
+        toast("User created", "success");
+        closeModal();
+        renderSettings(root);
+      });
+    }});
+  });
+
   // Theme: preset swatches
   qsa(".theme-color-swatch").forEach((sw) => {
     sw.addEventListener("click", () => {
@@ -331,10 +403,11 @@ export async function renderSettings(root) {
     if (file.size > 2 * 1024 * 1024) { toast("File too large. Max 2MB", "error"); return; }
     logoProgress.style.display = "block";
     logoProgress.textContent = "Uploading…";
-    try {
-      const ext = file.name.split(".").pop().toLowerCase();
-      const fileName = `logo-${STATE.business.id}.${ext}`;
-      const { data: uploadData, error: uploadErr } = await supabase.storage
+    const ext = file.name.split(".").pop().toLowerCase();
+    const fileName = `logo-${STATE.business.id}.${ext}`;
+
+    async function tryUpload() {
+      const { error: uploadErr } = await supabase.storage
         .from("logos")
         .upload(fileName, file, { upsert: true, contentType: file.type });
       if (uploadErr) throw uploadErr;
@@ -342,6 +415,11 @@ export async function renderSettings(root) {
       const logoUrl = urlData.publicUrl;
       const { error: updateErr } = await supabase.from("businesses").update({ logo_url: logoUrl }).eq("id", STATE.business.id);
       if (updateErr) throw updateErr;
+      return logoUrl;
+    }
+
+    try {
+      const logoUrl = await tryUpload();
       STATE.business.logo_url = logoUrl;
       logoProgress.textContent = "Logo uploaded!";
       setTimeout(() => { logoProgress.style.display = "none"; }, 2000);
@@ -349,16 +427,12 @@ export async function renderSettings(root) {
       toast("Logo updated successfully", "success");
       document.querySelector(".brand-row img")?.setAttribute("src", logoUrl);
     } catch (e) {
-      // Try to create the bucket automatically
-      if (e.message?.includes("Bucket not found")) {
+      const msg = e.message || String(e);
+      if (msg.includes("Bucket not found")) {
         try {
           await supabase.storage.createBucket("logos", { public: true });
           logoProgress.textContent = "Retrying upload…";
-          const retry = await supabase.storage.from("logos").upload(fileName, file, { upsert: true, contentType: file.type });
-          if (retry.error) throw retry.error;
-          const { data: urlData } = supabase.storage.from("logos").getPublicUrl(fileName);
-          const logoUrl = urlData.publicUrl;
-          await supabase.from("businesses").update({ logo_url: logoUrl }).eq("id", STATE.business.id);
+          const logoUrl = await tryUpload();
           STATE.business.logo_url = logoUrl;
           logoProgress.textContent = "Logo uploaded!";
           setTimeout(() => { logoProgress.style.display = "none"; }, 2000);
@@ -367,7 +441,7 @@ export async function renderSettings(root) {
           document.querySelector(".brand-row img")?.setAttribute("src", logoUrl);
           return;
         } catch (e2) {
-          logoProgress.textContent = "";
+          logoProgress.style.display = "none";
           openModal(`<div style="text-align:center;padding:8px;">
             <span style="font-size:48px;display:block;margin-bottom:12px;">📦</span>
             <h3 style="margin:0 0 8px;">Storage Bucket Required</h3>
@@ -384,8 +458,14 @@ export async function renderSettings(root) {
           return;
         }
       }
-      logoProgress.textContent = "";
-      toast("Upload failed: " + e.message, "error");
+      logoProgress.style.display = "none";
+      openModal(`<div style="text-align:center;padding:8px;">
+        <span style="font-size:48px;display:block;margin-bottom:12px;">⚠️</span>
+        <h3 style="margin:0 0 8px;">Logo Upload Failed</h3>
+        <p style="color:var(--text-muted);margin-bottom:16px;line-height:1.5;">${escapeHtml(msg)}</p>
+        <p style="color:var(--text-muted);margin-bottom:16px;font-size:13px;line-height:1.5;">If this is a permissions error, check that the <code style="background:var(--surface-2);padding:2px 6px;border-radius:4px;">logos</code> bucket has the correct RLS policies, or set it to <b>Public</b> in Supabase Dashboard → Storage.</p>
+        <button class="btn btn-primary" onclick="this.closest('.modal-overlay').remove()">OK</button>
+      </div>`);
     }
   });
 
@@ -438,5 +518,43 @@ export async function renderSettings(root) {
     const g = Math.max(0, Math.min(255, ((num >> 8) & 0xff) + pct));
     const b = Math.max(0, Math.min(255, (num & 0xff) + pct));
     return "#" + ((r << 16) | (g << 8) | b).toString(16).padStart(6, "0");
+  }
+
+  function openEditUserModal(u, root) {
+    openModal(`
+      <div class="modal-title-row"><h3>✏️ Edit User — ${escapeHtml(u.full_name)}</h3></div>
+      <div class="field"><label>Full Name</label><input id="eu-name" value="${escapeHtml(u.full_name)}" /></div>
+      <div class="field-row">
+        <div class="field"><label>Phone</label><input id="eu-phone" value="${escapeHtml(u.phone || "")}" /></div>
+        <div class="field"><label>Email</label><input id="eu-email" value="${escapeHtml(u.email || "")}" disabled title="Email cannot be changed" /></div>
+      </div>
+      <div class="field-row">
+        <div class="field"><label>Role</label>
+          <select id="eu-role">${['admin', 'manager', 'cashier', 'inventory_clerk', 'accountant'].map((r) => `<option value="${r}" ${u.role === r ? 'selected' : ''}>${r.replace('_', ' ')}</option>`).join('')}</select>
+        </div>
+        <div class="field"><label>Status</label>
+          <select id="eu-active"><option value="true" ${u.is_active ? 'selected' : ''}>Active</option><option value="false" ${!u.is_active ? 'selected' : ''}>Inactive</option></select>
+        </div>
+      </div>
+      <div class="flex gap" style="margin-top:14px;">
+        <button class="btn btn-outline btn-block" data-close-modal>Cancel</button>
+        <button class="btn btn-primary btn-block" id="eu-save">Save Changes</button>
+      </div>
+    `, { onMount: () => {
+      $('eu-save').addEventListener('click', async () => {
+        const name = $('eu-name').value.trim();
+        const phone = $('eu-phone').value.trim();
+        const role = $('eu-role').value;
+        const isActive = $('eu-active').value === 'true';
+        if (!name) { toast("Name is required", "error"); return; }
+        const { error } = await supabase.from('app_users').update({
+          full_name: name, phone: phone || null, role, is_active: isActive,
+        }).eq('id', u.id);
+        if (error) { toast("Failed: " + error.message, "error"); return; }
+        toast("User updated", "success");
+        closeModal();
+        renderSettings(root);
+      });
+    }});
   }
 }
