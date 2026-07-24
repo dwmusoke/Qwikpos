@@ -589,7 +589,7 @@ function renderCart() {
   const summaryEl = $("pos-cart-summary");
   if (!itemsEl || !summaryEl) return;
 
-  const { lines, subtotal, couponDiscount, manualDiscount, totalDiscount, vatTotal, grandTotal } = cartTotals();
+  const { lines, subtotal, couponDiscount, manualDiscount, totalDiscount, vatTotal, grandTotal, finalTotal } = cartTotals();
 
   if (!lines.length) {
     itemsEl.innerHTML = `<div class="empty-state"><div class="big-icon">🛒</div>Cart is empty — tap a product to add it.</div>`;
