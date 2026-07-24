@@ -79,7 +79,6 @@ export async function renderDashboard(root) {
   const monthTotal = sum(monthSales, "grand_total_base");
   const yearTotal = sum(yearSales, "grand_total_base");
   const monthVat = sumConverted(monthSales, "vat_total");
-  const yearVat = sumConverted(yearSales, "vat_total");
 
   const lowStock = lowStockProducts();
   const inventoryValue = STATE.products.reduce(
@@ -115,7 +114,112 @@ export async function renderDashboard(root) {
 
   const recent = allSales.slice(0, 8);
 
-  // Branch comparison (only if multi-branch)
+  // Yesterday trend
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+  yesterday.setHours(0, 0, 0, 0);
+  const yesterdayEnd = new Date(yesterday);
+  yesterdayEnd.setHours(23, 59, 59, 999);
+  const yesterdaySales = allSales.filter(
+    (s) =>
+      new Date(s.created_at) >= yesterday &&
+      new Date(s.created_at) <= yesterdayEnd,
+  );
+  const yesterdayTotal = sum(yesterdaySales, "grand_total_base");
+  const todayTrend =
+    yesterdayTotal > 0
+      ? (((todayTotal - yesterdayTotal) / yesterdayTotal) * 100).toFixed(1)
+      : null;
+
+  // 7-day daily sales
+  const dailySales7 = [];
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    d.setHours(0, 0, 0, 0);
+    const dEnd = new Date(d);
+    dEnd.setHours(23, 59, 59, 999);
+    const dayTotal = allSales
+      .filter(
+        (s) => new Date(s.created_at) >= d && new Date(s.created_at) <= dEnd,
+      )
+      .reduce((a, s) => a + Number(s.grand_total_base || 0), 0);
+    dailySales7.push({
+      label: d.toLocaleDateString("en", { weekday: "short" }),
+      value: dayTotal,
+    });
+  }
+
+  // Payment status counts (for donut)
+  const paidCount = allSales.filter((s) => s.payment_status === "paid").length;
+  const creditCount = allSales.filter((s) => s.payment_status === "credit").length;
+  const otherCount = allSales.length - paidCount - creditCount;
+
+  // --- SVG Line Chart ---
+  const chartW = 320;
+  const chartH = 90;
+  const padX = 32;
+  const padY = 14;
+  const maxVal = Math.max(...dailySales7.map((d) => d.value), 1);
+  const points = dailySales7.map((d, i) => {
+    const x = padX + (i / (dailySales7.length - 1)) * (chartW - padX - 10);
+    const y = padY + (1 - d.value / maxVal) * (chartH - padY * 2);
+    return { x, y, ...d };
+  });
+  const pathD = points
+    .map((p, i) => `${i === 0 ? "M" : "L"}${p.x.toFixed(1)},${p.y.toFixed(1)}`)
+    .join(" ");
+  const areaD =
+    pathD +
+    ` L${points[points.length - 1].x.toFixed(1)},${chartH - padY} L${points[0].x.toFixed(1)},${chartH - padY} Z`;
+  const brandColor = getComputedStyle(document.documentElement)
+    .getPropertyValue("--brand")
+    .trim() || "#0f6b4a";
+
+  const lineChartSvg = `
+    <svg viewBox="0 0 ${chartW} ${chartH}" class="line-chart-wrap" preserveAspectRatio="xMidYMid meet">
+      <path d="${areaD}" fill="${brandColor}" class="lc-area" />
+      <path d="${pathD}" stroke="${brandColor}" class="lc-line" />
+      ${points
+        .map(
+          (p) =>
+            `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" fill="${brandColor}" class="lc-dot" />`,
+        )
+        .join("")}
+      ${points
+        .map(
+          (p) =>
+            `<text x="${p.x.toFixed(1)}" y="${chartH - 2}" class="lc-label">${p.label}</text>`,
+        )
+        .join("")}
+    </svg>`;
+
+  // --- Donut Chart (SVG) ---
+  const donutTotal = paidCount + creditCount + otherCount || 1;
+  const donutR = 36;
+  const donutStroke = 12;
+  const circumference = 2 * Math.PI * donutR;
+  function donutArc(count) {
+    const pct = count / donutTotal;
+    const dash = pct * circumference;
+    const gap = circumference - dash;
+    return `${dash.toFixed(2)} ${gap.toFixed(2)}`;
+  }
+  const donutPaidOffset = 0;
+  const donutCreditOffset = -(paidCount / donutTotal) * circumference;
+  const donutOtherOffset = -((paidCount + creditCount) / donutTotal) * circumference;
+
+  const donutSvg = `
+    <svg viewBox="0 0 100 100" class="donut-svg">
+      <circle cx="50" cy="50" r="${donutR}" fill="none" stroke="#e5e7eb" stroke-width="${donutStroke}" />
+      ${paidCount > 0 ? `<circle cx="50" cy="50" r="${donutR}" fill="none" stroke="#16a34a" stroke-width="${donutStroke}" stroke-dasharray="${donutArc(paidCount)}" stroke-dashoffset="0" transform="rotate(-90 50 50)" />` : ""}
+      ${creditCount > 0 ? `<circle cx="50" cy="50" r="${donutR}" fill="none" stroke="#f59e0b" stroke-width="${donutStroke}" stroke-dasharray="${donutArc(creditCount)}" stroke-dashoffset="${-(paidCount / donutTotal) * circumference}" transform="rotate(-90 50 50)" />` : ""}
+      ${otherCount > 0 ? `<circle cx="50" cy="50" r="${donutR}" fill="none" stroke="#9ca3af" stroke-width="${donutStroke}" stroke-dasharray="${donutArc(otherCount)}" stroke-dashoffset="${-((paidCount + creditCount) / donutTotal) * circumference}" transform="rotate(-90 50 50)" />` : ""}
+      <text x="50" y="48" text-anchor="middle" font-size="14" font-weight="800" fill="currentColor">${allSales.length}</text>
+      <text x="50" y="60" text-anchor="middle" font-size="7" fill="var(--text-muted)">sales</text>
+    </svg>`;
+
+  // Branch comparison
   let branchComparison = "";
   if (STATE.branches.length > 1 && branchSales?.length) {
     const branchSalesFiltered = branchSales.filter(
@@ -146,7 +250,7 @@ export async function renderDashboard(root) {
       <div class="card">
         <div class="card-title" data-i18n="dash.branch_comparison">Store/Branch Comparison (YTD)</div>
         <div class="table-wrap"><table>
-          <thead><tr><th>Branch</th><th>Sales</th><th>Transactions</th><th>VAT</th><th>Paid</th><th>Credit</th></tr></thead>
+          <thead><tr><th>Branch</th><th>Sales</th><th>Txns</th><th>VAT</th><th>Paid</th><th>Credit</th></tr></thead>
           <tbody>
             ${rows
               .map(
@@ -166,139 +270,110 @@ export async function renderDashboard(root) {
       </div>`;
   }
 
-  // Calculate yesterday's sales for trend comparison
-  const yesterday = new Date();
-  yesterday.setDate(yesterday.getDate() - 1);
-  yesterday.setHours(0, 0, 0, 0);
-  const yesterdayEnd = new Date(yesterday);
-  yesterdayEnd.setHours(23, 59, 59, 999);
-  const yesterdaySales = allSales.filter(
-    (s) =>
-      new Date(s.created_at) >= yesterday &&
-      new Date(s.created_at) <= yesterdayEnd,
-  );
-  const yesterdayTotal = sum(yesterdaySales, "grand_total_base");
-  const todayTrend =
-    yesterdayTotal > 0
-      ? (((todayTotal - yesterdayTotal) / yesterdayTotal) * 100).toFixed(1)
-      : null;
-
-  // Daily sales for the last 7 days (mini chart)
-  const dailySales7 = [];
-  for (let i = 6; i >= 0; i--) {
-    const d = new Date();
-    d.setDate(d.getDate() - i);
-    d.setHours(0, 0, 0, 0);
-    const dEnd = new Date(d);
-    dEnd.setHours(23, 59, 59, 999);
-    const dayTotal = allSales
-      .filter(
-        (s) => new Date(s.created_at) >= d && new Date(s.created_at) <= dEnd,
-      )
-      .reduce((a, s) => a + Number(s.grand_total_base || 0), 0);
-    dailySales7.push({
-      label: d.toLocaleDateString("en", { weekday: "short" }),
-      value: dayTotal,
-    });
-  }
-  const maxDaily = Math.max(...dailySales7.map((d) => d.value), 1);
-
+  // --- Render ---
   root.innerHTML = `
     <div class="kpi-grid">
       <div class="kpi-card kpi-accent-blue">
         <div class="kpi-icon">🧾</div>
         <div class="kpi-content">
-          <div class="label" data-i18n="dash.today_sales">Today's Sales</div>
+          <div class="label">Today's Sales</div>
           <div class="value">${fmtMoney(todayTotal)}</div>
           <div class="delta ${todayTrend !== null ? (Number(todayTrend) >= 0 ? "up" : "down") : ""}">
-            ${todayTrend !== null ? `${Number(todayTrend) >= 0 ? "↑" : "↓"} ${Math.abs(Number(todayTrend))}% vs yesterday` : "First sale today"}
-            <span class="delta-sub">${todaySales.length} transaction${todaySales.length !== 1 ? "s" : ""}</span>
+            ${todayTrend !== null ? `${Number(todayTrend) >= 0 ? "↑" : "↓"} ${Math.abs(Number(todayTrend))}% vs yday` : "First sale today"}
           </div>
         </div>
       </div>
       <div class="kpi-card kpi-accent-green">
         <div class="kpi-icon">📅</div>
         <div class="kpi-content">
-          <div class="label" data-i18n="dash.month">This Month</div>
+          <div class="label">This Month</div>
           <div class="value">${fmtMoney(monthTotal)}</div>
-          <div class="delta up">${monthSales.length} transactions</div>
+          <div class="delta up">${monthSales.length} txns</div>
         </div>
       </div>
       <div class="kpi-card kpi-accent-purple">
         <div class="kpi-icon">📊</div>
         <div class="kpi-content">
-          <div class="label" data-i18n="dash.year">This Year</div>
+          <div class="label">This Year</div>
           <div class="value">${fmtMoney(yearTotal)}</div>
-          <div class="delta up">${yearSales.length} transactions</div>
+          <div class="delta up">${yearSales.length} txns</div>
         </div>
       </div>
       <div class="kpi-card kpi-accent-orange">
         <div class="kpi-icon">🏛️</div>
         <div class="kpi-content">
-          <div class="label" data-i18n="dash.vat_month">VAT Collected (Month)</div>
+          <div class="label">VAT (Month)</div>
           <div class="value">${fmtMoney(monthVat)}</div>
-          <div class="delta">Standard rate 18%</div>
         </div>
       </div>
       <div class="kpi-card kpi-accent-teal">
         <div class="kpi-icon">📦</div>
         <div class="kpi-content">
-          <div class="label" data-i18n="dash.inventory_value">Inventory Value</div>
+          <div class="label">Inventory</div>
           <div class="value">${fmtMoney(inventoryValue)}</div>
-          <div class="delta">${STATE.products.length} active SKUs</div>
+          <div class="delta">${STATE.products.length} SKUs</div>
         </div>
       </div>
       <div class="kpi-card ${lowStock.length ? "kpi-accent-red" : ""}">
         <div class="kpi-icon">⚠️</div>
         <div class="kpi-content">
-          <div class="label" data-i18n="dash.low_stock">Low Stock Alerts</div>
+          <div class="label">Low Stock</div>
           <div class="value" style="color:${lowStock.length ? "var(--danger)" : "inherit"}">${lowStock.length}</div>
-          <div class="delta">at/below reorder level</div>
         </div>
       </div>
       <div class="kpi-card">
         <div class="kpi-icon">👥</div>
         <div class="kpi-content">
-          <div class="label" data-i18n="dash.outstanding">Outstanding Balances</div>
+          <div class="label">Outstanding</div>
           <div class="value">${fmtMoney(outstandingBalance)}</div>
-          <div class="delta">across all customers</div>
         </div>
       </div>
       <div class="kpi-card kpi-accent-indigo">
         <div class="kpi-icon">🏛️</div>
         <div class="kpi-content">
-          <div class="label" data-i18n="dash.vat_ytd">YTD VAT Collected</div>
-          <div class="value">${fmtMoney(yearVat)}</div>
-          <div class="delta">Jan — ${new Date().toLocaleString("default", { month: "short" })}</div>
+          <div class="label">YTD VAT</div>
+          <div class="value">${fmtMoney(monthVat)}</div>
         </div>
       </div>
     </div>
 
-    <div class="card" style="margin-bottom:16px;">
-      <div class="card-title" data-i18n="dash.sales_trend">📈 Sales Trend (Last 7 Days)</div>
-      <div class="mini-chart">
-        ${dailySales7
-          .map(
-            (d) => `
-          <div class="mini-bar-col">
-            <div class="mini-bar-value">${fmtMoney(d.value)}</div>
-            <div class="mini-bar-track">
-              <div class="mini-bar-fill" style="height:${d.value > 0 ? Math.max((d.value / maxDaily) * 100, 4) : 0}%"></div>
+    <div class="dash-charts">
+      <div class="card">
+        <div class="card-title">Sales Trend (7d)</div>
+        <div class="line-chart-wrap">${lineChartSvg}</div>
+      </div>
+      <div class="card">
+        <div class="card-title">Payment Status</div>
+        <div class="donut-wrap">
+          ${donutSvg}
+          <div class="donut-legend">
+            <div class="donut-legend-item">
+              <div class="donut-legend-dot" style="background:#16a34a;"></div>
+              <span class="donut-legend-label">Paid</span>
+              <span class="donut-legend-value">${paidCount}</span>
             </div>
-            <div class="mini-bar-label">${d.label}</div>
-          </div>`,
-          )
-          .join("")}
+            <div class="donut-legend-item">
+              <div class="donut-legend-dot" style="background:#f59e0b;"></div>
+              <span class="donut-legend-label">Credit</span>
+              <span class="donut-legend-value">${creditCount}</span>
+            </div>
+            ${otherCount > 0 ? `
+            <div class="donut-legend-item">
+              <div class="donut-legend-dot" style="background:#9ca3af;"></div>
+              <span class="donut-legend-label">Other</span>
+              <span class="donut-legend-value">${otherCount}</span>
+            </div>` : ""}
+          </div>
+        </div>
       </div>
     </div>
 
     <div class="grid-2">
       <div class="card">
-        <div class="card-title" data-i18n="dash.recent">Recent Transactions</div>
+        <div class="card-title">Recent Transactions</div>
         ${
           recent.length
-            ? `
-        <div class="table-wrap"><table>
+            ? `<div class="table-wrap"><table>
           <thead><tr><th>Invoice</th><th>Time</th><th>Total</th><th>Status</th></tr></thead>
           <tbody>
             ${recent
@@ -319,20 +394,19 @@ export async function renderDashboard(root) {
       </div>
 
       <div class="card">
-        <div class="card-title" data-i18n="dash.top_products">Top Selling Products (90d)</div>
+        <div class="card-title">Top Products (90d)</div>
         ${
           topProducts.length
             ? topProducts
                 .map(
                   ([name, qty]) => `
-          <div class="summary-row"><span>${escapeHtml(name)}</span><span><b>${qty}</b> sold</span></div>
-        `,
+          <div class="summary-row"><span>${escapeHtml(name)}</span><span><b>${qty}</b> sold</span></div>`,
                 )
                 .join("")
             : `<div class="empty-state">No sales data yet.</div>`
         }
 
-        <div class="card-title" style="margin-top:18px;">EFRIS Invoice Status</div>
+        <div class="card-title" style="margin-top:14px;">EFRIS Status</div>
         <div class="flex gap" style="flex-wrap:wrap;">
           <span class="badge badge-gray">Pending ${efrisCounts.pending}</span>
           <span class="badge badge-blue">Queued ${efrisCounts.queued}</span>
@@ -349,16 +423,15 @@ export async function renderDashboard(root) {
       lowStock.length
         ? `
     <div class="card">
-      <div class="card-title" data-i18n="dash.low_stock">⚠️ Low Stock Alerts</div>
+      <div class="card-title">⚠️ Low Stock Alerts</div>
       <div class="table-wrap"><table>
-        <thead><tr><th>Product</th><th>In Stock</th><th>Reorder Level</th></tr></thead>
+        <thead><tr><th>Product</th><th>In Stock</th><th>Reorder</th></tr></thead>
         <tbody>
           ${lowStock
             .slice(0, 10)
             .map(
               (p) => `
-            <tr><td>${escapeHtml(p.name)}</td><td style="color:var(--danger); font-weight:700;">${STATE.stockByProduct[p.id] || 0}</td><td>${p.reorder_level}</td></tr>
-          `,
+            <tr><td>${escapeHtml(p.name)}</td><td style="color:var(--danger);font-weight:700;">${STATE.stockByProduct[p.id] || 0}</td><td>${p.reorder_level}</td></tr>`,
             )
             .join("")}
         </tbody>
@@ -381,9 +454,9 @@ export async function renderDashboard(root) {
       if (!expiring.length && !expired.length) return "";
       return `
     <div class="card">
-      <div class="card-title" data-i18n="dash.expiry_alerts">📅 Expiry Alerts</div>
+      <div class="card-title">📅 Expiry Alerts</div>
       <div class="table-wrap"><table>
-        <thead><tr><th>Product</th><th>Expiry Date</th><th>Status</th><th>Stock</th></tr></thead>
+        <thead><tr><th>Product</th><th>Expiry</th><th>Status</th><th>Stock</th></tr></thead>
         <tbody>
           ${expired
             .slice(0, 5)
