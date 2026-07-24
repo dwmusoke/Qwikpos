@@ -139,11 +139,11 @@ async function renderSupTable() {
   }));
   qsa("[data-delete-sup]", tbody).forEach((b) => b.addEventListener("click", async () => {
     if (!confirm("Delete this supplier? This cannot be undone.")) return;
-    const { error } = await supabase.from("suppliers").delete().eq("id", b.dataset.deleteSup);
+    const { error } = await supabase.rpc('delete_supplier', { p_id: b.dataset.deleteSup });
     if (error) { toast("Delete failed: " + error.message, "error"); return; }
     toast("Supplier deleted", "success");
     await refreshSuppliers();
-    renderTable();
+    renderSupTable();
   }));
 }
 
@@ -185,10 +185,16 @@ function openSupplierModal(supplierId) {
             tin: $("sf-tin").value.trim() || null,
             address: $("sf-address").value.trim() || null,
           };
-          const query = editing
-            ? supabase.from("suppliers").update(record).eq("id", supplierId)
-            : supabase.from("suppliers").insert(record);
-          const { error } = await query;
+          const { data, error } = await supabase.rpc('upsert_supplier', {
+            p_business_id: STATE.business.id,
+            p_name: name,
+            p_contact_person: $("sf-contact").value.trim() || null,
+            p_phone: $("sf-phone").value.trim() || null,
+            p_email: $("sf-email").value.trim() || null,
+            p_tin: $("sf-tin").value.trim() || null,
+            p_address: $("sf-address").value.trim() || null,
+            p_id: editing ? supplierId : null,
+          });
           if (error) {
             toast("Save failed: " + error.message, "error");
             return;
