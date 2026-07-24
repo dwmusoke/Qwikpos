@@ -13,7 +13,7 @@ import {
   closeModal,
   fmtMoney,
   refreshSuppliers,
-  fmtDate, stockFor
+  fmtDate, stockFor,
   emptyStateHtml,
 } from "./uganda-pos-core.js";
 import { logAuditAction } from "./uganda-pos-view-audit.js";
