@@ -307,6 +307,9 @@ alter table products add column if not exists brand_id uuid references brands(id
 -- Products: add has_batches flag for batch tracking
 alter table products add column if not exists has_batches boolean default false;
 
+-- Products: add efris_registered_at timestamp
+alter table products add column if not exists efris_registered_at timestamptz;
+
 -- Businesses: document template config columns
 alter table businesses add column if not exists tpl_primary_color text default '#0f6b4a';
 alter table businesses add column if not exists tpl_font_size text default '13';

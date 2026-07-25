@@ -627,7 +627,7 @@ function renderCart() {
   const summaryEl = $("pos-cart-summary");
   if (!itemsEl || !summaryEl) return;
 
-  const { lines, subtotal, couponDiscount, manualDiscount, totalLineDiscount, totalDiscount, vatTotal, grandTotal, finalTotal } = cartTotals();
+  const { lines, subtotal, couponDiscount, manualDiscount, totalLineDiscount, totalDiscount, vatTotal, grandTotal, finalTotal, taxByCategory } = cartTotals();
   const subtotalBeforeLineDisc = lines.reduce((a, l) => a + (l.lineGross || 0), 0);
 
   if (!lines.length) {
