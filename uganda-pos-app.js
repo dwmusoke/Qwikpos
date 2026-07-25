@@ -168,7 +168,7 @@ async function navigateTo(route) {
         <p style="color:var(--text-muted);max-width:400px;margin:0 auto 20px;line-height:1.5;font-size:13px;">Impersonate a tenant from the <b>Platform Admin</b>, or ensure your account is linked to a business.</p>
         <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;">
           <button class="btn btn-primary" onclick="document.querySelector('[data-route=&quot;admin&quot;]')?.click()">Platform Admin</button>
-          <button class="btn btn-outline" onclick="document.querySelector('[data-route=&quot;billing&quot;]')?.click()">Billing</button>
+          <button class="btn btn-secondary" onclick="document.querySelector('[data-route=&quot;billing&quot;]')?.click()">Billing</button>
         </div>
         <div style="margin-top:28px;display:flex;flex-direction:column;gap:8px;max-width:500px;margin-left:auto;margin-right:auto;">
           <div class="skeleton" style="height:32px;width:100%;"></div>

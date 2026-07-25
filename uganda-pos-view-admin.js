@@ -84,8 +84,8 @@ export async function renderAdmin(root) {
   const totalUsers = (users || []).length;
 
   root.innerHTML = `
-    <div class="view-header">
-      <div><h2>Platform Admin</h2><p class="sub">Manage all vendors, users, and branches</p></div>
+    <div class="page-header">
+      <div class="page-header-info"><h1>Platform Admin</h1><p>Manage all vendors, users, and branches</p></div>
     </div>
 
     <div class="admin-tabs" id="admin-tabs">
@@ -244,7 +244,7 @@ function renderVendors(el, d) {
                   <td>${userCount}</td>
                   <td>—</td>
                   <td style="display:flex;gap:4px">
-                    <button class="btn btn-outline btn-sm" data-manage="${b.id}">Manage</button>
+                    <button class="btn btn-secondary btn-sm" data-manage="${b.id}">Manage</button>
                     <button class="btn btn-sm btn-primary" data-impersonate="${b.id}" title="Log in as this vendor's admin">👁 Impersonate</button>
                   </td>
                 </tr>`;
@@ -289,7 +289,7 @@ function renderVendors(el, d) {
       <div class="field"><label>Plan</label><select id="ab-plan">${(d.plans || []).map((p) => `<option value="${p.id}">${escapeHtml(p.name)} (${Number(p.price_ugx).toLocaleString()} UGX/mo)</option>`).join("")}</select></div>
       <div class="field"><label>Admin Password</label><input id="ab-pw" type="password" required minlength="8" placeholder="At least 8 characters" /></div>
       <div class="flex gap" style="margin-top:14px">
-        <button class="btn btn-outline btn-block" data-close-modal>Cancel</button>
+        <button class="btn btn-secondary btn-block" data-close-modal>Cancel</button>
         <button class="btn btn-primary btn-block" id="ab-save">Create Business</button>
       </div>
     `, {
@@ -345,7 +345,7 @@ async function impersonateVendor(businessId, d) {
       </select>
     </div>
     <div class="flex gap" style="margin-top:14px">
-      <button class="btn btn-outline btn-block" data-close-modal>Cancel</button>
+      <button class="btn btn-secondary btn-block" data-close-modal>Cancel</button>
       <button class="btn btn-primary btn-block" id="imp-confirm">Start Impersonation</button>
     </div>
   `,
@@ -404,8 +404,8 @@ function openManageModal(business, sub, plans, branches, users) {
 
     <div class="admin-modal-tabs" style="display:flex;gap:8px;margin-bottom:16px;border-bottom:1px solid var(--border);padding-bottom:8px">
       <button class="btn btn-sm btn-primary" data-mtab="subscription">Subscription</button>
-      <button class="btn btn-sm btn-outline" data-mtab="branches">Branches (${branches.length})</button>
-      <button class="btn btn-sm btn-outline" data-mtab="users">Users (${users.length})</button>
+      <button class="btn btn-sm btn-secondary" data-mtab="branches">Branches (${branches.length})</button>
+      <button class="btn btn-sm btn-secondary" data-mtab="users">Users (${users.length})</button>
     </div>
 
     <div id="mg-tab-subscription">
@@ -429,7 +429,7 @@ function openManageModal(business, sub, plans, branches, users) {
         <div class="field"><label>Email</label><input id="mg-biz-email" value="${escapeHtml(business.email || "")}" /></div>
       </div>
       <div class="flex gap" style="margin-top:14px">
-        <button class="btn btn-outline btn-block" data-close-modal>Cancel</button>
+        <button class="btn btn-secondary btn-block" data-close-modal>Cancel</button>
         <button class="btn btn-primary btn-block" id="mg-save-btn">Save Changes</button>
         <button class="btn btn-danger btn-block" id="mg-delete-btn">Delete Business</button>
       </div>
@@ -447,7 +447,7 @@ function openManageModal(business, sub, plans, branches, users) {
               ${br.is_main ? '<span class="badge badge-green" style="margin-left:6px">Main</span>' : ""}
               <br><span class="text-muted" style="font-size:11px">${escapeHtml(br.address || "No address")}</span>
             </div>
-            <button class="btn btn-sm btn-outline" data-edit-branch="${br.id}">Edit</button>
+            <button class="btn btn-sm btn-secondary" data-edit-branch="${br.id}">Edit</button>
             ${!br.is_main ? `<button class="btn btn-sm btn-danger" data-del-branch="${br.id}">Delete</button>` : ""}
           </div>
         `,
@@ -476,7 +476,7 @@ function openManageModal(business, sub, plans, branches, users) {
                 </td>
                 <td><span class="badge ${u.is_active ? "badge-green" : "badge-red"}">${u.is_active ? "active" : "inactive"}</span></td>
                 <td>
-                  <button class="btn btn-sm btn-outline" data-toggle-user="${u.id}">${u.is_active ? "Deactivate" : "Activate"}</button>
+                  <button class="btn btn-sm btn-secondary" data-toggle-user="${u.id}">${u.is_active ? "Deactivate" : "Activate"}</button>
                 </td>
               </tr>
             `,
@@ -499,7 +499,7 @@ function openManageModal(business, sub, plans, branches, users) {
               b.className =
                 b.dataset.mtab === btn.dataset.mtab
                   ? "btn btn-sm btn-primary"
-                  : "btn btn-sm btn-outline";
+                  : "btn btn-sm btn-secondary";
             });
             ["subscription", "branches", "users"].forEach((t) => {
               const panel = $(`mg-tab-${t}`);
@@ -693,7 +693,7 @@ function renderUsers(el, d) {
                 <td><span class="badge ${u.is_active ? "badge-green" : "badge-red"}">${u.is_active ? "active" : "inactive"}</span></td>
                 <td>${u.created_at ? fmtDate(u.created_at) : "—"}</td>
                 <td>
-                  <button class="btn btn-sm btn-outline" data-user-manage="${u.id}">Manage</button>
+                  <button class="btn btn-sm btn-secondary" data-user-manage="${u.id}">Manage</button>
                 </td>
               </tr>
             `,
@@ -717,7 +717,7 @@ function renderUsers(el, d) {
       <div class="field"><label>Role</label><select id="au-role">${["admin", "manager", "cashier", "inventory_clerk", "accountant"].map((r) => `<option value="${r}">${r.replace("_", " ")}</option>`).join("")}</select></div>
       <div class="field"><label>Password</label><input id="au-pw" type="password" required minlength="8" placeholder="At least 8 characters" /></div>
       <div class="flex gap" style="margin-top:14px">
-        <button class="btn btn-outline btn-block" data-close-modal>Cancel</button>
+        <button class="btn btn-secondary btn-block" data-close-modal>Cancel</button>
         <button class="btn btn-primary btn-block" id="au-save">Create User</button>
       </div>
     `, {
@@ -762,7 +762,7 @@ function renderUsers(el, d) {
           <select id="um-active"><option value="true" ${u.is_active ? "selected" : ""}>Active</option><option value="false" ${!u.is_active ? "selected" : ""}>Inactive</option></select>
         </div>
         <div class="flex gap" style="margin-top:14px">
-          <button class="btn btn-outline btn-block" data-close-modal>Cancel</button>
+          <button class="btn btn-secondary btn-block" data-close-modal>Cancel</button>
           <button class="btn btn-primary btn-block" id="um-save">Save</button>
           <button class="btn btn-danger btn-block" id="um-delete">Delete User</button>
         </div>
@@ -818,7 +818,7 @@ function renderBranches(el, d) {
                 <td>${escapeHtml(br.address || "—")}</td>
                 <td>${escapeHtml(br.phone || "—")}</td>
                 <td>
-                  <button class="btn btn-sm btn-outline" data-branch-edit="${br.id}">Edit</button>
+                  <button class="btn btn-sm btn-secondary" data-branch-edit="${br.id}">Edit</button>
                   ${!br.is_main ? `<button class="btn btn-sm btn-danger" data-branch-del="${br.id}">Delete</button>` : ""}
                 </td>
               </tr>
@@ -900,7 +900,7 @@ function renderPlans(el, d) {
                   )
                   .join(" ")}</td>
                 <td><input type="checkbox" data-plan-active="${p.id}" ${p.is_active ? "checked" : ""} /></td>
-                <td><button class="btn btn-outline btn-sm" data-save-plan="${p.id}">Save</button></td>
+                <td><button class="btn btn-secondary btn-sm" data-save-plan="${p.id}">Save</button></td>
               </tr>
             `,
               )
@@ -1436,7 +1436,7 @@ async function renderRoles(el) {
       </div>
       <div class="flex gap" style="margin-top:12px">
         <button class="btn btn-primary" id="role-assign-btn">Assign Role</button>
-        <button class="btn btn-outline" id="role-refresh-btn">Refresh</button>
+        <button class="btn btn-secondary" id="role-refresh-btn">Refresh</button>
       </div>
       <p id="role-msg" class="help-text" style="margin-top:8px;display:none"></p>
     </div>

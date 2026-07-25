@@ -10,7 +10,7 @@ export async function renderSettings(root) {
   (rates || []).forEach((r) => { if (!(r.currency_code in latestRates)) latestRates[r.currency_code] = r; });
 
   root.innerHTML = `
-    <div class="view-header"><div><h2>Settings</h2><p class="sub">Business profile, currencies, EFRIS &amp; team</p></div></div>
+    <div class="page-header"><div class="page-header-info"><h1>Settings</h1><p>Business profile, currencies, EFRIS &amp; team</p></div></div>
 
     <div class="card">
       <div class="card-title">Business Profile</div>
@@ -64,7 +64,7 @@ export async function renderSettings(root) {
           Enable live EFRIS submission (invoices go to URA for real)
         </label>
       </div>
-      <button class="btn btn-outline" id="save-efris-key-btn">Save Provider Settings</button>
+      <button class="btn btn-secondary" id="save-efris-key-btn">Save Provider Settings</button>
       <p class="help-text" style="margin-top:8px;">Each product also needs an <b>EFRIS Commodity Category ID</b> before it can be
         fiscalised — set that per product in Inventory. Unregistered products are registered with EFRIS automatically the first
         time they appear on a submitted invoice.</p>
@@ -106,7 +106,7 @@ export async function renderSettings(root) {
                 <td>
                   ${c.is_base ? '1.00 (base)' : `<input type="number" step="0.0001" style="width:120px;" data-rate-input="${c.code}" value="${latestRates[c.code]?.rate_to_base ?? STATE.rates[c.code] ?? 1}" />`}
                 </td>
-                <td>${c.is_base ? '' : `<button class="btn btn-outline btn-sm" data-save-rate="${c.code}">Update Rate</button>`}</td>
+                <td>${c.is_base ? '' : `<button class="btn btn-secondary btn-sm" data-save-rate="${c.code}">Update Rate</button>`}</td>
               </tr>`).join('')}
           </tbody>
         </table>
@@ -121,7 +121,7 @@ export async function renderSettings(root) {
         <div class="field"><label>Symbol</label><input id="nc-symbol" placeholder="£" /></div>
         <div class="field"><label>Rate to ${escapeHtml(STATE.business.base_currency)}</label><input type="number" step="0.0001" id="nc-rate" placeholder="e.g. 4800" /></div>
       </div>
-      <button class="btn btn-outline" id="add-currency-btn">+ Add Currency</button>
+      <button class="btn btn-secondary" id="add-currency-btn">+ Add Currency</button>
     </div>
 
     <div class="card">
@@ -151,9 +151,9 @@ export async function renderSettings(root) {
                 <td>
                   <div style="display:flex;gap:4px;">
                     ${u.id !== STATE.appUser.id ? `
-                      <button class="btn btn-outline btn-sm" data-edit-user="${u.id}" title="Edit">✏️</button>
-                      <button class="btn btn-outline btn-sm" data-toggle-user="${u.id}" title="${u.is_active ? 'Deactivate' : 'Activate'}">${u.is_active ? '🔒' : '🔓'}</button>
-                      <button class="btn btn-outline btn-sm" data-share-user="${u.id}" title="Copy user info">📋</button>
+                      <button class="btn btn-secondary btn-sm" data-edit-user="${u.id}" title="Edit">✏️</button>
+                      <button class="btn btn-secondary btn-sm" data-toggle-user="${u.id}" title="${u.is_active ? 'Deactivate' : 'Activate'}">${u.is_active ? '🔒' : '🔓'}</button>
+                      <button class="btn btn-secondary btn-sm" data-share-user="${u.id}" title="Copy user info">📋</button>
                     ` : '<span class="text-muted" style="font-size:11px;">you</span>'}
                   </div>
                 </td>
@@ -172,7 +172,7 @@ export async function renderSettings(root) {
       <div class="field"><label>Current Logo</label>
         <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
           <img id="logo-preview" src="${STATE.business.logo_url || './uganda-pos-icon.svg'}" style="width:64px;height:64px;border-radius:12px;object-fit:cover;border:1px solid var(--border);" alt="logo" />
-          <button class="btn btn-outline" id="logo-remove-btn" style="${STATE.business.logo_url ? '' : 'display:none;'}">Remove</button>
+          <button class="btn btn-secondary" id="logo-remove-btn" style="${STATE.business.logo_url ? '' : 'display:none;'}">Remove</button>
         </div>
       </div>
       <div class="field"><label>Upload New Logo</label><input type="file" id="logo-file-input" accept="image/png,image/jpeg,image/webp,image/svg+xml" /></div>
@@ -229,7 +229,7 @@ export async function renderSettings(root) {
                 <td style="font-size:13px;font-weight:600;">${r.label}</td>
                 <td style="font-size:12px;color:var(--text-muted);">${r.perms}</td>
                 <td style="font-size:12px;">${r.count} user${r.count !== 1 ? 's' : ''}</td>
-                <td><button class="btn btn-outline btn-sm" data-edit-role="${r.key}">Edit</button></td>
+                <td><button class="btn btn-secondary btn-sm" data-edit-role="${r.key}">Edit</button></td>
               </tr>
             `).join('')}
           </tbody>
@@ -355,8 +355,8 @@ export async function renderSettings(root) {
                 <td>${b.is_active !== false ? '<span class="badge badge-green">active</span>' : '<span class="badge badge-gray">inactive</span>'}</td>
                 <td>
                   <div style="display:flex;gap:4px;">
-                    <button class="btn btn-outline btn-sm" data-edit-branch="${b.id}" title="Edit">✏️</button>
-                    ${!b.is_main ? `<button class="btn btn-outline btn-sm" data-delete-branch="${b.id}" title="Delete" style="color:var(--danger);">🗑️</button>` : ''}
+                    <button class="btn btn-secondary btn-sm" data-edit-branch="${b.id}" title="Edit">✏️</button>
+                    ${!b.is_main ? `<button class="btn btn-secondary btn-sm" data-delete-branch="${b.id}" title="Delete" style="color:var(--danger);">🗑️</button>` : ''}
                   </div>
                 </td>
               </tr>
@@ -505,7 +505,7 @@ export async function renderSettings(root) {
         <div class="field"><label>Password *</label><input id="tm-pw" type="password" minlength="8" placeholder="Min 8 characters" /></div>
       </div>
       <div class="flex gap" style="margin-top:14px;">
-        <button class="btn btn-outline btn-block" data-close-modal>Cancel</button>
+        <button class="btn btn-secondary btn-block" data-close-modal>Cancel</button>
         <button class="btn btn-primary btn-block" id="tm-save">Create User</button>
       </div>
     `, { onMount: () => {
@@ -661,7 +661,7 @@ export async function renderSettings(root) {
         `).join('')}
       </div>
       <div class="flex gap" style="margin-top:14px;">
-        <button class="btn btn-outline btn-block" data-close-modal>Cancel</button>
+        <button class="btn btn-secondary btn-block" data-close-modal>Cancel</button>
         <button class="btn btn-primary btn-block" id="er-save">Save Role</button>
       </div>
     `, { onMount: () => {
@@ -680,7 +680,7 @@ export async function renderSettings(root) {
       <div class="field"><label>Display Label</label><input id="ar-label" placeholder="e.g. Supervisor" /></div>
       <div class="field"><label>Description</label><input id="ar-desc" placeholder="What this role can do" /></div>
       <div class="flex gap" style="margin-top:14px;">
-        <button class="btn btn-outline btn-block" data-close-modal>Cancel</button>
+        <button class="btn btn-secondary btn-block" data-close-modal>Cancel</button>
         <button class="btn btn-primary btn-block" id="ar-save">Create Role</button>
       </div>
     `, { onMount: () => {
@@ -777,7 +777,7 @@ export async function renderSettings(root) {
         <div class="field"><label>Contact Person</label><input id="br-contact" placeholder="Manager name" /></div>
       </div>
       <div class="flex gap" style="margin-top:14px;">
-        <button class="btn btn-outline btn-block" data-close-modal>Cancel</button>
+        <button class="btn btn-secondary btn-block" data-close-modal>Cancel</button>
         <button class="btn btn-primary btn-block" id="br-save">Create Branch</button>
       </div>
     `, { onMount: () => {
@@ -821,7 +821,7 @@ export async function renderSettings(root) {
         <div class="field"><label>Contact Person</label><input id="eb-contact" value="${escapeHtml(b.contact_person || '')}" /></div>
       </div>
       <div class="flex gap" style="margin-top:14px;">
-        <button class="btn btn-outline btn-block" data-close-modal>Cancel</button>
+        <button class="btn btn-secondary btn-block" data-close-modal>Cancel</button>
         <button class="btn btn-primary btn-block" id="eb-save">Save Changes</button>
       </div>
     `, { onMount: () => {
@@ -893,7 +893,7 @@ export async function renderSettings(root) {
         </div>
       </div>
       <div class="flex gap" style="margin-top:14px;">
-        <button class="btn btn-outline btn-block" data-close-modal>Cancel</button>
+        <button class="btn btn-secondary btn-block" data-close-modal>Cancel</button>
         <button class="btn btn-primary btn-block" id="eu-save">Save Changes</button>
       </div>
     `, { onMount: () => {

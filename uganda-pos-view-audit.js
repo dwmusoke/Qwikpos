@@ -72,10 +72,15 @@ export async function renderAuditLogs(root) {
   const allLogs = logs || [];
 
   root.innerHTML = `
-    <div class="view-header">
-      <div><h2>Audit Logs</h2><p class="sub">${allLogs.length} actions in the last 30 days</p></div>
-      <div class="flex gap">
-        <button class="btn btn-outline btn-sm" id="audit-export-csv">📤 Export CSV</button>
+    <div class="page-header">
+      <div class="page-header-info">
+        <h1>Audit Logs</h1>
+        <p>${allLogs.length} actions in the last 30 days</p>
+      </div>
+      <div class="page-header-actions">
+        <div class="flex gap">
+          <button class="btn btn-secondary btn-sm" id="audit-export-csv">📤 Export CSV</button>
+        </div>
       </div>
     </div>
     <div class="notif-filters" id="audit-tabs">
@@ -137,7 +142,7 @@ function renderLogList(logs, body) {
               <td><b>${escapeHtml(l.user_name)}</b><br><span class="text-muted" style="font-size:11px;">${escapeHtml(l.user_role || "")}</span></td>
               <td><span class="badge badge-${actionBadge(l.action)}">${ACTION_ICONS[l.action] || "📌"} ${escapeHtml(l.action)}</span></td>
               <td>${ENTITY_ICONS[l.entity_type] || "📌"} ${escapeHtml(l.entity_type)}<br><span class="text-muted" style="font-size:11px;">${escapeHtml(l.entity_name || l.entity_id?.slice(0, 8) || "")}</span></td>
-              <td style="max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${l.old_value || l.new_value ? `<button class="btn btn-outline btn-xs" data-log-detail="${l.id}">View</button>` : "—"}</td>
+              <td style="max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${l.old_value || l.new_value ? `<button class="btn btn-secondary btn-xs" data-log-detail="${l.id}">View</button>` : "—"}</td>
             </tr>
           `,
             )
@@ -272,7 +277,7 @@ function showLogDetail(log) {
       <b>Metadata:</b>
       <pre style="background:var(--bg); padding:10px; border-radius:6px; font-size:12px; overflow-x:auto; max-height:200px;">${escapeHtml(metaStr)}</pre>
     </div>
-    <button class="btn btn-outline btn-block" data-close-modal style="margin-top:16px;">Close</button>
+    <button class="btn btn-secondary btn-block" data-close-modal style="margin-top:16px;">Close</button>
   `,
     { large: true },
   );

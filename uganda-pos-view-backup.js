@@ -55,8 +55,8 @@ const BACKUP_TABLES = [
 
 export async function renderBackupRestore(root) {
   root.innerHTML = `
-    <div class="view-header">
-      <div><h2>Database Backup & Restore</h2><p class="sub">Export your business data or restore from a backup</p></div>
+    <div class="page-header">
+      <div class="page-header-info"><h1>Database Backup & Restore</h1><p>Export your business data or restore from a backup</p></div>
     </div>
 
     <div class="grid-2" style="gap:24px;">

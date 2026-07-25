@@ -57,8 +57,8 @@ export async function renderHRM(root) {
   const activeEmp = employeesCache.filter((e) => e.status === "active").length;
 
   root.innerHTML = `
-    <div class="view-header">
-      <div><h2 data-i18n="nav.hrm">Human Resource Management</h2><p class="sub">${activeEmp} active employees · ${departmentsCache.length} departments</p></div>
+    <div class="page-header">
+      <div class="page-header-info"><h1 data-i18n="nav.hrm">Human Resource Management</h1><p>${activeEmp} active employees · ${departmentsCache.length} departments</p></div>
     </div>
     <div class="notif-filters" id="hrm-tabs">
       ${[
@@ -147,8 +147,8 @@ function renderEmployees(body) {
                   <td><span class="badge badge-${e.status === "active" ? "green" : e.status === "on_leave" ? "yellow" : "red"}">${e.status}</span></td>
                   <td>${fmtMoney(e.salary || 0)}</td>
                   <td>
-                    <button class="btn btn-outline btn-xs" data-edit-emp="${e.id}">Edit</button>
-                    <button class="btn btn-outline btn-xs" data-view-emp="${e.id}">View</button>
+                    <button class="btn btn-secondary btn-xs" data-edit-emp="${e.id}">Edit</button>
+                    <button class="btn btn-secondary btn-xs" data-view-emp="${e.id}">View</button>
                   </td>
                 </tr>`;
               })
@@ -182,7 +182,7 @@ function renderDepartments(body) {
       <div class="card-title">
         <span>Departments & Designations</span>
         <div class="flex gap">
-          <button class="btn btn-outline btn-sm" id="hrm-add-desig">➕ Designation</button>
+          <button class="btn btn-secondary btn-sm" id="hrm-add-desig">➕ Designation</button>
           <button class="btn btn-primary btn-sm" id="hrm-add-dept">➕ Department</button>
         </div>
       </div>
@@ -202,7 +202,7 @@ function renderDepartments(body) {
                   <td><b>${escapeHtml(d.name)}</b></td>
                   <td>${escapeHtml(d.description || "—")}</td>
                   <td>${empCount}</td>
-                  <td><button class="btn btn-outline btn-xs" data-edit-dept="${d.id}">Edit</button></td>
+                  <td><button class="btn btn-secondary btn-xs" data-edit-dept="${d.id}">Edit</button></td>
                 </tr>`;
               })
               .join("")}
@@ -307,7 +307,7 @@ function renderHrmSettings(body) {
     <div class="grid-2">
       <div class="card">
         <div class="card-title">Leave Types</div>
-        <button class="btn btn-outline btn-sm" id="hrm-add-leave-type" style="margin-bottom:12px;">➕ Add Leave Type</button>
+        <button class="btn btn-secondary btn-sm" id="hrm-add-leave-type" style="margin-bottom:12px;">➕ Add Leave Type</button>
         ${
           leaveTypesCache
             .map(
@@ -395,7 +395,7 @@ function showEmployeeModal(existing) {
     </div>
     <div class="field"><label>Address</label><textarea id="emp-address" rows="2">${escapeHtml(existing?.address || "")}</textarea></div>
     <button class="btn btn-primary btn-block" id="emp-save">${isEdit ? "Update" : "Add"} Employee</button>
-    <button class="btn btn-outline btn-block" data-close-modal style="margin-top:8px;">Cancel</button>
+    <button class="btn btn-secondary btn-block" data-close-modal style="margin-top:8px;">Cancel</button>
   `,
     { large: true },
   );
@@ -462,7 +462,7 @@ function showDepartmentModal(existing) {
     <div class="field"><label>Name *</label><input id="dept-name" value="${escapeHtml(existing?.name || "")}" /></div>
     <div class="field"><label>Description</label><textarea id="dept-desc" rows="2">${escapeHtml(existing?.description || "")}</textarea></div>
     <button class="btn btn-primary btn-block" id="dept-save">${isEdit ? "Update" : "Create"}</button>
-    <button class="btn btn-outline btn-block" data-close-modal style="margin-top:8px;">Cancel</button>
+    <button class="btn btn-secondary btn-block" data-close-modal style="margin-top:8px;">Cancel</button>
   `);
 
   $("dept-save")?.addEventListener("click", async () => {
@@ -521,7 +521,7 @@ function showDesignationModal(existing) {
       <div class="field"><label>Max Salary</label><input id="desig-max" type="number" value="${existing?.max_salary || 0}" /></div>
     </div>
     <button class="btn btn-primary btn-block" id="desig-save">${isEdit ? "Update" : "Create"}</button>
-    <button class="btn btn-outline btn-block" data-close-modal style="margin-top:8px;">Cancel</button>
+    <button class="btn btn-secondary btn-block" data-close-modal style="margin-top:8px;">Cancel</button>
   `);
 
   $("desig-save")?.addEventListener("click", async () => {
@@ -596,7 +596,7 @@ function showAttendanceModal() {
     </div>
     <div class="field"><label>Notes</label><input id="att-notes" /></div>
     <button class="btn btn-primary btn-block" id="att-save">Save Attendance</button>
-    <button class="btn btn-outline btn-block" data-close-modal style="margin-top:8px;">Cancel</button>
+    <button class="btn btn-secondary btn-block" data-close-modal style="margin-top:8px;">Cancel</button>
   `);
 
   $("att-save")?.addEventListener("click", async () => {
@@ -655,7 +655,7 @@ function showLeaveRequestModal() {
     </div>
     <div class="field"><label>Reason</label><textarea id="leave-reason" rows="2"></textarea></div>
     <button class="btn btn-primary btn-block" id="leave-save">Submit Request</button>
-    <button class="btn btn-outline btn-block" data-close-modal style="margin-top:8px;">Cancel</button>
+    <button class="btn btn-secondary btn-block" data-close-modal style="margin-top:8px;">Cancel</button>
   `);
 
   $("leave-save")?.addEventListener("click", async () => {
@@ -701,7 +701,7 @@ function showPayrollModal() {
       This will create payroll records for all active employees based on their configured salary.
     </p>
     <button class="btn btn-primary btn-block" id="pay-run">💰 Generate Payroll</button>
-    <button class="btn btn-outline btn-block" data-close-modal style="margin-top:8px;">Cancel</button>
+    <button class="btn btn-secondary btn-block" data-close-modal style="margin-top:8px;">Cancel</button>
   `);
 
   $("pay-run")?.addEventListener("click", async () => {
@@ -755,7 +755,7 @@ function showLeaveTypeModal() {
       </div>
     </div>
     <button class="btn btn-primary btn-block" id="lt-save">Create</button>
-    <button class="btn btn-outline btn-block" data-close-modal style="margin-top:8px;">Cancel</button>
+    <button class="btn btn-secondary btn-block" data-close-modal style="margin-top:8px;">Cancel</button>
   `);
 
   $("lt-save")?.addEventListener("click", async () => {
@@ -801,7 +801,7 @@ function showEmployeeDetail(emp) {
       <div><b>Type:</b> ${(emp.employment_type || "").replace("_", " ")}</div>
       <div><b>Address:</b> ${escapeHtml(emp.address || "—")}</div>
     </div>
-    <button class="btn btn-outline btn-block" data-close-modal style="margin-top:16px;">Close</button>
+    <button class="btn btn-secondary btn-block" data-close-modal style="margin-top:16px;">Close</button>
   `,
     { large: true },
   );

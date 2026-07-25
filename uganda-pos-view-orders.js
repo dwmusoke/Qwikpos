@@ -5,9 +5,14 @@ let orderFilter = "all";
 
 export async function renderOrders(root) {
   root.innerHTML = `
-    <div class="view-header">
-      <div><h2>Orders</h2><p class="sub">Manage customer orders and fulfillments</p></div>
-      <button class="btn btn-primary" id="order-add-btn">+ New Order</button>
+    <div class="page-header">
+      <div class="page-header-info">
+        <h1>Orders</h1>
+        <p>Manage customer orders and fulfillments</p>
+      </div>
+      <div class="page-header-actions">
+        <button class="btn btn-primary" id="order-add-btn">+ New Order</button>
+      </div>
     </div>
     <div class="notif-filters" id="order-filters">
       ${["all", "pending", "processing", "completed", "cancelled"].map((f) =>
@@ -56,8 +61,8 @@ async function loadOrders() {
       <td style="font-size:12px;color:var(--text-muted);">${fmtDate(o.created_at)}</td>
       <td>
         <div style="display:flex;gap:4px;flex-wrap:wrap;">
-          <button class="btn btn-sm btn-outline" data-action="view" data-id="${o.id}">View</button>
-          <button class="btn btn-sm btn-outline" data-action="edit" data-id="${o.id}">Edit</button>
+          <button class="btn btn-sm btn-secondary" data-action="view" data-id="${o.id}">View</button>
+          <button class="btn btn-sm btn-secondary" data-action="edit" data-id="${o.id}">Edit</button>
           <button class="btn btn-sm btn-danger" data-action="delete" data-id="${o.id}">Delete</button>
         </div>
       </td>
@@ -155,10 +160,10 @@ function viewOrder(order) {
       </div>
     </div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;">
-      <button class="btn btn-outline" data-action="processing" data-id="${order.id}">Mark Processing</button>
+      <button class="btn btn-secondary" data-action="processing" data-id="${order.id}">Mark Processing</button>
       <button class="btn btn-primary" data-action="completed" data-id="${order.id}">Mark Completed</button>
       <button class="btn btn-danger" data-action="cancelled" data-id="${order.id}">Cancel</button>
-      <button class="btn btn-outline" data-action="delete" data-id="${order.id}" style="color:var(--danger);">Delete</button>
+      <button class="btn btn-secondary" data-action="delete" data-id="${order.id}" style="color:var(--danger);">Delete</button>
     </div>
   `);
 
@@ -205,7 +210,7 @@ function editOrder(order) {
       </div>
       <div class="field"><label>Total (${escapeHtml(STATE.business.base_currency)})</label><input id="oe-total" type="number" step="0.01" min="0" value="${order.total_base || 0}" /></div>
       <div class="flex gap" style="margin-top:14px;">
-        <button class="btn btn-outline btn-block" data-close-modal>Cancel</button>
+        <button class="btn btn-secondary btn-block" data-close-modal>Cancel</button>
         <button class="btn btn-primary btn-block" type="submit">Save Changes</button>
       </div>
     </form>

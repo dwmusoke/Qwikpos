@@ -57,11 +57,16 @@ export async function renderLeads(root) {
   leadsCache = leads || [];
 
   root.innerHTML = `
-    <div class="view-header">
-      <div><h2 data-i18n="nav.leads">Lead Management</h2><p class="sub">${leadsCache.length} leads in pipeline</p></div>
-      <div class="flex gap">
-        <button class="btn btn-outline btn-sm" id="leads-export-csv">📤 Export</button>
-        <button class="btn btn-primary btn-sm" id="leads-add">➕ New Lead</button>
+    <div class="page-header">
+      <div class="page-header-info">
+        <h1 data-i18n="nav.leads">Lead Management</h1>
+        <p>${leadsCache.length} leads in pipeline</p>
+      </div>
+      <div class="page-header-actions">
+        <div class="flex gap">
+          <button class="btn btn-secondary btn-sm" id="leads-export-csv">📤 Export</button>
+          <button class="btn btn-primary btn-sm" id="leads-add">➕ New Lead</button>
+        </div>
       </div>
     </div>
     <div class="notif-filters" id="leads-tabs">
@@ -186,8 +191,8 @@ function renderLeadList(body) {
               <td><span class="badge ${PRIORITY_BADGES[l.priority] || "badge-gray"}">${l.priority}</span></td>
               <td>${fmtMoney(l.value || 0)}</td>
               <td>
-                <button class="btn btn-outline btn-xs" data-edit-lead="${l.id}">Edit</button>
-                <button class="btn btn-outline btn-xs" data-view-lead="${l.id}">View</button>
+                <button class="btn btn-secondary btn-xs" data-edit-lead="${l.id}">Edit</button>
+                <button class="btn btn-secondary btn-xs" data-view-lead="${l.id}">View</button>
               </td>
             </tr>
           `,
@@ -370,7 +375,7 @@ function showLeadModal(existing) {
     <div class="field"><label>Next Follow-up</label><input id="lead-followup" type="datetime-local" value="${existing?.next_followup_at ? new Date(existing.next_followup_at).toISOString().slice(0, 16) : ""}" /></div>
     <div class="field"><label>Notes</label><textarea id="lead-notes" rows="3">${escapeHtml(existing?.notes || "")}</textarea></div>
     <button class="btn btn-primary btn-block" id="lead-save">${isEdit ? "Update" : "Create"} Lead</button>
-    <button class="btn btn-outline btn-block" data-close-modal style="margin-top:8px;">Cancel</button>
+    <button class="btn btn-secondary btn-block" data-close-modal style="margin-top:8px;">Cancel</button>
   `,
     { large: true },
   );
@@ -457,7 +462,7 @@ async function showLeadDetail(lead) {
     <div style="margin-top:16px;">
       <div style="display:flex; justify-content:space-between; align-items:center;">
         <b>Activities</b>
-        <button class="btn btn-outline btn-xs" id="lead-add-activity">➕ Add</button>
+        <button class="btn btn-secondary btn-xs" id="lead-add-activity">➕ Add</button>
       </div>
       ${
         (activities || []).length
@@ -480,7 +485,7 @@ async function showLeadDetail(lead) {
     </div>
 
     <div style="display:flex; gap:8px; margin-top:16px;">
-      <button class="btn btn-outline btn-block" data-close-modal>Close</button>
+      <button class="btn btn-secondary btn-block" data-close-modal>Close</button>
       <button class="btn btn-primary btn-block" id="lead-edit-btn">Edit Lead</button>
     </div>
   `,
@@ -512,7 +517,7 @@ function showActivityModal(lead) {
     </div>
     <div class="field"><label>Description *</label><textarea id="act-desc" rows="3"></textarea></div>
     <button class="btn btn-primary btn-block" id="act-save">Save Activity</button>
-    <button class="btn btn-outline btn-block" data-close-modal style="margin-top:8px;">Cancel</button>
+    <button class="btn btn-secondary btn-block" data-close-modal style="margin-top:8px;">Cancel</button>
   `);
 
   $("act-save")?.addEventListener("click", async () => {

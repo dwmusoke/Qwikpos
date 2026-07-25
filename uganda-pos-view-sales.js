@@ -13,8 +13,8 @@ let activeTab = 'list';
 
 export async function renderSalesModule(root) {
   root.innerHTML = `
-    <div class="view-header">
-      <div><h2 data-i18n="nav.sales">Sales</h2><p class="sub">Manage sales transactions and returns</p></div>
+    <div class="page-header">
+      <div class="page-header-info"><h1 data-i18n="nav.sales">Sales</h1><p>Manage sales transactions and returns</p></div>
     </div>
     <div class="notif-filters" id="sales-tabs">
       ${[
@@ -54,7 +54,7 @@ async function renderSalesListTab(body) {
         <div class="field"><label>To</label><input type="date" id="sl-to" value="${new Date().toISOString().slice(0, 10)}" /></div>
         <div class="field"><label>Status</label><select id="sl-status"><option value="">All</option><option value="paid">Paid</option><option value="partial">Partial</option><option value="credit">Credit</option><option value="unpaid">Unpaid</option></select></div>
         <button class="btn btn-primary" id="sl-run">Run</button>
-        <button class="btn btn-outline" id="sl-export">Export CSV</button>
+        <button class="btn btn-secondary" id="sl-export">Export CSV</button>
       </div>
     </div>
     <div id="sl-output"><div class="empty-state">Loading…</div></div>`;
@@ -160,9 +160,9 @@ async function renderSalesListTab(body) {
       <div class="card-title" style="margin-top:12px;">Payments</div>
       ${(sale.payments || []).map((p) => `<div class="summary-row"><span style="text-transform:capitalize;">${escapeHtml(p.method)}</span><span>${fmtMoney(p.amount_base)}</span></div>`).join('')}
       <div class="flex gap" style="margin-top:14px;flex-wrap:wrap;">
-        <button class="btn btn-outline" data-print-receipt="${sale.id}">🖨️ Print Receipt</button>
-        <button class="btn btn-outline" data-download-csv="${sale.id}">📥 Download CSV</button>
-        <button class="btn btn-outline" data-close-modal>Close</button>
+        <button class="btn btn-secondary" data-print-receipt="${sale.id}">🖨️ Print Receipt</button>
+        <button class="btn btn-secondary" data-download-csv="${sale.id}">📥 Download CSV</button>
+        <button class="btn btn-secondary" data-close-modal>Close</button>
       </div>
     `, {
       large: true,
@@ -223,7 +223,7 @@ async function renderReturnsTab(body) {
             <td>${fmtMoney(r.refund_amount)}</td>
             <td style="text-transform:capitalize;">${escapeHtml((r.refund_method || 'cash').replace('_', ' '))}</td>
             <td><span class="badge ${r.status === 'completed' ? 'badge-green' : r.status === 'rejected' ? 'badge-red' : 'badge-yellow'}">${r.status}</span></td>
-            <td>${r.status === 'pending' ? `<button class="btn btn-outline btn-sm" data-approve-ret="${r.id}">Approve</button>` : ''}</td>
+            <td>${r.status === 'pending' ? `<button class="btn btn-secondary btn-sm" data-approve-ret="${r.id}">Approve</button>` : ''}</td>
           </tr>`).join('')}
         </tbody></table>
       </div></div>` : '<div class="card"><div class="empty-state">No sales returns yet.</div></div>';
@@ -274,7 +274,7 @@ async function initiateReturn(saleId) {
          <div class="field"><label>Refund Method</label><select id="ret-method"><option value="cash">Cash</option><option value="mobile_money">Mobile Money</option><option value="bank">Bank Transfer</option><option value="card">Card</option><option value="exchange">Exchange</option></select></div>
          <button class="btn btn-primary btn-block" id="ret-submit" style="margin-top:14px;">Submit Return</button>`}
     </div>
-    <button class="btn btn-outline btn-block" data-close-modal style="margin-top:8px;">Cancel</button>
+    <button class="btn btn-secondary btn-block" data-close-modal style="margin-top:8px;">Cancel</button>
   `, {
     large: !!sale,
     onMount: () => {

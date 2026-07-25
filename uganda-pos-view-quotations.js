@@ -47,12 +47,14 @@ export async function renderQuotations(root) {
   quotations.forEach((q) => { counts[bucket(q)] = (counts[bucket(q)] || 0) + 1; });
 
   root.innerHTML = `
-    <div class="view-header">
-      <div>
-        <h2>Quotations</h2>
-        <p class="sub">Price quotes that haven't been paid or fiscalised yet. Convert one to a sale once the customer confirms.</p>
+    <div class="page-header">
+      <div class="page-header-info">
+        <h1>Quotations</h1>
+        <p>Price quotes that haven't been paid or fiscalised yet. Convert one to a sale once the customer confirms.</p>
       </div>
-      <button class="btn btn-primary" id="new-quote-btn">+ New Quotation</button>
+      <div class="page-header-actions">
+        <button class="btn btn-primary" id="new-quote-btn">+ New Quotation</button>
+      </div>
     </div>
 
     <div class="category-chips" style="margin-bottom:14px;">
@@ -85,8 +87,8 @@ export async function renderQuotations(root) {
         <td>${statusBadge(b, convertedMap[q.converted_sale_id])}</td>
         <td>${new Date(q.created_at).toLocaleDateString('en-UG')}</td>
         <td class="flex gap">
-          <button class="btn btn-outline btn-sm" data-view="${q.id}">View</button>
-          <button class="btn btn-outline btn-sm" data-print="${q.id}">Print</button>
+          <button class="btn btn-secondary btn-sm" data-view="${q.id}">View</button>
+          <button class="btn btn-secondary btn-sm" data-print="${q.id}">Print</button>
           ${b === 'open' ? `<button class="btn btn-primary btn-sm" data-convert="${q.id}">Convert to Sale</button>` : ''}
           ${b === 'open' ? `<button class="btn btn-ghost btn-sm" data-void="${q.id}">Void</button>` : ''}
         </td>
@@ -106,7 +108,7 @@ export async function renderQuotations(root) {
         <div class="card-title" style="margin-top:12px;">Items</div>
         <div class="table-wrap"><table><thead><tr><th>Product</th><th>Qty</th><th>Price</th><th>Total</th></tr></thead>
           <tbody>${(q.sale_items || []).map((it) => `<tr><td>${escapeHtml(it.product_name)}</td><td>${it.quantity}</td><td>${fmtMoney(it.unit_price)}</td><td>${fmtMoney(it.line_total)}</td></tr>`).join('')}</tbody></table></div>
-        <button class="btn btn-outline btn-block" data-close-modal style="margin-top:14px;">Close</button>
+        <button class="btn btn-secondary btn-block" data-close-modal style="margin-top:14px;">Close</button>
       `, { large: true });
     }));
     qsa('[data-print]', tbody).forEach((b) => b.addEventListener('click', () => printQuotation(b.dataset.print)));
@@ -185,10 +187,10 @@ async function openConvertModal(quotationSummary) {
     <div class="modal-title-row"><h3>Convert ${escapeHtml(quotation.sale_number)} to Sale</h3></div>
     <div class="summary-row total" style="margin-bottom:14px;"><span>Amount Due</span><span>${fmtMoneyRaw(grandTotal, currency)}</span></div>
     <div id="pay-rows">${renderRows()}</div>
-    <button class="btn btn-outline btn-sm" id="add-pay-row" type="button" style="margin-bottom:14px;">+ Split Payment</button>
+    <button class="btn btn-secondary btn-sm" id="add-pay-row" type="button" style="margin-bottom:14px;">+ Split Payment</button>
     <div class="summary-row" id="pay-balance-row"></div>
     <div class="flex gap" style="margin-top:16px;">
-      <button class="btn btn-outline btn-block" data-close-modal>Cancel</button>
+      <button class="btn btn-secondary btn-block" data-close-modal>Cancel</button>
       <button class="btn btn-primary btn-block" id="confirm-convert-btn">Confirm &amp; Complete Sale</button>
     </div>
   `, {

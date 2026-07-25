@@ -234,23 +234,25 @@ export async function renderBI(root) {
   const tabLabels = { executive: "Executive", insights: "Insights", forecasting: "Forecasting", sales: "Sales", profitability: "Profitability", financial: "Financial", tax: "Tax", inventory: "Inventory", customers: "Customers", suppliers: "Suppliers", operations: "Operations" };
 
   root.innerHTML = `
-    <div class="view-header">
-      <div>
-        <h2>📊 Business Intelligence</h2>
-        <p class="sub">${STATE.business.name} · ${baseCurrency()} · Last 90 days</p>
+    <div class="page-header">
+      <div class="page-header-info">
+        <h1>📊 Business Intelligence</h1>
+        <p>${STATE.business.name} · ${baseCurrency()} · Last 90 days</p>
       </div>
-      <div style="display:flex;gap:8px;align-items:center">
-        <div style="position:relative">
-          <select id="bi-group-select" style="border-radius:var(--radius-sm);border:1px solid var(--border);padding:8px 14px;background:var(--surface);font-weight:600;font-size:13px;cursor:pointer">
-            ${Object.keys(biGroups).map(g => `<option value="${g}" ${currentGroup === g ? "selected" : ""}>${g}</option>`).join("")}
-          </select>
+      <div class="page-header-actions">
+        <div style="display:flex;gap:8px;align-items:center">
+          <div style="position:relative">
+            <select id="bi-group-select" style="border-radius:var(--radius-sm);border:1px solid var(--border);padding:8px 14px;background:var(--surface);font-weight:600;font-size:13px;cursor:pointer">
+              ${Object.keys(biGroups).map(g => `<option value="${g}" ${currentGroup === g ? "selected" : ""}>${g}</option>`).join("")}
+            </select>
+          </div>
+          <div style="display:flex;gap:4px;flex-wrap:wrap" id="bi-sub-tabs">
+            ${biGroups[currentGroup].map(t =>
+              `<button class="admin-tab ${biTab===t?"active":""}" data-bitab="${t}">${tabLabels[t]}</button>`
+            ).join("")}
+          </div>
+          <button class="btn btn-secondary btn-sm" id="bi-refresh">🔄</button>
         </div>
-        <div style="display:flex;gap:4px;flex-wrap:wrap" id="bi-sub-tabs">
-          ${biGroups[currentGroup].map(t =>
-            `<button class="admin-tab ${biTab===t?"active":""}" data-bitab="${t}">${tabLabels[t]}</button>`
-          ).join("")}
-        </div>
-        <button class="btn btn-outline btn-sm" id="bi-refresh">🔄</button>
       </div>
     </div>
     <div id="bi-content"></div>

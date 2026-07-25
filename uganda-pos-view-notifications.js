@@ -23,14 +23,16 @@ export async function renderNotifications(root) {
   await loadNotifications();
 
   root.innerHTML = `
-    <div class="view-header">
-      <div>
-        <h2>Notifications</h2>
-        <p class="sub">${STATE.unreadCount} unread of ${STATE.notifications.length} total</p>
+    <div class="page-header">
+      <div class="page-header-info">
+        <h1>Notifications</h1>
+        <p>${STATE.unreadCount} unread of ${STATE.notifications.length} total</p>
       </div>
-      <div class="flex gap">
-        <button class="btn btn-outline" id="notif-mark-all-btn">✓ Mark all read</button>
-        <button class="btn btn-outline" id="notif-clear-btn">🗑️ Clear all</button>
+      <div class="page-header-actions">
+        <div class="flex gap">
+          <button class="btn btn-secondary" id="notif-mark-all-btn">✓ Mark all read</button>
+          <button class="btn btn-secondary" id="notif-clear-btn">🗑️ Clear all</button>
+        </div>
       </div>
     </div>
 
@@ -115,7 +117,7 @@ function renderNotifList() {
         ${n.body ? `<div class="notif-full-text">${escapeHtml(n.body)}</div>` : ""}
         <div class="notif-full-time">${fmtDate(n.created_at)}</div>
       </div>
-      ${n.route ? `<button class="btn btn-sm btn-outline" data-notif-action="${n.id}" data-notif-route="${n.route}">View</button>` : ""}
+      ${n.route ? `<button class="btn btn-sm btn-secondary" data-notif-action="${n.id}" data-notif-route="${n.route}">View</button>` : ""}
       ${!n.is_read ? `<div class="unread-dot"></div>` : ""}
     </div>
   `,

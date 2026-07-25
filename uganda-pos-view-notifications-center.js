@@ -39,9 +39,14 @@ export async function renderNotificationsCenter(root) {
   const allLog = log || [];
 
   root.innerHTML = `
-    <div class="view-header">
-      <div><h2>Notifications Center</h2><p class="sub">${allTemplates.length} templates · ${allLog.length} sent</p></div>
-      <button class="btn btn-primary btn-sm" id="nc-add-template">➕ New Template</button>
+    <div class="page-header">
+      <div class="page-header-info">
+        <h1>Notifications Center</h1>
+        <p>${allTemplates.length} templates · ${allLog.length} sent</p>
+      </div>
+      <div class="page-header-actions">
+        <button class="btn btn-primary btn-sm" id="nc-add-template">➕ New Template</button>
+      </div>
     </div>
     <div class="notif-filters" id="nc-tabs">
       ${[
@@ -101,8 +106,8 @@ function renderTemplates(templates, body) {
               <td>${escapeHtml(t.subject || "—")}</td>
               <td><span class="badge badge-${t.is_active ? "green" : "gray"}">${t.is_active ? "Active" : "Disabled"}</span></td>
               <td>
-                <button class="btn btn-outline btn-xs" data-edit-template="${t.id}">Edit</button>
-                <button class="btn btn-outline btn-xs" data-delete-template="${t.id}" style="color:var(--danger);">Delete</button>
+                <button class="btn btn-secondary btn-xs" data-edit-template="${t.id}">Edit</button>
+                <button class="btn btn-secondary btn-xs" data-delete-template="${t.id}" style="color:var(--danger);">Delete</button>
               </td>
             </tr>
           `,
@@ -295,7 +300,7 @@ function showTemplateModal(existing, templates) {
       <p class="help-text">Use {{customer_name}}, {{amount}}, {{invoice_number}}, etc. as placeholders.</p>
     </div>
     <button class="btn btn-primary btn-block" id="tmpl-save">${isEdit ? "Update" : "Create"} Template</button>
-    <button class="btn btn-outline btn-block" data-close-modal style="margin-top:8px;">Cancel</button>
+    <button class="btn btn-secondary btn-block" data-close-modal style="margin-top:8px;">Cancel</button>
   `,
     { large: true },
   );

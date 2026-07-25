@@ -5,9 +5,14 @@ let activeTab = "coupons";
 
 export async function renderCoupons(root) {
   root.innerHTML = `
-    <div class="view-header">
-      <div><h2>Coupons &amp; Gift Cards</h2><p class="sub">Manage discounts, promotional codes, and gift cards</p></div>
-      <button class="btn btn-primary" id="coupon-add-btn">+ Create New</button>
+    <div class="page-header">
+      <div class="page-header-info">
+        <h1>Coupons &amp; Gift Cards</h1>
+        <p>Manage discounts, promotional codes, and gift cards</p>
+      </div>
+      <div class="page-header-actions">
+        <button class="btn btn-primary" id="coupon-add-btn">+ Create New</button>
+      </div>
     </div>
     <div class="notif-filters" id="coupon-tabs">
       <button class="chip ${activeTab === "coupons" ? "active" : ""}" data-tab="coupons">🎟️ Coupons</button>

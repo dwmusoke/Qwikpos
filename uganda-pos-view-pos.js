@@ -111,7 +111,7 @@ export async function renderPOS(root) {
       <div class="pos-catalog">
         <div class="pos-search-row">
           <input id="pos-search" data-i18n-placeholder="pos.search" placeholder="Search product, SKU or scan barcode…" autocomplete="off" />
-          <button class="btn btn-outline" id="pos-scan-btn" title="Focus for barcode scanner">📷</button>
+          <button class="btn btn-secondary" id="pos-scan-btn" title="Focus for barcode scanner">📷</button>
         </div>
         <div class="category-chips" id="pos-categories">
           <button class="chip active" data-cat="all">All</button>
@@ -144,7 +144,7 @@ export async function renderPOS(root) {
               <label>👤 Customer</label>
               <div style="display:flex;gap:6px;">
                 <input type="text" id="pos-customer-input" placeholder="Search or type new name…" autocomplete="off" value="${(STATE.customers.find(c => c.id === STATE.cartCustomerId)?.name) || ""}" style="flex:1;" />
-                <button class="btn btn-outline btn-sm" id="pos-customer-add-btn" title="Add new customer" style="padding:0 10px;">+ New</button>
+                <button class="btn btn-secondary btn-sm" id="pos-customer-add-btn" title="Add new customer" style="padding:0 10px;">+ New</button>
               </div>
               <div id="pos-customer-dropdown" style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-xs);max-height:160px;overflow-y:auto;z-index:100;box-shadow:var(--shadow-md);"></div>
             </div>
@@ -161,7 +161,7 @@ export async function renderPOS(root) {
               <label>🎟️ Coupon Code</label>
               <div style="display:flex;gap:6px;">
                 <input type="text" id="pos-coupon-input" placeholder="Enter coupon code" autocomplete="off" value="${STATE.cartCouponCode || ""}" style="flex:1;text-transform:uppercase;" />
-                <button class="btn btn-outline btn-sm" id="pos-coupon-apply-btn" style="padding:0 10px;">Apply</button>
+                <button class="btn btn-secondary btn-sm" id="pos-coupon-apply-btn" style="padding:0 10px;">Apply</button>
               </div>
               <div id="pos-coupon-msg" style="font-size:12px;margin-top:4px;"></div>
             </div>
@@ -450,7 +450,7 @@ async function openAddCustomerModal() {
     <div class="field"><label>Address</label><input id="ac-address" placeholder="Street, area, city" /></div>
     <div class="field"><label>Notes</label><input id="ac-notes" placeholder="Any notes about this customer" /></div>
     <div class="flex gap" style="margin-top:16px;">
-      <button class="btn btn-outline btn-block" data-close-modal>Cancel</button>
+      <button class="btn btn-secondary btn-block" data-close-modal>Cancel</button>
       <button class="btn btn-primary btn-block" id="ac-save-btn">💾 Save Customer</button>
     </div>
   `, {
@@ -589,7 +589,7 @@ function openQtyPicker(productId) {
         <button data-act="inc">+</button>
       </div>
       <div class="qp-actions">
-        <button class="btn btn-outline" data-act="cancel">Cancel</button>
+        <button class="btn btn-secondary" data-act="cancel">Cancel</button>
         <button class="btn btn-primary" data-act="add">${existing ? "Update Cart" : "Add to Cart"}</button>
       </div>
     </div>
@@ -756,7 +756,7 @@ function renderCart() {
     <button class="btn btn-primary btn-block" id="pos-checkout-btn" style="margin-top:10px;font-size:15px;padding:14px;" ${!lines.length ? "disabled" : ""}>
       ${isQuote ? `📄 Save Quotation` : `💳 Pay ${fmtMoneyRaw(finalTotal, posSaleCurrency)}`}
     </button>
-    ${!isQuote ? `<button class="btn btn-outline btn-block" id="pos-hold-btn" style="margin-top:8px;" ${!lines.length ? "disabled" : ""}>Hold Sale</button>` : ""}
+    ${!isQuote ? `<button class="btn btn-secondary btn-block" id="pos-hold-btn" style="margin-top:8px;" ${!lines.length ? "disabled" : ""}>Hold Sale</button>` : ""}
   `;
 
   const discountInputEl = $("pos-discount-input");
@@ -861,12 +861,12 @@ function openCheckoutModal() {
     <div style="margin-bottom:14px;">
       <div style="font-size:13px;font-weight:600;margin-bottom:8px;">Payment Method</div>
       <div id="pay-rows">${renderRows()}</div>
-      <button class="btn btn-outline btn-sm" id="add-pay-row" type="button" style="margin-top:8px;">+ Split Payment</button>
+      <button class="btn btn-secondary btn-sm" id="add-pay-row" type="button" style="margin-top:8px;">+ Split Payment</button>
       <div class="summary-row" id="pay-balance-row" style="margin-top:8px;"></div>
     </div>
 
     <div class="flex gap" style="margin-top:16px;">
-      <button class="btn btn-outline btn-block" data-close-modal>Cancel</button>
+      <button class="btn btn-secondary btn-block" data-close-modal>Cancel</button>
       <button class="btn btn-primary btn-block" id="confirm-checkout-btn">✓ Confirm &amp; Create Order</button>
     </div>
   `,
@@ -1284,10 +1284,10 @@ function showOrderSuccess(sale) {
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
       <button class="btn btn-primary" id="order-cta-view" style="display:flex;align-items:center;justify-content:center;gap:6px;">👁️ View Order</button>
-      <button class="btn btn-outline" id="order-cta-print" style="display:flex;align-items:center;justify-content:center;gap:6px;">🖨️ Print Receipt</button>
-      <button class="btn btn-outline" id="order-cta-edit" style="display:flex;align-items:center;justify-content:center;gap:6px;">✏️ Edit Order</button>
-      <button class="btn btn-outline" id="order-cta-return" style="display:flex;align-items:center;justify-content:center;gap:6px;">🔄 Add Return</button>
-      <button class="btn btn-outline" id="order-cta-sms" style="display:flex;align-items:center;justify-content:center;gap:6px;">📱 Send SMS</button>
+      <button class="btn btn-secondary" id="order-cta-print" style="display:flex;align-items:center;justify-content:center;gap:6px;">🖨️ Print Receipt</button>
+      <button class="btn btn-secondary" id="order-cta-edit" style="display:flex;align-items:center;justify-content:center;gap:6px;">✏️ Edit Order</button>
+      <button class="btn btn-secondary" id="order-cta-return" style="display:flex;align-items:center;justify-content:center;gap:6px;">🔄 Add Return</button>
+      <button class="btn btn-secondary" id="order-cta-sms" style="display:flex;align-items:center;justify-content:center;gap:6px;">📱 Send SMS</button>
       <button class="btn btn-danger" id="order-cta-delete" style="display:flex;align-items:center;justify-content:center;gap:6px;">🗑️ Delete</button>
     </div>
     <div style="margin-top:12px;">
@@ -1368,8 +1368,8 @@ export function printableModal(sale, opts = {}) {
     <div class="modal-title-row"><h3>${escapeHtml(docLabel === "QUOTATION" ? "Quotation" : "Receipt")}</h3></div>
     ${receiptHtml(sale, opts)}
     <div class="flex gap" style="margin-top:16px;">
-      <button class="btn btn-outline btn-block" data-close-modal>Close</button>
-      ${showSendSms ? `<button class="btn btn-outline" id="send-sms-btn" title="Send receipt via SMS">📱 SMS</button>` : ""}
+      <button class="btn btn-secondary btn-block" data-close-modal>Close</button>
+      ${showSendSms ? `<button class="btn btn-secondary" id="send-sms-btn" title="Send receipt via SMS">📱 SMS</button>` : ""}
       <button class="btn btn-primary btn-block" id="print-receipt-btn">Print</button>
     </div>
   `,

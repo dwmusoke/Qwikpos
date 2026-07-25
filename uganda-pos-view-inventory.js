@@ -28,10 +28,10 @@ let invTab = "products";
 
 export async function renderInventory(root) {
   root.innerHTML = `
-    <div class="view-header">
-      <div>
-        <h2>Inventory</h2>
-        <p class="sub">${STATE.products.length} products · ${STATE.categories.length} categories · ${STATE.branches.length} branches</p>
+    <div class="page-header">
+      <div class="page-header-info">
+        <h1>Inventory</h1>
+        <p>${STATE.products.length} products · ${STATE.categories.length} categories · ${STATE.branches.length} branches</p>
       </div>
     </div>
 
@@ -85,10 +85,10 @@ function renderProductsTab(el) {
       <div class="pos-search-row" style="flex:1;min-width:200px;max-width:380px">
         <input id="inv-search" placeholder="Search products, SKU or scan barcode…" />
       </div>
-      <button class="btn btn-outline" id="manage-categories-btn">🏷️ Categories</button>
-      <button class="btn btn-outline" id="import-products-btn">📥 Import CSV</button>
-      <button class="btn btn-outline" id="bulk-labels-btn">🏷️ Print Labels</button>
-      <button class="btn btn-outline" id="scan-camera-btn" title="Scan barcode with camera">📷 Scan</button>
+      <button class="btn btn-secondary" id="manage-categories-btn">🏷️ Categories</button>
+      <button class="btn btn-secondary" id="import-products-btn">📥 Import CSV</button>
+      <button class="btn btn-secondary" id="bulk-labels-btn">🏷️ Print Labels</button>
+      <button class="btn btn-secondary" id="scan-camera-btn" title="Scan barcode with camera">📷 Scan</button>
       <button class="btn btn-primary" id="add-product-btn">+ Add Product</button>
     </div>
 
@@ -160,13 +160,13 @@ function renderProductTable() {
         <td>${fmtMoney(p.selling_price)}</td>
         <td><span class="badge ${low ? "badge-red" : "badge-green"}">${stock} ${escapeHtml(p.unit || "pc")}</span></td>
         <td><span class="badge badge-blue">${escapeHtml(p.tax_category_code || "VAT")}</span></td>
-        ${efrisOn ? `<td>${p.efris_registered_at ? '<span class="badge badge-green">registered</span>' : `<button class="btn btn-outline btn-sm" data-efris-register="${p.id}">Register</button>`}</td>` : ""}
+        ${efrisOn ? `<td>${p.efris_registered_at ? '<span class="badge badge-green">registered</span>' : `<button class="btn btn-secondary btn-sm" data-efris-register="${p.id}">Register</button>`}</td>` : ""}
         <td>${expired ? `<span class="badge badge-red">EXPIRED</span>` : expiringSoon ? `<span class="badge badge-yellow">${Math.ceil((new Date(p.expiry_date) - new Date()) / (1000*60*60*24))}d</span>` : p.expiry_date ? `<span style="font-size:12px;color:var(--text-muted)">${p.expiry_date}</span>` : `<span style="font-size:12px;color:var(--text-faint)">—</span>`}</td>
         <td>${p.has_batches ? `<span class="badge badge-blue">tracked</span>` : `<span style="font-size:12px;color:var(--text-faint)">—</span>`}</td>
         <td class="flex gap">
-          <button class="btn btn-outline btn-sm" data-edit="${p.id}">Edit</button>
-          <button class="btn btn-outline btn-sm" data-stock="${p.id}">Stock</button>
-          <button class="btn btn-outline btn-sm" data-label="${p.id}">Label</button>
+          <button class="btn btn-secondary btn-sm" data-edit="${p.id}">Edit</button>
+          <button class="btn btn-secondary btn-sm" data-stock="${p.id}">Stock</button>
+          <button class="btn btn-secondary btn-sm" data-label="${p.id}">Label</button>
         </td>
       </tr>`;
     })
@@ -276,7 +276,7 @@ function openProductModal(productId) {
         : ""
     }
     <div class="flex gap" style="margin-top:14px;">
-      <button class="btn btn-outline btn-block" data-close-modal>Cancel</button>
+      <button class="btn btn-secondary btn-block" data-close-modal>Cancel</button>
       <button class="btn btn-primary btn-block" id="save-product-btn">${editing ? "Save Changes" : "Add Product"}</button>
     </div>
   `,
@@ -427,7 +427,7 @@ function openStockModal(productId) {
     <div class="field"><label>Batch Number (optional)</label>
       <div style="display:flex;gap:8px">
         <select id="sm-batch" style="flex:1"><option value="">— No batch —</option></select>
-        <button class="btn btn-outline btn-sm" id="sm-new-batch-btn" style="white-space:nowrap">+ New</button>
+        <button class="btn btn-secondary btn-sm" id="sm-new-batch-btn" style="white-space:nowrap">+ New</button>
       </div>
       <p class="help-text">Assign to a batch for expiry tracking. Leave empty for general stock.</p>
     </div>
@@ -437,7 +437,7 @@ function openStockModal(productId) {
     </div>
     <div class="field"><label>Notes</label><input id="sm-notes" placeholder="Optional reference / reason" /></div>
     <div class="flex gap" style="margin-top:14px;">
-      <button class="btn btn-outline btn-block" data-close-modal>Cancel</button>
+      <button class="btn btn-secondary btn-block" data-close-modal>Cancel</button>
       <button class="btn btn-primary btn-block" id="save-stock-btn">Save</button>
     </div>
   `,
@@ -668,8 +668,8 @@ async function renderBatchesTab(el) {
         <td>${fmtMoney(b.cost_price * b.quantity)}</td>
         <td>${statusHtml}</td>
         <td class="flex gap">
-          <button class="btn btn-outline btn-sm" data-edit-batch="${b.id}">Edit</button>
-          <button class="btn btn-outline btn-sm btn-danger" data-del-batch="${b.id}" data-batch-name="${escapeHtml(b.batch_number)}" data-batch-qty="${b.quantity}">Del</button>
+          <button class="btn btn-secondary btn-sm" data-edit-batch="${b.id}">Edit</button>
+          <button class="btn btn-secondary btn-sm btn-danger" data-del-batch="${b.id}" data-batch-name="${escapeHtml(b.batch_number)}" data-batch-qty="${b.quantity}">Del</button>
         </td>
       </tr>`;
     }).join("");
@@ -709,7 +709,7 @@ function openBatchModal(batchId) {
     <div class="field"><label>Quantity</label><input type="number" step="0.01" id="bm-qty" value="0" /></div>
     <div class="field"><label>Notes</label><input id="bm-notes" placeholder="Optional notes" /></div>
     <div class="flex gap" style="margin-top:14px;">
-      <button class="btn btn-outline btn-block" data-close-modal>Cancel</button>
+      <button class="btn btn-secondary btn-block" data-close-modal>Cancel</button>
       <button class="btn btn-primary btn-block" id="bm-save">${editing ? "Save Changes" : "Add Batch"}</button>
     </div>
   `, {
@@ -810,7 +810,7 @@ function openImportModal() {
     </div>
     <div id="csv-preview" style="max-height:240px;overflow-y:auto;margin-top:10px"></div>
     <div class="flex gap" style="margin-top:14px;">
-      <button class="btn btn-outline btn-block" data-close-modal>Cancel</button>
+      <button class="btn btn-secondary btn-block" data-close-modal>Cancel</button>
       <button class="btn btn-primary btn-block" id="csv-import-btn" disabled>Import</button>
     </div>
   `,
@@ -945,7 +945,7 @@ function openCameraScanner() {
     <div class="field" style="margin-top:6px"><input id="manual-barcode" placeholder="Type barcode and press Enter" autofocus /></div>
     <div id="scan-result" style="margin-top:10px;text-align:center;font-weight:600"></div>
     <div class="flex gap" style="margin-top:14px;">
-      <button class="btn btn-outline btn-block" data-close-modal>Close</button>
+      <button class="btn btn-secondary btn-block" data-close-modal>Close</button>
     </div>
   `,
     {
@@ -1120,7 +1120,7 @@ function openTransferModal() {
     <div class="field"><label>Quantity to Transfer</label><input type="number" step="0.01" id="tf-qty" min="1" value="1" /></div>
     <div class="field"><label>Notes</label><input id="tf-notes" placeholder="e.g. Restock from warehouse" /></div>
     <div class="flex gap" style="margin-top:14px;">
-      <button class="btn btn-outline btn-block" data-close-modal>Cancel</button>
+      <button class="btn btn-secondary btn-block" data-close-modal>Cancel</button>
       <button class="btn btn-primary btn-block" id="tf-save">Transfer</button>
     </div>
   `,
@@ -1213,7 +1213,7 @@ function renderStockCountTab(el) {
         </table>
       </div>
       <div class="flex gap" style="margin-top:14px;justify-content:flex-end">
-        <button class="btn btn-outline" id="count-export-btn">📥 Export Variance</button>
+        <button class="btn btn-secondary" id="count-export-btn">📥 Export Variance</button>
         <button class="btn btn-primary" id="count-save-btn">Save Adjustments</button>
       </div>
     </div>
@@ -1406,7 +1406,7 @@ async function renderCountHistoryTab(el) {
       <td>${totalProducts}</td>
       <td>${variances > 0 ? `<span class="badge badge-red">${variances} adjusted</span>` : '<span class="badge badge-green">Matched</span>'}</td>
       <td>${escapeHtml(s.counted_by_user?.name || "—")}</td>
-      <td><button class="btn btn-outline btn-sm" data-view-count="${s.id}">View</button></td>
+      <td><button class="btn btn-secondary btn-sm" data-view-count="${s.id}">View</button></td>
     </tr>`;
   }).join("");
 
@@ -1438,7 +1438,7 @@ async function renderCountHistoryTab(el) {
           </table>
         </div>
         <div class="flex gap" style="margin-top:14px;justify-content:flex-end">
-          <button class="btn btn-outline" data-close-modal>Close</button>
+          <button class="btn btn-secondary" data-close-modal>Close</button>
         </div>
       `);
     });
@@ -1465,7 +1465,7 @@ function renderMovementsTab(el) {
         <option value="">All Products</option>
         ${STATE.products.map((p) => `<option value="${p.id}">${escapeHtml(p.name)}</option>`).join("")}
       </select>
-      <button class="btn btn-outline" id="mv-export-btn">📥 Export</button>
+      <button class="btn btn-secondary" id="mv-export-btn">📥 Export</button>
     </div>
     <div class="card">
       <div class="table-wrap" style="max-height:500px;overflow-y:auto">
@@ -1636,7 +1636,7 @@ async function loadPOList() {
         </tbody>
       </table>
       <div class="flex gap" style="margin-top:8px;justify-content:flex-end">
-        ${po.status === "draft" ? `<button class="btn btn-sm btn-outline" data-receive-po="${po.id}">Mark Received</button>` : ""}
+        ${po.status === "draft" ? `<button class="btn btn-sm btn-secondary" data-receive-po="${po.id}">Mark Received</button>` : ""}
         ${po.status === "ordered" ? `<button class="btn btn-sm btn-primary" data-receive-po="${po.id}">Mark Received</button>` : ""}
       </div>
     </div>
@@ -1669,9 +1669,9 @@ function openPOModal() {
     </div>
     <div class="field"><label>Expected Delivery Date</label><input type="date" id="po-date" /></div>
     <div id="po-items" style="margin-bottom:12px"></div>
-    <button class="btn btn-sm btn-outline" id="po-add-item">+ Add Item</button>
+    <button class="btn btn-sm btn-secondary" id="po-add-item">+ Add Item</button>
     <div class="flex gap" style="margin-top:14px;">
-      <button class="btn btn-outline btn-block" data-close-modal>Cancel</button>
+      <button class="btn btn-secondary btn-block" data-close-modal>Cancel</button>
       <button class="btn btn-primary btn-block" id="po-save">Create PO</button>
     </div>
   `,
@@ -1788,7 +1788,7 @@ function openCategoriesModal() {
       <div class="field"><label>Category Name</label><input id="cat-name" placeholder="e.g. Beverages" /></div>
     </div>
     <div class="flex gap">
-      <button class="btn btn-outline btn-block" data-close-modal>Close</button>
+      <button class="btn btn-secondary btn-block" data-close-modal>Close</button>
       <button class="btn btn-primary btn-block" id="add-cat-btn">Add Category</button>
     </div>
   `,
@@ -2126,7 +2126,7 @@ async function renderProductionTab(el) {
           </div>
           <div class="flex gap">
             <button class="btn btn-sm btn-primary" data-assemble="${bom.id}">⚙️ Assemble</button>
-            <button class="btn btn-sm btn-outline" data-disassemble="${bom.id}">↩️ Disassemble</button>
+            <button class="btn btn-sm btn-secondary" data-disassemble="${bom.id}">↩️ Disassemble</button>
             <button class="btn btn-sm btn-danger" data-del-bom="${bom.id}">&times;</button>
           </div>
         </div>
@@ -2182,9 +2182,9 @@ function openBOMModal() {
     <div class="field"><label>Yield Quantity</label><input type="number" step="0.01" id="bom-yield" value="1" min="0.01" /><p class="help-text">How many units of the finished product one build produces</p></div>
     <div style="margin:14px 0;font-weight:700">Components (ingredients)</div>
     <div id="bom-components"></div>
-    <button class="btn btn-sm btn-outline" id="bom-add-comp">+ Add Component</button>
+    <button class="btn btn-sm btn-secondary" id="bom-add-comp">+ Add Component</button>
     <div class="flex gap" style="margin-top:14px;">
-      <button class="btn btn-outline btn-block" data-close-modal>Cancel</button>
+      <button class="btn btn-secondary btn-block" data-close-modal>Cancel</button>
       <button class="btn btn-primary btn-block" id="bom-save">Save Recipe</button>
     </div>
   `,
@@ -2501,7 +2501,7 @@ async function renderValuationTab(el) {
     <div class="card" style="margin-top:16px">
       <div class="card-title">
         <span>Full Inventory Valuation</span>
-        <button class="btn btn-sm btn-outline" id="val-export-btn">📥 Export CSV</button>
+        <button class="btn btn-sm btn-secondary" id="val-export-btn">📥 Export CSV</button>
       </div>
       <div class="table-wrap" style="max-height:400px;overflow-y:auto">
         <table>

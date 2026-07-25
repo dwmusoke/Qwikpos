@@ -20,10 +20,15 @@ import { logAuditAction } from "./uganda-pos-view-audit.js";
 
 export async function renderCustomers(root) {
   root.innerHTML = `
-    <div class="view-header">
-      <div><h2>Customers</h2><p class="sub">${STATE.customers.length} customers on file</p></div>
-      <button class="btn btn-primary" id="add-customer-btn">+ Add Customer</button>
-      <button class="btn btn-outline" id="import-customers-btn">📥 Import CSV</button>
+    <div class="page-header">
+      <div class="page-header-info">
+        <h1>Customers</h1>
+        <p>${STATE.customers.length} customers on file</p>
+      </div>
+      <div class="page-header-actions">
+        <button class="btn btn-primary" id="add-customer-btn">+ Add Customer</button>
+        <button class="btn btn-secondary" id="import-customers-btn">📥 Import CSV</button>
+      </div>
     </div>
     <div class="table-wrap">
       <table>
@@ -42,7 +47,7 @@ function renderTable() {
   if (!STATE.customers.length) {
     tbody.innerHTML = `<tr><td colspan="6">
       ${emptyStateHtml("👥", "No Customers Yet", "Add your first customer or import them from a CSV file to start tracking sales and statements.", "+ Add Customer", () => openCustomerModal())}
-      <div style="text-align:center;margin-bottom:14px;"><button class="btn btn-outline btn-sm" onclick="document.getElementById('import-customers-btn')?.click()">📥 Import from CSV</button></div>
+      <div style="text-align:center;margin-bottom:14px;"><button class="btn btn-secondary btn-sm" onclick="document.getElementById('import-customers-btn')?.click()">📥 Import from CSV</button></div>
     </td></tr>`;
     return;
   }
@@ -63,10 +68,10 @@ function renderTable() {
       <td><span class="badge ${Number(c.balance) > 0 ? "badge-yellow" : "badge-green"}">${fmtMoney(c.balance || 0)}</span></td>
       <td>
         <div style="display:flex;gap:4px;flex-wrap:wrap;">
-          <button class="btn btn-outline btn-sm" data-edit="${c.id}" title="Edit">✏️</button>
-          <button class="btn btn-outline btn-sm" data-statement="${c.id}" title="Statement">📄</button>
-          <button class="btn btn-outline btn-sm" data-share="${c.id}" title="Share">📋</button>
-          <button class="btn btn-outline btn-sm" data-delete-cust="${c.id}" title="Delete" style="color:var(--danger);">🗑️</button>
+          <button class="btn btn-secondary btn-sm" data-edit="${c.id}" title="Edit">✏️</button>
+          <button class="btn btn-secondary btn-sm" data-statement="${c.id}" title="Statement">📄</button>
+          <button class="btn btn-secondary btn-sm" data-share="${c.id}" title="Share">📋</button>
+          <button class="btn btn-secondary btn-sm" data-delete-cust="${c.id}" title="Delete" style="color:var(--danger);">🗑️</button>
         </div>
       </td>
     </tr>`,
@@ -112,7 +117,7 @@ function openCustomerModal(customerId) {
     </div>
     <div class="field"><label>Address</label><input id="cf-address" value="${escapeHtml(c.address || "")}" /></div>
     <div class="flex gap" style="margin-top:14px;">
-      <button class="btn btn-outline btn-block" data-close-modal>Cancel</button>
+      <button class="btn btn-secondary btn-block" data-close-modal>Cancel</button>
       <button class="btn btn-primary btn-block" id="save-customer-btn">${editing ? "Save Changes" : "Add Customer"}</button>
     </div>
   `,
@@ -195,7 +200,7 @@ async function openStatementModal(customerId) {
         </tbody>
       </table>
     </div>
-    <button class="btn btn-outline btn-block" data-close-modal style="margin-top:14px;">Close</button>
+    <button class="btn btn-secondary btn-block" data-close-modal style="margin-top:14px;">Close</button>
     <button class="btn btn-primary btn-block" id="print-stmt-btn" style="margin-top:8px;">🖨️ Print Statement</button>
     `,
     { large: true },
@@ -238,7 +243,7 @@ function openCustomerImportModal() {
     <div class="modal-title-row"><h3>Import Customers from CSV</h3></div>
     <p class="help-text" style="margin-bottom:12px;">Download the sample template to see the expected format, then upload your file.</p>
     <div class="flex gap" style="margin-bottom:14px;">
-      <button class="btn btn-outline" id="cust-dl-sample">📄 Download Sample CSV</button>
+      <button class="btn btn-secondary" id="cust-dl-sample">📄 Download Sample CSV</button>
     </div>
     <div class="field"><label>CSV File</label><input type="file" id="cust-import-file" accept=".csv" /></div>
     <div class="field"><label>Default Balance (if not in CSV)</label><input type="number" id="cust-default-balance" value="0" /></div>

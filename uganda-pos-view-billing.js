@@ -24,7 +24,7 @@ export async function renderBilling(root, { paywall = false } = {}) {
         <b>${sub?.status === 'trialing' ? 'Your free trial has ended.' : 'Your subscription is not active.'}</b>
         Choose a plan below and pay with Flutterwave (mobile money, card or bank) to keep using Qwickpos.
       </div>` : `
-      <div class="view-header"><div><h2>Billing</h2><p class="sub">Plan, payments and trial status</p></div></div>
+      <div class="page-header"><div class="page-header-info"><h1>Billing</h1><p>Plan, payments and trial status</p></div></div>
     `}
 
     <div class="card">
@@ -77,7 +77,7 @@ export async function renderBilling(root, { paywall = false } = {}) {
           <li>${p.features?.efris ? '✅' : '—'} EFRIS e-invoicing</li>
           <li>${p.features?.reports_export ? '✅' : '—'} Report exports</li>
         </ul>
-        <button class="btn ${isCurrent ? 'btn-outline' : 'btn-primary'} btn-block" data-pay="${p.code}" ${isCurrent ? 'disabled' : ''}>
+        <button class="btn ${isCurrent ? 'btn-secondary' : 'btn-primary'} btn-block" data-pay="${p.code}" ${isCurrent ? 'disabled' : ''}>
           ${isCurrent ? 'Current Plan' : (active ? 'Switch & Pay' : 'Subscribe & Pay')}
         </button>
       </div>`;

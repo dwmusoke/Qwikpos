@@ -48,9 +48,14 @@ export async function renderDeliveries(root) {
   const allDeliveries = deliveries || [];
 
   root.innerHTML = `
-    <div class="view-header">
-      <div><h2 data-i18n="nav.deliveries">Delivery Management</h2><p class="sub">${allDeliveries.length} deliveries</p></div>
-      <button class="btn btn-primary btn-sm" id="del-add">➕ New Delivery</button>
+    <div class="page-header">
+      <div class="page-header-info">
+        <h1 data-i18n="nav.deliveries">Delivery Management</h1>
+        <p>${allDeliveries.length} deliveries</p>
+      </div>
+      <div class="page-header-actions">
+        <button class="btn btn-primary btn-sm" id="del-add">➕ New Delivery</button>
+      </div>
     </div>
     <div class="notif-filters" id="del-tabs">
       ${[
@@ -130,7 +135,7 @@ function renderDelTab(deliveries) {
                 <td>${escapeHtml(d.assigned_to || "—")}</td>
                 <td>${d.estimated_delivery ? fmtDate(d.estimated_delivery) : "—"}</td>
                 <td>
-                  <button class="btn btn-outline btn-xs" data-view-del="${d.id}">View</button>
+                  <button class="btn btn-secondary btn-xs" data-view-del="${d.id}">View</button>
                   ${d.status !== "delivered" && d.status !== "returned" ? `<button class="btn btn-primary btn-xs" data-update-del="${d.id}">Update</button>` : ""}
                 </td>
               </tr>
@@ -186,7 +191,7 @@ function showDeliveryModal(existing, deliveries) {
     </div>
     <div class="field"><label>Notes</label><textarea id="del-notes" rows="2">${escapeHtml(existing?.delivery_notes || "")}</textarea></div>
     <button class="btn btn-primary btn-block" id="del-save">${isEdit ? "Update" : "Create"} Delivery</button>
-    <button class="btn btn-outline btn-block" data-close-modal style="margin-top:8px;">Cancel</button>
+    <button class="btn btn-secondary btn-block" data-close-modal style="margin-top:8px;">Cancel</button>
   `,
     { large: true },
   );
@@ -264,7 +269,7 @@ function showUpdateStatusModal(delivery) {
     </div>
     <div class="field"><label>Notes</label><textarea id="del-status-notes" rows="2"></textarea></div>
     <button class="btn btn-primary btn-block" id="del-status-save">Update Status</button>
-    <button class="btn btn-outline btn-block" data-close-modal style="margin-top:8px;">Cancel</button>
+    <button class="btn btn-secondary btn-block" data-close-modal style="margin-top:8px;">Cancel</button>
   `);
 
   $("del-status-save")?.addEventListener("click", async () => {
@@ -330,7 +335,7 @@ async function showDeliveryDetail(delivery) {
         : '<div class="empty-state">No status history.</div>'
     }
 
-    <button class="btn btn-outline btn-block" data-close-modal style="margin-top:16px;">Close</button>
+    <button class="btn btn-secondary btn-block" data-close-modal style="margin-top:16px;">Close</button>
   `,
     { large: true },
   );

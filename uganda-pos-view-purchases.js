@@ -22,8 +22,8 @@ let activeTab = "list";
 
 export async function renderPurchasesModule(root) {
   root.innerHTML = `
-    <div class="view-header">
-      <div><h2 data-i18n="nav.purchases">Purchases</h2><p class="sub">Manage purchase orders, requests & returns</p></div>
+    <div class="page-header">
+      <div class="page-header-info"><h1 data-i18n="nav.purchases">Purchases</h1><p>Manage purchase orders, requests & returns</p></div>
     </div>
     <div class="notif-filters" id="purchases-tabs">
       ${[
@@ -138,9 +138,9 @@ async function renderPOListTab(body) {
               <span class="badge ${statusColors[po.status] || "badge-gray"}" style="margin-left:8px">${po.status}</span>
             </div>
             <div class="flex gap">
-              ${po.status === "draft" ? `<button class="btn btn-sm btn-outline" data-view-po="${po.id}">View</button><button class="btn btn-sm btn-primary" data-receive-po="${po.id}">Receive</button>` : ""}
-              ${po.status === "ordered" ? `<button class="btn btn-sm btn-outline" data-view-po="${po.id}">View</button><button class="btn btn-sm btn-primary" data-receive-po="${po.id}">Receive</button>` : ""}
-              ${po.status === "received" ? `<button class="btn btn-sm btn-outline" data-view-po="${po.id}">View</button><button class="btn btn-sm btn-outline" data-return-po="${po.id}">Return</button>` : ""}
+              ${po.status === "draft" ? `<button class="btn btn-sm btn-secondary" data-view-po="${po.id}">View</button><button class="btn btn-sm btn-primary" data-receive-po="${po.id}">Receive</button>` : ""}
+              ${po.status === "ordered" ? `<button class="btn btn-sm btn-secondary" data-view-po="${po.id}">View</button><button class="btn btn-sm btn-primary" data-receive-po="${po.id}">Receive</button>` : ""}
+              ${po.status === "received" ? `<button class="btn btn-sm btn-secondary" data-view-po="${po.id}">View</button><button class="btn btn-sm btn-secondary" data-return-po="${po.id}">Return</button>` : ""}
               ${po.status === "draft" ? `<button class="btn btn-sm btn-danger" data-cancel-po="${po.id}">Cancel</button>` : ""}
             </div>
           </div>
@@ -254,7 +254,7 @@ async function viewPODetail(poId, poList) {
       </table>
     </div>
     <div class="flex gap" style="margin-top:14px;">
-      <button class="btn btn-outline btn-block" data-close-modal>Close</button>
+      <button class="btn btn-secondary btn-block" data-close-modal>Close</button>
       ${po.status === "received" ? `<button class="btn btn-primary btn-block" data-return-po="${po.id}">Initiate Return</button>` : ""}
     </div>
   `,
@@ -322,11 +322,11 @@ async function openNewPOModal() {
     <div style="margin-bottom:8px;"><b>Line Items</b></div>
     <div id="po-items" style="margin-bottom:8px;"></div>
     <div class="flex between" style="margin-bottom:12px;">
-      <button class="btn btn-sm btn-outline" id="po-add-item">+ Add Item</button>
+      <button class="btn btn-sm btn-secondary" id="po-add-item">+ Add Item</button>
       <div id="po-total" style="font-weight:700;font-size:14px;"></div>
     </div>
     <div class="flex gap" style="margin-top:14px;">
-      <button class="btn btn-outline btn-block" data-close-modal>Cancel</button>
+      <button class="btn btn-secondary btn-block" data-close-modal>Cancel</button>
       <button class="btn btn-primary btn-block" id="po-save">Create Purchase Order</button>
     </div>
   `,
@@ -532,7 +532,7 @@ async function renderRequestsTab(body) {
             </div>
             <div class="flex gap">
               ${req.status === "draft" ? `<button class="btn btn-sm btn-primary" data-submit-req="${req.id}">Submit</button><button class="btn btn-sm btn-danger" data-del-req="${req.id}">Delete</button>` : ""}
-              ${req.status === "submitted" ? `<button class="btn btn-sm btn-outline" data-approve-req="${req.id}">Approve</button><button class="btn btn-sm btn-danger" data-reject-req="${req.id}">Reject</button>` : ""}
+              ${req.status === "submitted" ? `<button class="btn btn-sm btn-secondary" data-approve-req="${req.id}">Approve</button><button class="btn btn-sm btn-danger" data-reject-req="${req.id}">Reject</button>` : ""}
               ${req.status === "approved" ? `<button class="btn btn-sm btn-primary" data-convert-req="${req.id}">Convert to PO</button>` : ""}
             </div>
           </div>
@@ -629,11 +629,11 @@ async function openNewRequestModal() {
     <div style="margin-bottom:8px;"><b>Requested Items</b></div>
     <div id="req-items" style="margin-bottom:8px;"></div>
     <div class="flex between" style="margin-bottom:12px;">
-      <button class="btn btn-sm btn-outline" id="req-add-item">+ Add Item</button>
+      <button class="btn btn-sm btn-secondary" id="req-add-item">+ Add Item</button>
       <div id="req-total" style="font-weight:700;font-size:14px;"></div>
     </div>
     <div class="flex gap" style="margin-top:14px;">
-      <button class="btn btn-outline btn-block" data-close-modal>Cancel</button>
+      <button class="btn btn-secondary btn-block" data-close-modal>Cancel</button>
       <button class="btn btn-primary btn-block" id="req-save">Create Request</button>
     </div>
   `,
@@ -769,7 +769,7 @@ async function convertRequestToPO(reqId, reqList) {
     <div id="conv-items" style="margin-bottom:8px;"></div>
     <div style="font-weight:700;font-size:14px;text-align:right;margin-bottom:12px;" id="conv-total"></div>
     <div class="flex gap" style="margin-top:14px;">
-      <button class="btn btn-outline btn-block" data-close-modal>Cancel</button>
+      <button class="btn btn-secondary btn-block" data-close-modal>Cancel</button>
       <button class="btn btn-primary btn-block" id="conv-save">Create PO</button>
     </div>
   `,
@@ -969,7 +969,7 @@ async function renderPUReturnsTab(body) {
             <span class="badge ${statusColors[ret.status] || "badge-gray"}" style="margin-left:8px">${ret.status}</span>
           </div>
           <div class="flex gap">
-            ${ret.status === "pending" ? `<button class="btn btn-sm btn-outline" data-approve-ret="${ret.id}">Approve</button><button class="btn btn-sm btn-danger" data-reject-ret="${ret.id}">Reject</button>` : ""}
+            ${ret.status === "pending" ? `<button class="btn btn-sm btn-secondary" data-approve-ret="${ret.id}">Approve</button><button class="btn btn-sm btn-danger" data-reject-ret="${ret.id}">Reject</button>` : ""}
             ${ret.status === "approved" ? `<button class="btn btn-sm btn-primary" data-complete-ret="${ret.id}">Complete</button>` : ""}
           </div>
         </div>
@@ -1084,7 +1084,7 @@ async function openReturnSelectPOModal() {
       </select>
     </div>
     <div class="flex gap" style="margin-top:14px;">
-      <button class="btn btn-outline btn-block" data-close-modal>Cancel</button>
+      <button class="btn btn-secondary btn-block" data-close-modal>Cancel</button>
       <button class="btn btn-primary btn-block" id="ret-po-go">Continue</button>
     </div>
   `,
@@ -1114,7 +1114,7 @@ async function openReturnItemModal(po) {
     <div id="ret-items" style="margin-bottom:12px;"></div>
     <div style="font-weight:700;font-size:14px;text-align:right;margin-bottom:12px;" id="ret-total">Refund Total: UGX 0</div>
     <div class="flex gap" style="margin-top:14px;">
-      <button class="btn btn-outline btn-block" data-close-modal>Cancel</button>
+      <button class="btn btn-secondary btn-block" data-close-modal>Cancel</button>
       <button class="btn btn-primary btn-block" id="ret-save">Submit Return</button>
     </div>
   `,

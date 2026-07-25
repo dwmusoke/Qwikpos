@@ -22,8 +22,8 @@ let supTab = "list";
 
 export async function renderSuppliers(root) {
   root.innerHTML = `
-    <div class="view-header">
-      <div><h2>Suppliers</h2><p class="sub">${STATE.suppliers.length} suppliers · ${STATE.suppliers.reduce((a, s) => a + Number(s.balance || 0), 0) > 0 ? "Outstanding: " + fmtMoney(STATE.suppliers.reduce((a, s) => a + Number(s.balance || 0), 0)) : "All clear"}</p></div>
+    <div class="page-header">
+      <div class="page-header-info"><h1>Suppliers</h1><p>${STATE.suppliers.length} suppliers · ${STATE.suppliers.reduce((a, s) => a + Number(s.balance || 0), 0) > 0 ? "Outstanding: " + fmtMoney(STATE.suppliers.reduce((a, s) => a + Number(s.balance || 0), 0)) : "All clear"}</p></div>
     </div>
 
     <div class="admin-tabs" id="sup-tabs">
@@ -111,11 +111,11 @@ async function renderSupTable() {
       <td>${poMap[s.id] || 0}</td>
       <td>
         <div style="display:flex;gap:4px;flex-wrap:wrap;">
-          <button class="btn btn-outline btn-sm" data-edit="${s.id}" title="Edit">✏️</button>
-          <button class="btn btn-outline btn-sm" data-pay="${s.id}" title="Record Payment">💰</button>
+          <button class="btn btn-secondary btn-sm" data-edit="${s.id}" title="Edit">✏️</button>
+          <button class="btn btn-secondary btn-sm" data-pay="${s.id}" title="Record Payment">💰</button>
           <button class="btn btn-sm btn-primary" data-view-sup="${s.id}" title="View">👁️</button>
-          <button class="btn btn-outline btn-sm" data-share-sup="${s.id}" title="Share">📋</button>
-          <button class="btn btn-outline btn-sm" data-delete-sup="${s.id}" title="Delete" style="color:var(--danger);">🗑️</button>
+          <button class="btn btn-secondary btn-sm" data-share-sup="${s.id}" title="Share">📋</button>
+          <button class="btn btn-secondary btn-sm" data-delete-sup="${s.id}" title="Delete" style="color:var(--danger);">🗑️</button>
         </div>
       </td>
     </tr>`,
@@ -164,7 +164,7 @@ function openSupplierModal(supplierId) {
     </div>
     <div class="field"><label>Address</label><input id="sf-address" value="${escapeHtml(s.address || "")}" /></div>
     <div class="flex gap" style="margin-top:14px;">
-      <button class="btn btn-outline btn-block" data-close-modal>Cancel</button>
+      <button class="btn btn-secondary btn-block" data-close-modal>Cancel</button>
       <button class="btn btn-primary btn-block" id="save-supplier-btn">${editing ? "Save Changes" : "Add Supplier"}</button>
     </div>
   `,
@@ -230,7 +230,7 @@ function openPaymentModal(supplierId) {
     </div>
     <div class="field"><label>Reference</label><input id="pf-ref" placeholder="Optional" /></div>
     <div class="flex gap" style="margin-top:14px;">
-      <button class="btn btn-outline btn-block" data-close-modal>Cancel</button>
+      <button class="btn btn-secondary btn-block" data-close-modal>Cancel</button>
       <button class="btn btn-primary btn-block" id="save-payment-btn">Record Payment</button>
     </div>
   `,
@@ -422,7 +422,7 @@ async function renderPOTab(el) {
               <span class="badge ${statusColors[po.status] || "badge-gray"}" style="margin-left:8px">${po.status}</span>
             </div>
             <div class="flex gap">
-              ${po.status === "draft" ? `<button class="btn btn-sm btn-outline" data-receive-po="${po.id}">Mark Received</button>` : ""}
+              ${po.status === "draft" ? `<button class="btn btn-sm btn-secondary" data-receive-po="${po.id}">Mark Received</button>` : ""}
               ${po.status === "ordered" ? `<button class="btn btn-sm btn-primary" data-receive-po="${po.id}">Mark Received</button>` : ""}
             </div>
           </div>
@@ -488,9 +488,9 @@ function openPOModal() {
     </div>
     <div class="field"><label>Expected Delivery Date</label><input type="date" id="pos-date" /></div>
     <div id="pos-items" style="margin-bottom:12px"></div>
-    <button class="btn btn-sm btn-outline" id="pos-add-item">+ Add Item</button>
+    <button class="btn btn-sm btn-secondary" id="pos-add-item">+ Add Item</button>
     <div class="flex gap" style="margin-top:14px;">
-      <button class="btn btn-outline btn-block" data-close-modal>Cancel</button>
+      <button class="btn btn-secondary btn-block" data-close-modal>Cancel</button>
       <button class="btn btn-primary btn-block" id="pos-save">Create PO</button>
     </div>
   `,

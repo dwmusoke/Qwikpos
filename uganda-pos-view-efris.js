@@ -43,14 +43,16 @@ export async function renderEfris(root) {
   });
 
   root.innerHTML = `
-    <div class="view-header">
-      <div>
-        <h2>EFRIS — URA E-Invoicing</h2>
-        <p class="sub">Mode: <span class="badge ${STATE.business.efris_live_enabled ? "badge-green" : "badge-yellow"}">${STATE.business.efris_live_enabled ? "LIVE" : "SANDBOX"}</span>
+    <div class="page-header">
+      <div class="page-header-info">
+        <h1>EFRIS — URA E-Invoicing</h1>
+        <p>Mode: <span class="badge ${STATE.business.efris_live_enabled ? "badge-green" : "badge-yellow"}">${STATE.business.efris_live_enabled ? "LIVE" : "SANDBOX"}</span>
           &nbsp;·&nbsp; TIN: ${escapeHtml(STATE.business.tin || "not set")}
           &nbsp;·&nbsp; Device No: ${escapeHtml(STATE.business.efris_device_no || "not registered")}</p>
       </div>
-      <button class="btn btn-outline" id="export-efris-btn">Export CSV</button>
+      <div class="page-header-actions">
+        <button class="btn btn-secondary" id="export-efris-btn">Export CSV</button>
+      </div>
     </div>
 
     ${
@@ -104,7 +106,7 @@ export async function renderEfris(root) {
         <td>${statusBadge(inv.status)}</td>
         <td>${fmtDate(inv.created_at)}</td>
         <td class="flex gap">
-          <button class="btn btn-outline btn-sm" data-view="${inv.id}">Payload</button>
+          <button class="btn btn-secondary btn-sm" data-view="${inv.id}">Payload</button>
           ${["pending", "queued", "failed"].includes(inv.status) ? `<button class="btn btn-primary btn-sm" data-submit="${inv.id}">Submit</button>` : ""}
         </td>
       </tr>`,
@@ -149,7 +151,7 @@ function viewPayload(invoice) {
     <pre style="background:var(--surface-2); padding:14px; border-radius:8px; max-height:400px; overflow:auto; font-size:11.5px;">${escapeHtml(JSON.stringify(invoice.payload_json, null, 2))}</pre>
     ${invoice.antifake_code ? `<p class="help-text">Anti-fake code: <b>${escapeHtml(invoice.antifake_code)}</b></p>` : ""}
     ${invoice.error_message ? `<p class="help-text" style="color:var(--danger);">Error: ${escapeHtml(invoice.error_message)}</p>` : ""}
-    <button class="btn btn-outline btn-block" data-close-modal style="margin-top:10px;">Close</button>
+    <button class="btn btn-secondary btn-block" data-close-modal style="margin-top:10px;">Close</button>
   `,
     { large: true },
   );

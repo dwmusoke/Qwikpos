@@ -27,7 +27,7 @@ function rangeFormHtml(id, range) {
       <div class="field"><label>From</label><input type="date" id="${id}-from" value="${range.from}" /></div>
       <div class="field"><label>To</label><input type="date" id="${id}-to" value="${range.to}" /></div>
       <button class="btn btn-primary" id="${id}-run">Run Report</button>
-      <button class="btn btn-outline" id="${id}-export">Export CSV</button>
+      <button class="btn btn-secondary" id="${id}-export">Export CSV</button>
     </div>`;
 }
 
@@ -51,8 +51,8 @@ export async function renderReports(root) {
   let activeTab = "sales";
 
   root.innerHTML = `
-    <div class="view-header">
-      <div><h2>Reports</h2><p class="sub">Sales, purchases, tax and expense insights</p></div>
+    <div class="page-header">
+      <div class="page-header-info"><h1>Reports</h1><p>Sales, purchases, tax and expense insights</p></div>
     </div>
     <div class="notif-filters" id="report-tabs">
       <button class="chip active" data-tab="sales">Sales Analysis</button>

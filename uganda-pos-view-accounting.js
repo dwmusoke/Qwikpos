@@ -73,8 +73,8 @@ function downloadCsv(rows, header, filename) {
 
 export async function renderAccounting(root) {
   root.innerHTML = `
-    <div class="view-header">
-      <div><h2>Accounting</h2><p class="sub">General Ledger, Journal Entries, Trial Balance, and financial statements</p></div>
+    <div class="page-header">
+      <div class="page-header-info"><h1>Accounting</h1><p>General Ledger, Journal Entries, Trial Balance, and financial statements</p></div>
     </div>
     <div class="notif-filters" id="acct-tabs" style="margin-bottom:16px;">
       ${[
@@ -126,11 +126,11 @@ export async function renderAccounting(root) {
 function periodPickerHtml(key, id) {
   return `
     <div class="field-row" style="align-items:end; flex-wrap:wrap; gap:8px;">
-      ${PERIODS.map(([k, label]) => `<button class="btn btn-sm ${k === key ? "btn-primary" : "btn-outline"}" data-period="${k}" data-for="${id}">${label}</button>`).join("")}
+      ${PERIODS.map(([k, label]) => `<button class="btn btn-sm ${k === key ? "btn-primary" : "btn-secondary"}" data-period="${k}" data-for="${id}">${label}</button>`).join("")}
       <div class="field"><label>From</label><input type="date" id="${id}-from" value="${periodRange(key).from}" /></div>
       <div class="field"><label>To</label><input type="date" id="${id}-to" value="${periodRange(key).to}" /></div>
       <button class="btn btn-primary" id="${id}-run">Run</button>
-      <button class="btn btn-outline" id="${id}-export">Export CSV</button>
+      <button class="btn btn-secondary" id="${id}-export">Export CSV</button>
     </div>`;
 }
 
@@ -143,7 +143,7 @@ function wirePeriodButtons(rootId) {
       qsa(`[data-for="${rootId}"]`).forEach(
         (b) =>
           (b.className =
-            b === btn ? "btn btn-sm btn-primary" : "btn btn-sm btn-outline"),
+            b === btn ? "btn btn-sm btn-primary" : "btn btn-sm btn-secondary"),
       );
     });
   });
@@ -1069,7 +1069,7 @@ async function renderBalanceSheetTab(body) {
     ${nonStatutoryNote()}
     <div class="card">
       <div class="card-title">Balance Sheet — as of ${escapeHtml(new Date().toISOString().slice(0, 10))}</div>
-      <div style="margin-bottom:12px;"><button class="btn btn-outline btn-sm" id="bs-export">Export CSV</button></div>
+      <div style="margin-bottom:12px;"><button class="btn btn-secondary btn-sm" id="bs-export">Export CSV</button></div>
       <table class="stmt-table">
         <tr><td colspan="2"><b>Assets</b></td></tr>
         <tr><td>Cash &amp; Mobile Money</td><td class="num">${fmtMoney(Math.max(0, estimatedCash))}</td></tr>

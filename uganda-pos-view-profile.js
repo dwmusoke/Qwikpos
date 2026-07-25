@@ -12,8 +12,8 @@ export async function renderProfile(root) {
   const totalSales = (recentSales || []).reduce((a, s) => a + Number(s.grand_total_base || 0), 0);
 
   root.innerHTML = `
-    <div class="view-header">
-      <div><h2>My Profile</h2><p class="sub">Manage your account information</p></div>
+    <div class="page-header">
+      <div class="page-header-info"><h1>My Profile</h1><p>Manage your account information</p></div>
     </div>
 
     <div class="profile-header">

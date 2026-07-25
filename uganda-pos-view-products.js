@@ -14,8 +14,8 @@ let activeTab = 'list';
 
 export async function renderProductsModule(root) {
   root.innerHTML = `
-    <div class="view-header">
-      <div><h2 data-i18n="prod.list">Products</h2><p class="sub">${STATE.products.length} products · ${STATE.categories.length} categories</p></div>
+    <div class="page-header">
+      <div class="page-header-info"><h1 data-i18n="prod.list">Products</h1><p>${STATE.products.length} products · ${STATE.categories.length} categories</p></div>
     </div>
     <div class="notif-filters" id="products-tabs">
       ${[
@@ -63,8 +63,8 @@ async function renderProductListTab(body) {
         <div class="field" style="flex:2;"><label>Search</label><input id="pl-search" placeholder="Search by name, SKU, barcode…" /></div>
         <div class="field"><label>Category</label><select id="pl-cat"><option value="">All</option>${STATE.categories.map((c) => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('')}</select></div>
         <button class="btn btn-primary" id="pl-add-btn">+ Add Product</button>
-        <button class="btn btn-outline" id="pl-import-btn">📥 Import CSV</button>
-        <button class="btn btn-outline" id="pl-labels-btn">🖨️ Labels</button>
+        <button class="btn btn-secondary" id="pl-import-btn">📥 Import CSV</button>
+        <button class="btn btn-secondary" id="pl-labels-btn">🖨️ Labels</button>
       </div>
     </div>
     <div class="card"><div class="table-wrap" style="max-height:600px;overflow-y:auto;">
@@ -111,11 +111,11 @@ async function renderProductListTab(body) {
         <td><span class="badge ${low ? 'badge-red' : 'badge-green'}">${stock} ${escapeHtml(p.unit || 'pc')}</span></td>
         <td><span class="badge badge-blue">${escapeHtml(p.tax_category_code || 'STD')}</span></td>
         <td class="flex gap">
-          <button class="btn btn-outline btn-sm" data-edit="${p.id}">Edit</button>
-          <button class="btn btn-outline btn-sm" data-stock="${p.id}">Stock</button>
-          <button class="btn btn-outline btn-sm" data-label="${p.id}">Label</button>
+          <button class="btn btn-secondary btn-sm" data-edit="${p.id}">Edit</button>
+          <button class="btn btn-secondary btn-sm" data-stock="${p.id}">Stock</button>
+          <button class="btn btn-secondary btn-sm" data-label="${p.id}">Label</button>
         </td></tr>`;
-    }).join('') : `<tr><td colspan="8">${emptyStateHtml("🏷️", "No Products Yet", "Start by adding your first product, or import multiple at once from a CSV file.", "+ Add Product", () => openProductModal())}<div style="text-align:center;margin-bottom:14px;"><button class="btn btn-outline btn-sm" data-import-csv>📥 Import CSV</button></div></td></tr>`;
+    }).join('') : `<tr><td colspan="8">${emptyStateHtml("🏷️", "No Products Yet", "Start by adding your first product, or import multiple at once from a CSV file.", "+ Add Product", () => openProductModal())}<div style="text-align:center;margin-bottom:14px;"><button class="btn btn-secondary btn-sm" data-import-csv>📥 Import CSV</button></div></td></tr>`;
 
     qsa('[data-edit]', tbody).forEach((b) => b.addEventListener('click', () => openProductModal(b.dataset.edit)));
     qsa('[data-stock]', tbody).forEach((b) => b.addEventListener('click', () => openStockModal(b.dataset.stock)));
@@ -145,7 +145,7 @@ async function openProductModal(productId) {
     </div>
     <div class="field-row">
       <div class="field"><label>SKU</label><input id="pf-sku" value="${escapeHtml(p.sku || '')}" /></div>
-      <div class="field"><label>Barcode</label><div style="display:flex;gap:6px;"><input id="pf-barcode" value="${escapeHtml(p.barcode || '')}" style="flex:1;" /><button type="button" class="btn btn-outline btn-sm" id="pf-scan-btn" title="Scan barcode with camera">📷 Scan</button></div>
+      <div class="field"><label>Barcode</label><div style="display:flex;gap:6px;"><input id="pf-barcode" value="${escapeHtml(p.barcode || '')}" style="flex:1;" /><button type="button" class="btn btn-secondary btn-sm" id="pf-scan-btn" title="Scan barcode with camera">📷 Scan</button></div>
     </div>
     <div class="field-row">
       <div class="field"><label>Category</label><select id="pf-category"><option value="">— None —</option>${STATE.categories.map((c) => `<option value="${c.id}" ${p.category_id === c.id ? 'selected' : ''}>${escapeHtml(c.name)}</option>`).join('')}</select></div>
@@ -172,7 +172,7 @@ async function openProductModal(productId) {
       </div>
     </div>
     <div class="flex gap" style="margin-top:14px;">
-      <button class="btn btn-outline btn-block" data-close-modal>Cancel</button>
+      <button class="btn btn-secondary btn-block" data-close-modal>Cancel</button>
       <button class="btn btn-primary btn-block" id="save-product-btn">${editing ? 'Save Changes' : 'Add Product'}</button>
     </div>
   `, {
@@ -384,7 +384,7 @@ async function renderCategoriesTab(body) {
       <div class="field"><label>Icon</label><input id="ecat-icon" value="${escapeHtml(c.icon || '📦')}" style="width:80px;" /></div>
       <div class="field"><label>Name</label><input id="ecat-name" value="${escapeHtml(c.name)}" /></div>
       <div class="flex gap" style="margin-top:14px;">
-        <button class="btn btn-outline btn-block" data-close-modal>Cancel</button>
+        <button class="btn btn-secondary btn-block" data-close-modal>Cancel</button>
         <button class="btn btn-primary btn-block" id="ecat-save">Save</button>
       </div>
     `, { onMount: () => {
@@ -454,7 +454,7 @@ async function renderTaxTab(body) {
       <div class="field"><label>Rate (%)</label><input type="number" step="0.01" id="etax-rate" value="${t.rate}" /></div>
       <div class="field"><label>Description</label><input id="etax-desc" value="${escapeHtml(t.description || '')}" /></div>
       <div class="flex gap" style="margin-top:14px;">
-        <button class="btn btn-outline btn-block" data-close-modal>Cancel</button>
+        <button class="btn btn-secondary btn-block" data-close-modal>Cancel</button>
         <button class="btn btn-primary btn-block" id="etax-save">Save</button>
       </div>
     `, { onMount: () => {
@@ -518,7 +518,7 @@ async function renderUnitsTab(body) {
       <div class="field"><label>Name</label><input id="eunit-name" value="${escapeHtml(u.name)}" /></div>
       <div class="field"><label>Abbreviation</label><input id="eunit-abbr" value="${escapeHtml(u.abbreviation)}" /></div>
       <div class="flex gap" style="margin-top:14px;">
-        <button class="btn btn-outline btn-block" data-close-modal>Cancel</button>
+        <button class="btn btn-secondary btn-block" data-close-modal>Cancel</button>
         <button class="btn btn-primary btn-block" id="eunit-save">Save</button>
       </div>
     `, { onMount: () => {
@@ -585,7 +585,7 @@ async function renderBrandsTab(body) {
       <div class="modal-title-row"><h3>Edit Brand</h3></div>
       <div class="field"><label>Name</label><input id="ebrand-name" value="${escapeHtml(b.name)}" /></div>
       <div class="flex gap" style="margin-top:14px;">
-        <button class="btn btn-outline btn-block" data-close-modal>Cancel</button>
+        <button class="btn btn-secondary btn-block" data-close-modal>Cancel</button>
         <button class="btn btn-primary btn-block" id="ebrand-save">Save</button>
       </div>
     `, { onMount: () => {
@@ -679,7 +679,7 @@ async function openVariantModal(variantId) {
     </div>
     <div class="field"><label>Attributes (JSON)</label><textarea id="vf-attrs" rows="3">${JSON.stringify(v.attributes || {}, null, 2)}</textarea></div>
     <div class="flex gap" style="margin-top:14px;">
-      <button class="btn btn-outline btn-block" data-close-modal>Cancel</button>
+      <button class="btn btn-secondary btn-block" data-close-modal>Cancel</button>
       <button class="btn btn-primary btn-block" id="vf-save">${editing ? 'Save' : 'Add Variant'}</button>
     </div>
   `, { onMount: () => {
@@ -783,7 +783,7 @@ function openStockModal(productId) {
     <div class="field"><label>Quantity</label><input type="number" step="1" min="0" id="stk-qty" value="0" /></div>
     <div class="field"><label>Note</label><input id="stk-note" placeholder="Reason for adjustment" /></div>
     <div class="flex gap" style="margin-top:14px;">
-      <button class="btn btn-outline btn-block" data-close-modal>Cancel</button>
+      <button class="btn btn-secondary btn-block" data-close-modal>Cancel</button>
       <button class="btn btn-primary btn-block" id="stk-save">Save Adjustment</button>
     </div>
   `, { onMount: () => {
@@ -836,7 +836,7 @@ function openSingleLabelModal(productId) {
       </div>
     </div>
     <div class="flex gap" style="margin-top:14px;">
-      <button class="btn btn-outline btn-block" data-close-modal>Cancel</button>
+      <button class="btn btn-secondary btn-block" data-close-modal>Cancel</button>
       <button class="btn btn-primary btn-block" id="sl-print">🖨️ Print</button>
     </div>
   `, { onMount: () => {
@@ -855,7 +855,7 @@ function openImportModal() {
     <div class="modal-title-row"><h3>Import Products from CSV</h3></div>
     <p class="help-text" style="margin-bottom:12px;">Download the sample template to see the expected format, then upload your file.</p>
     <div class="flex gap" style="margin-bottom:14px;">
-      <button class="btn btn-outline" id="download-sample-btn">📄 Download Sample CSV</button>
+      <button class="btn btn-secondary" id="download-sample-btn">📄 Download Sample CSV</button>
     </div>
     <div class="field"><label>CSV File</label><input type="file" id="import-file" accept=".csv" /></div>
     <button class="btn btn-primary btn-block" id="import-run" style="margin-top:14px;">Import</button>

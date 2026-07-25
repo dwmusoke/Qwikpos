@@ -296,7 +296,7 @@ function showNewChatModal() {
         ${others
           .map(
             (m) => `
-          <button class="btn btn-outline btn-block new-chat-member" data-user-id="${m.id}" style="justify-content:flex-start">
+          <button class="btn btn-secondary btn-block new-chat-member" data-user-id="${m.id}" style="justify-content:flex-start">
             <span style="font-weight:600">${escapeHtml(m.full_name)}</span>
             <span class="text-muted" style="margin-left:8px;font-size:12px">${m.role.replace("_", " ")}</span>
           </button>

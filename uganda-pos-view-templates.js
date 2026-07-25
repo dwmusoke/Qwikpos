@@ -62,8 +62,8 @@ export async function renderTemplateSettings(root) {
   const tpl = loadTemplate();
 
   root.innerHTML = `
-    <div class="view-header">
-      <div><h2>Document Templates</h2><p class="sub">Customize receipts, invoices, and quotations</p></div>
+    <div class="page-header">
+      <div class="page-header-info"><h1>Document Templates</h1><p>Customize receipts, invoices, and quotations</p></div>
     </div>
     <div class="grid-2" style="gap:24px;">
       <div class="card">
@@ -151,7 +151,7 @@ export async function renderTemplateSettings(root) {
         </div>
 
         <button class="btn btn-primary btn-block" id="tpl-save" style="margin-top:16px;">💾 Save Template</button>
-        <button class="btn btn-outline btn-block" id="tpl-reset" style="margin-top:8px;">↩️ Reset to Default</button>
+        <button class="btn btn-secondary btn-block" id="tpl-reset" style="margin-top:8px;">↩️ Reset to Default</button>
       </div>
 
       <div class="card" style="position:sticky; top:20px;">
@@ -160,8 +160,8 @@ export async function renderTemplateSettings(root) {
           ${renderPreview(tpl)}
         </div>
         <div class="flex gap" style="margin-top:12px;">
-          <button class="btn btn-outline btn-sm" id="tpl-test-print">🖨️ Test Print</button>
-          <button class="btn btn-outline btn-sm" id="tpl-test-pdf">📄 Export HTML</button>
+          <button class="btn btn-secondary btn-sm" id="tpl-test-print">🖨️ Test Print</button>
+          <button class="btn btn-secondary btn-sm" id="tpl-test-pdf">📄 Export HTML</button>
         </div>
       </div>
     </div>
