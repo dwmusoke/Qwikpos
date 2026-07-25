@@ -463,6 +463,19 @@ body.sidebar-expanded .sidebar {
   border-radius: var(--radius-xs);
   transition: all var(--dur-fast) var(--ease);
 }
+.nav-module > .nav-link > .icon {
+  font-size: 18px;
+  width: 30px;
+  height: 30px;
+}
+.nav-module > .nav-link:hover > .icon {
+  background: var(--brand);
+  color: #fff;
+}
+.nav-module > .nav-link.active > .icon {
+  background: var(--brand);
+  color: #fff;
+}
 .nav-link.nav-link-locked {
   opacity: 0.40;
 }
@@ -481,13 +494,24 @@ body.sidebar-expanded .sidebar-inner .nav-link {
   border-radius: var(--radius);
   margin-bottom: 0;
 }
-/* Expanded top-level nav items: icons collapse smoothly */
+/* Expanded top-level nav items: keep icons visible, styled as badges */
 body.sidebar-expanded .sidebar-inner > .nav-link .icon,
 body.sidebar-expanded .sidebar-inner .nav-module > .nav-link .icon {
-  width: 0;
-  opacity: 0;
-  overflow: hidden;
-  transition: width 0.25s var(--ease), opacity 0.2s var(--ease);
+  width: 30px;
+  height: 30px;
+  opacity: 1;
+  overflow: visible;
+  font-size: 18px;
+  background: var(--surface-2);
+  transition: background var(--dur-fast) var(--ease);
+}
+body.sidebar-expanded .sidebar-inner .nav-module > .nav-link:hover .icon {
+  background: var(--brand);
+  color: #fff;
+}
+body.sidebar-expanded .sidebar-inner .nav-module > .nav-link.active .icon {
+  background: var(--brand);
+  color: #fff;
 }
 
 /* Expanded child nav items: icons visible */
