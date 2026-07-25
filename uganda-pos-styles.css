@@ -369,9 +369,11 @@ body.sidebar-expanded .sidebar {
   box-shadow: var(--shadow-md);
 }
 
-/* ── Sidebar scrollbar hidden ── */
-.sidebar::-webkit-scrollbar { width: 0; }
-.sidebar { scrollbar-width: none; }
+/* ── Sidebar scrollbar ── */
+.sidebar::-webkit-scrollbar { width: 4px; }
+.sidebar::-webkit-scrollbar-track { background: transparent; }
+.sidebar::-webkit-scrollbar-thumb { background: var(--brand); border-radius: 4px; }
+.sidebar { scrollbar-width: thin; scrollbar-color: var(--brand) transparent; }
 
 /* ── Sidebar inner — sits directly on brand bg ── */
 .sidebar-inner {
