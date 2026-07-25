@@ -493,10 +493,10 @@ function renderSales(el, d) {
     <div class="kpi-grid" style="margin-bottom:16px">
       ${kpi("💰", "Total Revenue (90d)", fmtMoney(d.totalRevenue90, baseCurrency()), { trend: d.revenueGrowth })}
       ${kpi("🧾", "Transactions", fmtN(d.allSales.length), { sub: `${fmtN(d.todaySales.length)} today` })}
-      ${kpi("🛒", "Avg Order", fmtMoney(d.avgOrderValue, baseCurrency())}
-      ${kpi("📦", "Units Sold", fmtN(Object.values(d.prodSales).reduce((a, p) => a + p.qty, 0))}
-      ${kpi("💸", "Discounts", fmtMoney(totalDiscount, baseCurrency())}
-      ${kpi("🏛️", "VAT (90d)", fmtMoney(d.totalVat90, baseCurrency())}
+      ${kpi("🛒", "Avg Order", fmtMoney(d.avgOrderValue, baseCurrency()))}
+      ${kpi("📦", "Units Sold", fmtN(Object.values(d.prodSales).reduce((a, p) => a + p.qty, 0)))}
+      ${kpi("💸", "Discounts", fmtMoney(totalDiscount, baseCurrency()))}
+      ${kpi("🏛️", "VAT (90d)", fmtMoney(d.totalVat90, baseCurrency()))}
     </div>
 
     <div class="card" style="margin-bottom:16px">
