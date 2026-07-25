@@ -16,6 +16,7 @@ import {
   refreshProducts,
   stockFor,
   hasFeature,
+  createNotification,
 } from "./uganda-pos-core.js";
 import { logAuditAction } from "./uganda-pos-view-audit.js";
 
@@ -556,6 +557,18 @@ function openStockModal(productId) {
           });
 
           toast("Stock updated", "success");
+
+          // Notify if stock is now below reorder level
+          const updatedProd = STATE.products.find(x => x.id === productId);
+          if (updatedProd && newQty <= Number(updatedProd.reorder_level || 0) && newQty >= 0) {
+            createNotification({
+              title: "Stock below reorder level",
+              body: `${updatedProd.name} is now at ${newQty} ${updatedProd.unit || "pc"} (reorder: ${updatedProd.reorder_level})`,
+              type: "stock",
+              route: "inventory",
+            }).catch(() => {});
+          }
+
           closeModal();
           await refreshProducts();
           renderProductTable();
@@ -731,6 +744,30 @@ function openBatchModal(batchId) {
           p_created_by: STATE.appUser.id,
         });
         toast(editing ? "Batch updated" : "Batch added", "success");
+
+        // Notify if batch expires within 7 days
+        if (expiry) {
+          const expDate = new Date(expiry);
+          const daysLeft = Math.ceil((expDate - new Date()) / (1000*60*60*24));
+          if (daysLeft <= 7 && daysLeft >= 0) {
+            const prod = STATE.products.find(x => x.id === productId);
+            createNotification({
+              title: "Batch expiring soon",
+              body: `${prod?.name || "Product"} batch "${batchNum}" expires in ${daysLeft} day(s)`,
+              type: "warning",
+              route: "inventory",
+            }).catch(() => {});
+          } else if (daysLeft < 0) {
+            const prod = STATE.products.find(x => x.id === productId);
+            createNotification({
+              title: "Batch already expired",
+              body: `${prod?.name || "Product"} batch "${batchNum}" expired ${Math.abs(daysLeft)} day(s) ago`,
+              type: "error",
+              route: "inventory",
+            }).catch(() => {});
+          }
+        }
+
         closeModal();
         await refreshProducts();
         renderBatchesTab($("inv-tab-content"));

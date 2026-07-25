@@ -451,6 +451,12 @@ export async function loadBootstrapData() {
       console.warn("loadSubscription failed:", e),
     ),
   ]);
+
+  // Generate inventory notifications (low stock, expiry alerts)
+  generateInventoryNotifications().catch((e) =>
+    console.warn("generateInventoryNotifications failed:", e),
+  );
+
   return true;
 }
 
@@ -706,6 +712,72 @@ export async function createNotification({
     p_type: type,
     p_route: route,
   });
+}
+
+// ---------------------------------------------------------------------
+// 6b. INVENTORY NOTIFICATIONS (low stock, expiry alerts)
+// ---------------------------------------------------------------------
+export async function generateInventoryNotifications() {
+  if (!STATE.business || !STATE.branch) return;
+  const now = new Date();
+  const sevenDays = new Date(now.getTime() + 7 * 86400000);
+  const thirtyDays = new Date(now.getTime() + 30 * 86400000);
+
+  // 1. Low stock alerts
+  const low = lowStockProducts();
+  if (low.length > 0) {
+    const names = low.slice(0, 3).map(p => p.name).join(", ");
+    const suffix = low.length > 3 ? ` and ${low.length - 3} more` : "";
+    await createNotification({
+      title: `${low.length} product(s) low on stock`,
+      body: `${names}${suffix} are at or below reorder level`,
+      type: "stock",
+      route: "inventory",
+    }).catch(() => {});
+  }
+
+  // 2. Expiring batches (within 7 days)
+  const { data: expiringSoon } = await supabase
+    .from("stock_batches")
+    .select("id, batch_number, expiry_date, product:products(name)")
+    .eq("business_id", STATE.business.id)
+    .eq("branch_id", STATE.branch.id)
+    .gt("quantity", 0)
+    .not("expiry_date", "is", null)
+    .lte("expiry_date", sevenDays.toISOString().slice(0, 10))
+    .gte("expiry_date", now.toISOString().slice(0, 10));
+
+  if (expiringSoon?.length) {
+    const names = expiringSoon.slice(0, 3).map(b => `${b.product?.name} (${b.batch_number})`).join(", ");
+    const suffix = expiringSoon.length > 3 ? ` and ${expiringSoon.length - 3} more` : "";
+    await createNotification({
+      title: `${expiringSoon.length} batch(es) expiring soon`,
+      body: `${names}${suffix} expire within 7 days`,
+      type: "warning",
+      route: "inventory",
+    }).catch(() => {});
+  }
+
+  // 3. Expired batches
+  const { data: expired } = await supabase
+    .from("stock_batches")
+    .select("id, batch_number, expiry_date, product:products(name)")
+    .eq("business_id", STATE.business.id)
+    .eq("branch_id", STATE.branch.id)
+    .gt("quantity", 0)
+    .not("expiry_date", "is", null)
+    .lt("expiry_date", now.toISOString().slice(0, 10));
+
+  if (expired?.length) {
+    const names = expired.slice(0, 3).map(b => `${b.product?.name} (${b.batch_number})`).join(", ");
+    const suffix = expired.length > 3 ? ` and ${expired.length - 3} more` : "";
+    await createNotification({
+      title: `${expired.length} batch(es) expired`,
+      body: `${names}${suffix} have passed their expiry date`,
+      type: "error",
+      route: "inventory",
+    }).catch(() => {});
+  }
 }
 
 // ---------------------------------------------------------------------
