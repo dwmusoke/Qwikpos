@@ -169,8 +169,9 @@ a { color: inherit; text-decoration: none; }
   top: 0;
   height: 100vh;
   overflow-y: auto;
+  overflow-x: hidden;
   z-index: 40;
-  transition: transform var(--dur) var(--ease), background-color 0.6s var(--ease), width 0.3s var(--ease);
+  transition: width 0.3s var(--ease), padding 0.3s var(--ease), transform var(--dur) var(--ease), background-color 0.6s var(--ease);
 }
 
 /* Brand glow overlay at the top of sidebar */
@@ -395,7 +396,6 @@ a { color: inherit; text-decoration: none; }
     opacity: 1;
   }
 }
-}
 .offline-pill {
   display: none;
   align-items: center;
@@ -449,6 +449,50 @@ a { color: inherit; text-decoration: none; }
   padding: 0 24px;
   height: var(--topbar-h);
   backdrop-filter: blur(12px);
+}
+.topbar::after {
+  content: "";
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, var(--brand), var(--brand-dark), var(--brand));
+  opacity: 0.7;
+  pointer-events: none;
+}
+
+.topbar-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  border-radius: var(--radius-pill);
+  border: none;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--dur-fast) var(--ease);
+  white-space: nowrap;
+  background: var(--brand);
+  color: #fff;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.12);
+}
+.topbar-cta:hover {
+  background: var(--brand-dark);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.18);
+  transform: translateY(-1px);
+}
+.topbar-cta:active {
+  transform: translateY(0);
+}
+.topbar-cta .cta-icon {
+  font-size: 14px;
+}
+.topbar-cta-group {
+  display: flex;
+  gap: 8px;
+  margin-left: 8px;
 }
 .topbar h1 {
   font-size: 17px;
@@ -1739,6 +1783,7 @@ tbody tr:hover {
 
 @media (max-width: 860px) {
   .menu-btn { display: inline-flex; }
+  .topbar-cta-group { display: none !important; }
   .sidebar {
     position: fixed;
     left: 0;

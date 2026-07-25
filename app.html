@@ -468,6 +468,17 @@
           <button class="menu-btn" id="menu-btn">☰</button>
           <button class="sidebar-collapse-btn" id="sidebar-collapse-btn" title="Toggle sidebar">◀</button>
           <h1 id="page-title">Dashboard</h1>
+          <div class="topbar-cta-group" id="topbar-cta-group">
+            <button class="topbar-cta" onclick="navigateTo('pos')" title="Open POS">
+              <span class="cta-icon">🛒</span> New Sale
+            </button>
+            <button class="topbar-cta" onclick="navigateTo('products')" title="Add product">
+              <span class="cta-icon">➕</span> Product
+            </button>
+            <button class="topbar-cta" onclick="navigateTo('customers')" title="Add customer">
+              <span class="cta-icon">👤</span> Customer
+            </button>
+          </div>
           <div class="spacer"></div>
           <select
             id="currency-picker"

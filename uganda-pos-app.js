@@ -930,3 +930,4 @@ setTimeout(() => {
 }, 1000);
 
 window.__qwickposReady && window.__qwickposReady();
+window.navigateTo = navigateTo;
