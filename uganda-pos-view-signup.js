@@ -6,6 +6,7 @@
 // so pricing can be shown before anyone logs in.
 // =====================================================================
 import { supabase, $, qsa, escapeHtml, toast, STATE } from "./uganda-pos-core.js";
+import { BUSINESS_TYPES, seedDefaultsForType } from "./uganda-pos-view-onboarding.js";
 
 const PENDING_KEY = "ugpos_pending_signup";
 let selectedPlan = null;
@@ -214,6 +215,15 @@ export async function showCreateBusinessScreen() {
               <option value="KES">KES — Kenyan Shilling</option>
             </select>
           </div>
+          <div class="field">
+            <label for="cb-type">Business Type</label>
+            <select id="cb-type">
+              ${BUSINESS_TYPES.map(t =>
+                `<option value="${t.id}">${t.icon} ${t.label}</option>`
+              ).join("")}
+            </select>
+            <p class="help-text" id="cb-type-desc" style="margin-top:4px;font-size:12px">${BUSINESS_TYPES[0].desc}</p>
+          </div>
           <button class="btn btn-primary btn-block" type="submit" id="cb-submit">
             Create Business & Start Trial
           </button>
@@ -249,6 +259,16 @@ export async function showCreateBusinessScreen() {
   const freshErr = $("cb-error");
   const freshCancel = $("cb-cancel");
 
+  // Business type description updater
+  const typeSelect = $("cb-type");
+  const typeDesc = $("cb-type-desc");
+  if (typeSelect && typeDesc) {
+    typeSelect.addEventListener("change", () => {
+      const t = BUSINESS_TYPES.find(t => t.id === typeSelect.value);
+      if (t) typeDesc.textContent = t.desc;
+    });
+  }
+
   freshCancel.addEventListener("click", (e) => {
     e.preventDefault();
     showLoginScreen();
@@ -262,6 +282,7 @@ export async function showCreateBusinessScreen() {
     const fullName = $("cb-full-name").value.trim();
     const phone = $("cb-phone").value.trim();
     const currency = $("cb-currency").value;
+    const businessType = $("cb-type")?.value || "retail";
 
     if (!businessName || !fullName) {
       freshErr.textContent = "Business name and your name are required.";
@@ -274,7 +295,7 @@ export async function showCreateBusinessScreen() {
 
     // Try RPC first (schema v1-v8)
     let rpcFailed = false;
-    const { error: rpcErr } = await supabase.rpc("create_business_and_owner", {
+    const { error: rpcErr, data: rpcData } = await supabase.rpc("create_business_and_owner", {
       p_business_name: businessName,
       p_full_name: fullName,
       p_phone: phone,
@@ -282,13 +303,27 @@ export async function showCreateBusinessScreen() {
       p_plan_code: "starter",
     });
 
-    if (rpcErr) {
-      rpcFailed = true;
-      console.warn(
-        "create_business_and_owner RPC failed, using fallback:",
-        rpcErr.message,
-      );
+    // If RPC succeeded, we need the business ID to seed defaults
+    // Try to get it from the session
+    let businessId = null;
+    let branchId = null;
+
+    if (!rpcErr) {
+      // RPC succeeded - reload to get fresh state, then seed
+      freshBtn.textContent = "Setting up defaults…";
+      // Reload bootstrap to get the newly created business
+      await boot();
+      businessId = STATE.business?.id;
+      branchId = STATE.branch?.id;
+      if (businessId) {
+        await seedDefaultsForType(businessId, businessType, branchId);
+      }
+      createCard.classList.add("hidden");
+      return; // boot already renders the app
     }
+
+    rpcFailed = true;
+    console.warn("create_business_and_owner RPC failed, using fallback:", rpcErr.message);
 
     // Fallback: direct inserts if RPC failed or doesn't exist
     if (rpcFailed) {
@@ -302,13 +337,14 @@ export async function showCreateBusinessScreen() {
 
         if (!plan) throw new Error("Starter plan not found");
 
-        // Create business
+        // Create business with type
         const { data: business, error: bizErr } = await supabase
           .from("businesses")
           .insert({
             name: businessName,
             base_currency: currency,
             primary_phone: phone || null,
+            business_type: businessType,
           })
           .select()
           .single();
@@ -349,6 +385,10 @@ export async function showCreateBusinessScreen() {
         });
 
         if (subErr) throw subErr;
+
+        // Seed defaults
+        businessId = business.id;
+        branchId = branch.id;
       } catch (fallbackErr) {
         freshBtn.disabled = false;
         freshBtn.textContent = "Create Business & Start Trial";
@@ -358,6 +398,12 @@ export async function showCreateBusinessScreen() {
         console.error("Fallback create business failed:", fallbackErr);
         return;
       }
+    }
+
+    // Seed defaults after creation
+    if (businessId) {
+      freshBtn.textContent = "Setting up defaults…";
+      await seedDefaultsForType(businessId, businessType, branchId);
     }
 
     freshBtn.disabled = false;
