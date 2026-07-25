@@ -63,8 +63,8 @@ function renderSupListTab(el) {
     <div class="flex gap" style="margin-bottom:14px">
       <button class="btn btn-primary" id="add-supplier-btn">+ Add Supplier</button>
     </div>
-    <div class="table-wrap">
-      <table>
+    <div class="table-wrap sup-table">
+      <table class="sup-table">
         <thead><tr><th>Name</th><th>Phone</th><th>Email</th><th>Address</th><th>TIN</th><th>Balance</th><th>POs</th><th></th></tr></thead>
         <tbody id="sup-table-body"></tbody>
       </table>
@@ -98,9 +98,9 @@ async function renderSupTable() {
       (s) => `
     <tr>
       <td>
-        <div style="display:flex;align-items:center;gap:8px;">
-          <div style="width:32px;height:32px;border-radius:50%;background:var(--brand-light);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;color:var(--brand);">${escapeHtml((s.name || "?")[0])}</div>
-          <div><b style="font-size:13px;">${escapeHtml(s.name)}</b><br><span style="font-size:11px;color:var(--text-muted);">${escapeHtml(s.contact_person || "—")}</span></div>
+        <div class="sup-name">
+          <div class="sup-name-avatar">${escapeHtml((s.name || "?")[0])}</div>
+          <div class="sup-name-text"><b>${escapeHtml(s.name)}</b><span>${escapeHtml(s.contact_person || "—")}</span></div>
         </div>
       </td>
       <td style="font-size:12px;">${escapeHtml(s.phone || "—")}</td>
@@ -110,7 +110,7 @@ async function renderSupTable() {
       <td><span class="badge ${Number(s.balance) > 0 ? "badge-yellow" : "badge-green"}">${fmtMoney(s.balance || 0)}</span></td>
       <td>${poMap[s.id] || 0}</td>
       <td>
-        <div style="display:flex;gap:4px;flex-wrap:wrap;">
+        <div class="sup-actions">
           <button class="btn btn-secondary btn-sm" data-edit="${s.id}" title="Edit">✏️</button>
           <button class="btn btn-secondary btn-sm" data-pay="${s.id}" title="Record Payment">💰</button>
           <button class="btn btn-sm btn-primary" data-view-sup="${s.id}" title="View">👁️</button>

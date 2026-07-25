@@ -2215,6 +2215,27 @@ tbody tr:hover {
 .cat-bar-fill.method-fill { background: var(--success, #16a34a); }
 .cat-bar-meta { font-size: 11px; color: var(--text-muted); }
 
+/* ---------- Suppliers Table ---------- */
+.sup-table table { table-layout: fixed; width: 100%; }
+.sup-table th, .sup-table td { padding: 8px; font-size: 12.5px; }
+.sup-table th { white-space: nowrap; color: var(--text-muted); }
+.sup-table td { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sup-table td:nth-child(1) { width: 24%; }
+.sup-table td:nth-child(2) { width: 14%; }
+.sup-table td:nth-child(3) { width: 16%; }
+.sup-table td:nth-child(4) { width: 18%; }
+.sup-table td:nth-child(5) { width: 10%; }
+.sup-table td:nth-child(6) { width: 10%; }
+.sup-table td:nth-child(7) { width: 6%; text-align: center; }
+.sup-table td:nth-child(8) { width: 12%; }
+.sup-table .sup-name { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.sup-table .sup-name-avatar { width: 32px; height: 32px; border-radius: 50%; background: var(--brand-light); display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700; color: var(--brand); flex-shrink: 0; }
+.sup-table .sup-name-text { min-width: 0; }
+.sup-table .sup-name-text b { font-size: 13px; }
+.sup-table .sup-name-text span { font-size: 11px; color: var(--text-muted); display: block; }
+.sup-table .sup-actions { display: flex; gap: 4px; flex-wrap: wrap; }
+.sup-table .sup-actions .btn { min-width: 0; padding: 6px 8px; font-size: 12px; }
+
 /* ---------- 12. ACCOUNTING STATEMENTS ---------- */
 .stmt-table {
   width: 100%;
