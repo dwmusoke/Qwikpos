@@ -250,17 +250,17 @@ function wireShell() {
   });
   $("sidebar-backdrop").addEventListener("click", closeSidebarOnMobile);
 
-  // Sidebar collapse toggle (desktop)
-  const savedCollapsed = localStorage.getItem("ugpos_sidebar_collapsed") === "true";
-  if (savedCollapsed) document.body.classList.add("sidebar-collapsed");
+  // Sidebar expand/collapse toggle (desktop) — defaults to expanded
+  const savedExpanded = localStorage.getItem("ugpos_sidebar_expanded") !== "false";
+  if (savedExpanded) document.body.classList.add("sidebar-expanded");
 
   $("sidebar-collapse-btn").addEventListener("click", () => {
-    document.body.classList.toggle("sidebar-collapsed");
-    const isCollapsed = document.body.classList.contains("sidebar-collapsed");
-    localStorage.setItem("ugpos_sidebar_collapsed", isCollapsed);
-    $("sidebar-collapse-btn").textContent = isCollapsed ? "▶" : "◀";
+    document.body.classList.toggle("sidebar-expanded");
+    const isExpanded = document.body.classList.contains("sidebar-expanded");
+    localStorage.setItem("ugpos_sidebar_expanded", isExpanded);
+    $("sidebar-collapse-btn").textContent = isExpanded ? "◀" : "▶";
   });
-  $("sidebar-collapse-btn").textContent = document.body.classList.contains("sidebar-collapsed") ? "▶" : "◀";
+  $("sidebar-collapse-btn").textContent = document.body.classList.contains("sidebar-expanded") ? "◀" : "▶";
 
   $("theme-toggle").addEventListener("click", () => {
     const html = document.documentElement;
