@@ -431,7 +431,13 @@ export async function loadBootstrapData() {
   ];
   STATE.currencies = (currencies && currencies.length > 0) ? currencies : DEFAULT_CURRENCIES;
   STATE.categories = categories || [];
-  STATE.taxCategories = taxCategories || [];
+  const DEFAULT_TAX_CATEGORIES = [
+    { code: "VAT", name: "VAT Standard", rate: 18 },
+    { code: "VAT0", name: "VAT Zero Rated", rate: 0 },
+    { code: "VATE", name: "VAT Exempt", rate: 0 },
+    { code: "NONE", name: "No Tax", rate: 0 },
+  ];
+  STATE.taxCategories = (taxCategories && taxCategories.length > 0) ? taxCategories : DEFAULT_TAX_CATEGORIES;
   STATE.brands = brands || [];
   STATE.units = units || [];
   STATE.displayCurrency = business?.base_currency || "UGX";
