@@ -1318,8 +1318,8 @@ body.sidebar-expanded .main {
 }
 .product-image-preview {
   width: 100%;
-  max-width: 120px;
-  height: 120px;
+  max-width: 96px;
+  height: 96px;
   border: 1px dashed var(--border);
   border-radius: var(--radius-sm);
   display: flex;
@@ -1711,7 +1711,7 @@ tbody tr:hover {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
-  padding: 12px;
+  padding: 10px;
   cursor: pointer;
   text-align: left;
   display: flex;
@@ -1750,7 +1750,7 @@ tbody tr:hover {
   color: var(--danger);
   font-weight: 700;
 }
-.product-emoji { font-size: 28px; }
+.product-emoji { font-size: 22px; }
 
 /* Product card qty badge (when item is in cart) */
 .product-card .qty-badge {
