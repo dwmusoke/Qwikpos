@@ -1058,3 +1058,31 @@ export function buildEfrisPayload({
     },
   };
 }
+
+// ── Image resize utility ──
+export function resizeImage(file, maxSize = 400, quality = 0.7) {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        let w = img.width, h = img.height;
+        if (w > maxSize || h > maxSize) {
+          const ratio = Math.min(maxSize / w, maxSize / h);
+          w = Math.round(w * ratio);
+          h = Math.round(h * ratio);
+        }
+        const canvas = document.createElement("canvas");
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0, w, h);
+        canvas.toBlob((blob) => {
+          resolve(new File([blob], file.name, { type: blob.type || "image/jpeg", lastModified: Date.now() }));
+        }, "image/jpeg", quality);
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}

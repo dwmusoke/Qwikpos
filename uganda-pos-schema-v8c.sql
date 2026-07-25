@@ -312,8 +312,14 @@ alter table products add column if not exists efris_commodity_category_id text;
 alter table products add column if not exists efris_measure_unit text;
 alter table products add column if not exists efris_registered_at timestamptz;
 
--- Tax categories: add description column
-alter table tax_categories add column if not exists description text;
+-- Tax categories: enable RLS (readable by all authenticated, writable by admins)
+alter table tax_categories enable row level security;
+drop policy if exists tax_categories_select on tax_categories;
+create policy tax_categories_select on tax_categories for select using (true);
+drop policy if exists tax_categories_manage on tax_categories;
+create policy tax_categories_manage on tax_categories for all using (
+  exists (select 1 from app_users where id = auth.uid() and role in ('superadmin','admin') and is_active = true)
+);
 
 -- Businesses: document template config columns
 alter table businesses add column if not exists tpl_primary_color text default '#0f6b4a';

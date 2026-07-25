@@ -17,6 +17,7 @@ import {
   stockFor,
   hasFeature,
   createNotification,
+  resizeImage,
 } from "./uganda-pos-core.js";
 import { logAuditAction } from "./uganda-pos-view-audit.js";
 
@@ -353,13 +354,14 @@ function openProductModal(productId) {
             return;
           }
 
-          // Upload image
+          // Upload image (auto-resized)
           if (pendingImageFile && saved) {
-            const ext = pendingImageFile.name.split(".").pop() || "jpg";
+            const resized = await resizeImage(pendingImageFile);
+            const ext = resized.name.split(".").pop() || "jpg";
             const path = `${STATE.business.id}/${saved.id}.${ext}`;
             const { error: uploadErr } = await supabase.storage
               .from("product-images")
-              .upload(path, pendingImageFile, { upsert: true });
+              .upload(path, resized, { upsert: true });
             if (uploadErr?.message?.includes("Bucket not found")) {
               toast("Run uganda-pos-schema-v8c.sql to create storage buckets, then try again.", "error", 6000);
             } else if (uploadErr) {
