@@ -335,19 +335,39 @@ function renderProductGrid() {
     return;
   }
 
+  // Fetch batch data for expiry-aware products
+  const batchProducts = STATE.products.filter(p => p.has_batches || p.expiry_date);
+  const batchMap = {};
+  if (batchProducts.length > 0) {
+    supabase.from("stock_batches").select("product_id, batch_number, expiry_date, quantity").eq("business_id", STATE.business.id).gt("quantity", 0).then(({ data: batches }) => {
+      (batches || []).forEach(b => {
+        if (!batchMap[b.product_id]) batchMap[b.product_id] = [];
+        batchMap[b.product_id].push(b);
+      });
+    });
+  }
+
   grid.innerHTML = list
     .map((p) => {
       const stock = stockFor(p.id);
       const low = stock <= Number(p.reorder_level || 0);
       const cartItem = STATE.cart.find((i) => i.productId === p.id);
       const qtyInCart = cartItem ? cartItem.qty : 0;
+      const pb = batchMap[p.id] || [];
+      const hasExpiry = p.expiry_date || pb.length > 0;
+      let expiryBadge = "";
+      if (p.expiry_date) {
+        const days = Math.ceil((new Date(p.expiry_date) - new Date()) / (1000*60*60*24));
+        if (days < 0) expiryBadge = `<span class="badge badge-red" style="font-size:9px;">EXPIRED</span>`;
+        else if (days <= 7) expiryBadge = `<span class="badge badge-yellow" style="font-size:9px;">${days}d left</span>`;
+      }
       return `
       <button class="product-card" data-id="${p.id}">
         ${qtyInCart > 0 ? `<span class="qty-badge">${qtyInCart}</span>` : ""}
         ${p.image_url ? `<div class="product-card-img"><img src="${escapeHtml(p.image_url)}" alt="" /></div>` : `<div class="product-emoji">${escapeHtml(categoryIcon(p.category_id))}</div>`}
         <div class="pname">${escapeHtml(p.name)}</div>
         <div class="pprice">${fmtMoneyRaw(fromBase(p.selling_price, posSaleCurrency), posSaleCurrency)}</div>
-        <div class="pstock ${low ? "low" : ""}">${stock} ${escapeHtml(p.unit || "pc")} in stock</div>
+        <div class="pstock ${low ? "low" : ""}">${stock} ${escapeHtml(p.unit || "pc")} ${hasExpiry ? expiryBadge : ""}</div>
       </button>`;
     })
     .join("");
@@ -540,6 +560,8 @@ function addToCart(productId, qty = 1) {
       unitPriceBase: Number(product.selling_price),
       taxCode: product.tax_category_code || "VAT",
       discount: 0,
+      batchNumber: null,
+      expiryDate: product.expiry_date || null,
     });
   }
   renderCart();
@@ -613,7 +635,7 @@ function renderCart() {
         <div class="cart-row-top">
           <div class="info">
             <div class="name">${escapeHtml(l.name)}</div>
-            <div class="unit">${fmtMoneyRaw(l.unitPrice, posSaleCurrency)} each</div>
+            <div class="unit">${fmtMoneyRaw(l.unitPrice, posSaleCurrency)} each${l.expiryDate ? ` · Exp: ${l.expiryDate}` : ""}${l.batchNumber ? ` · Batch: ${escapeHtml(l.batchNumber)}` : ""}</div>
           </div>
           <button class="cart-row-remove" data-action="remove" title="Remove item">✕</button>
         </div>

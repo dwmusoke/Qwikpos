@@ -95,7 +95,7 @@ function renderProductsTab(el) {
     <div class="table-wrap">
       <table>
         <thead>
-          <tr><th>Product</th><th>Category</th><th>Cost</th><th>Price</th><th>Stock</th><th>Tax</th>${STATE.business.efris_live_enabled ? "<th>EFRIS</th>" : ""}<th></th></tr>
+          <tr><th>Product</th><th>Category</th><th>Cost</th><th>Price</th><th>Stock</th><th>Tax</th>${STATE.business.efris_live_enabled ? "<th>EFRIS</th>" : ""}<th>Expiry</th><th>Batches</th><th></th></tr>
         </thead>
         <tbody id="inv-table-body"></tbody>
       </table>
@@ -130,7 +130,7 @@ function renderProductTable() {
   }
 
   if (!list.length) {
-    const colSpan = STATE.business.efris_live_enabled ? 9 : 8;
+    const colSpan = STATE.business.efris_live_enabled ? 11 : 10;
     tbody.innerHTML = `<tr><td colspan="${colSpan}"><div class="empty-state">No products yet. Click "Add Product" or "Import CSV" to get started.</div></td></tr>`;
     return;
   }
@@ -161,6 +161,8 @@ function renderProductTable() {
         <td><span class="badge ${low ? "badge-red" : "badge-green"}">${stock} ${escapeHtml(p.unit || "pc")}</span></td>
         <td><span class="badge badge-blue">${escapeHtml(p.tax_category_code || "VAT")}</span></td>
         ${efrisOn ? `<td>${p.efris_registered_at ? '<span class="badge badge-green">registered</span>' : `<button class="btn btn-outline btn-sm" data-efris-register="${p.id}">Register</button>`}</td>` : ""}
+        <td>${expired ? `<span class="badge badge-red">EXPIRED</span>` : expiringSoon ? `<span class="badge badge-yellow">${Math.ceil((new Date(p.expiry_date) - new Date()) / (1000*60*60*24))}d</span>` : p.expiry_date ? `<span style="font-size:12px;color:var(--text-muted)">${p.expiry_date}</span>` : `<span style="font-size:12px;color:var(--text-faint)">—</span>`}</td>
+        <td>${p.has_batches ? `<span class="badge badge-blue">tracked</span>` : `<span style="font-size:12px;color:var(--text-faint)">—</span>`}</td>
         <td class="flex gap">
           <button class="btn btn-outline btn-sm" data-edit="${p.id}">Edit</button>
           <button class="btn btn-outline btn-sm" data-stock="${p.id}">Stock</button>
@@ -238,7 +240,20 @@ function openProductModal(productId) {
       <div class="field"><label>VAT / Tax Category</label>
         <select id="pf-tax">${STATE.taxCategories.map((t) => `<option value="${t.code}" ${p.tax_category_code === t.code ? "selected" : ""}>${escapeHtml(t.name)}</option>`).join("")}</select>
       </div>
-      <div class="field"><label>Expiry Date</label><input type="date" id="pf-expiry" value="${p.expiry_date || ""}" /></div>
+    </div>
+
+    <div style="margin:14px 0 8px;padding:12px;background:var(--surface-2);border-radius:var(--radius-sm);border:1px solid var(--border)">
+      <div style="font-size:13px;font-weight:700;margin-bottom:10px;">🍎 Food / Pharmacy</div>
+      <div class="field-row">
+        <div class="field">
+          <label>
+            <input type="checkbox" id="pf-has-batches" ${p.has_batches ? "checked" : ""} style="width:auto;margin-right:6px" />
+            Track batches
+          </label>
+          <p class="help-text" style="margin-top:4px">Assign stock to specific batches for traceability</p>
+        </div>
+        <div class="field"><label>Expiry Date</label><input type="date" id="pf-expiry" value="${p.expiry_date || ""}" /></div>
+      </div>
     </div>
     <div class="field"><label>Initial Stock (this branch)</label><input type="number" step="1" id="pf-stock" value="${editing ? "" : "0"}" ${editing ? "disabled" : ""} placeholder="${editing ? "Use Stock button to adjust" : "0"}" /></div>
     <div class="field">
@@ -304,6 +319,9 @@ function openProductModal(productId) {
               efrisReset = true;
           }
 
+          const expiryDate = $("pf-expiry").value || null;
+          const hasBatches = $("pf-has-batches")?.checked || false;
+
           const { data: saved, error } = await supabase.rpc(
             editing ? "upsert_product" : "upsert_product",
             {
@@ -326,6 +344,8 @@ function openProductModal(productId) {
               p_efris_commodity_category_id: efrisCat,
               p_efris_measure_unit: efrisUnit,
               p_reset_efris_registration: efrisReset,
+              p_expiry_date: expiryDate,
+              p_has_batches: hasBatches,
             },
           );
           if (error) {
