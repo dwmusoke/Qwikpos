@@ -588,10 +588,10 @@ function renderProfitability(el, d) {
 
   el.innerHTML = `
     <div class="kpi-grid" style="margin-bottom:16px">
-      ${kpi("💰", "Revenue (90d)", fmtMoney(d.totalRevenue90, baseCurrency())}
-      ${kpi("📦", "COGS", fmtMoney(d.totalCOGS, baseCurrency())}
+      ${kpi("💰", "Revenue (90d)", fmtMoney(d.totalRevenue90, baseCurrency()))}
+      ${kpi("📦", "COGS", fmtMoney(d.totalCOGS, baseCurrency()))}
       ${kpi("📈", "Gross Profit", fmtMoney(d.grossProfit, baseCurrency()), { color: d.grossProfit >= 0 ? "var(--success)" : "var(--danger)", sub: `Margin: ${gm}%` })}
-      ${kpi("💳", "Expenses", fmtMoney(d.totalExpenses, baseCurrency())}
+      ${kpi("💳", "Expenses", fmtMoney(d.totalExpenses, baseCurrency()))}
       ${kpi("🏦", "Net Profit", fmtMoney(netProfit, baseCurrency()), { color: netProfit >= 0 ? "var(--success)" : "var(--danger)", sub: `Margin: ${nm}%` })}
     </div>
 
@@ -673,8 +673,8 @@ function renderInventory(el, d) {
   el.innerHTML = `
     <div class="kpi-grid" style="margin-bottom:16px">
       ${kpi("📦", "Products", fmtN(d.products.length), { sub: `${d.outOfStock.length} out of stock` })}
-      ${kpi("📊", "Stock Value (Cost)", fmtMoney(d.totalStockValue, baseCurrency())}
-      ${kpi("💰", "Stock Value (Retail)", fmtMoney(d.totalRetailValue, baseCurrency())}
+      ${kpi("📊", "Stock Value (Cost)", fmtMoney(d.totalStockValue, baseCurrency()))}
+      ${kpi("💰", "Stock Value (Retail)", fmtMoney(d.totalRetailValue, baseCurrency()))}
       ${kpi("🔄", "Turnover", `${turnover}x`, { sub: `${daysOfInventory} days of stock` })}
       ${kpi("⚠️", "Low Stock", fmtN(d.lowStock.length), { color: d.lowStock.length > 0 ? "var(--danger)" : "var(--success)" })}
       ${kpi("🚫", "Out of Stock", fmtN(d.outOfStock.length), { color: d.outOfStock.length > 0 ? "var(--danger)" : "var(--success)" })}
@@ -763,10 +763,10 @@ function renderCustomers(el, d) {
     <div class="kpi-grid" style="margin-bottom:16px">
       ${kpi("👥", "Total Customers", fmtN(d.customers.length))}
       ${kpi("🌟", "VIP Customers", fmtN(vip.length), { sub: "Top 20% by spend" })}
-      ${kpi("🔄", "Repeat Rate", d.customers.length > 0 ? `${pct(custData.filter(c => c.count > 1).length, d.customers.length)}%` : "N/A"}
+      ${kpi("🔄", "Repeat Rate", d.customers.length > 0 ? `${pct(custData.filter(c => c.count > 1).length, d.customers.length))}%` : "N/A"}
       ${kpi("💤", "Inactive (60d+)", fmtN(inactive.length), { color: inactive.length > 0 ? "var(--warning)" : "var(--success)" })}
       ${kpi("💳", "Credit Customers", fmtN(creditCustomers.length), { sub: fmtMoney(totalAR, baseCurrency()) + " outstanding" })}
-      ${kpi("🛒", "Avg Basket", fmtMoney(d.avgOrderValue, baseCurrency())}
+      ${kpi("🛒", "Avg Basket", fmtMoney(d.avgOrderValue, baseCurrency()))}
     </div>
 
     <div class="card" style="margin-bottom:16px">
@@ -845,7 +845,7 @@ function renderSuppliers(el, d) {
   el.innerHTML = `
     <div class="kpi-grid" style="margin-bottom:16px">
       ${kpi("🏢", "Suppliers", fmtN(d.suppliers.length))}
-      ${kpi("💰", "Total Spend (90d)", fmtMoney(supRows.reduce((a, s) => a + s.spend, 0), baseCurrency())}
+      ${kpi("💰", "Total Spend (90d)", fmtMoney(supRows.reduce((a, s) => a + s.spend, 0), baseCurrency()))}
       ${kpi("📋", "Purchase Orders", fmtN(d.pos.length), { sub: `${d.pendingPOs.length} pending` })}
       ${kpi("💳", "Outstanding Payables", fmtMoney(d.outstandingAP, baseCurrency()), { color: d.outstandingAP > 0 ? "var(--warning)" : "var(--success)" })}
     </div>
@@ -906,10 +906,10 @@ function renderFinancial(el, d) {
     </div>
 
     <div class="kpi-grid" style="margin-top:16px">
-      ${kpi("💵", "Cash Collected", fmtMoney(cashCollected, baseCurrency())}
-      ${kpi("🏛️", "VAT Collected", fmtMoney(d.totalVat90, baseCurrency())}
-      ${kpi("💳", "Outstanding AR", fmtMoney(d.outstandingAR, baseCurrency())}
-      ${kpi("📄", "Outstanding AP", fmtMoney(d.outstandingAP, baseCurrency())}
+      ${kpi("💵", "Cash Collected", fmtMoney(cashCollected, baseCurrency()))}
+      ${kpi("🏛️", "VAT Collected", fmtMoney(d.totalVat90, baseCurrency()))}
+      ${kpi("💳", "Outstanding AR", fmtMoney(d.outstandingAR, baseCurrency()))}
+      ${kpi("📄", "Outstanding AP", fmtMoney(d.outstandingAP, baseCurrency()))}
     </div>
   `;
 }
@@ -935,12 +935,12 @@ function renderTax(el, d) {
 
   el.innerHTML = `
     <div class="kpi-grid" style="margin-bottom:16px">
-      ${kpi("🏛️", "VAT Collected (90d)", fmtMoney(d.totalVat90, baseCurrency())}
+      ${kpi("🏛️", "VAT Collected (90d)", fmtMoney(d.totalVat90, baseCurrency()))}
       ${kpi("📋", "EFRIS Invoices", fmtN(d.efris.length), { sub: `${d.efrisAccepted} accepted` })}
       ${kpi("✅", "Accepted", fmtN(d.efrisAccepted), { color: "var(--success)" })}
       ${kpi("❌", "Rejected", fmtN(d.efrisRejected), { color: d.efrisRejected > 0 ? "var(--danger)" : "var(--success)" })}
-      ${kpi("⏳", "Pending", fmtN(d.efrisPending)}
-      ${kpi("💳", "TIN Coverage", `${tinCoverage}%`}
+      ${kpi("⏳", "Pending", fmtN(d.efrisPending))}
+      ${kpi("💳", "TIN Coverage", `${tinCoverage}%`)}
     </div>
 
     <div class="card" style="margin-bottom:16px">
@@ -1049,8 +1049,8 @@ function renderOperations(el, d) {
     <div class="kpi-grid" style="margin-bottom:16px">
       ${kpi("🔍", "Issues Found", fmtN(issues.length), { color: issues.length > 0 ? "var(--warning)" : "var(--success)" })}
       ${kpi("🔴", "Critical", fmtN(issues.filter(i => i.severity === "critical").length), { color: issues.some(i => i.severity === "critical") ? "var(--danger)" : "var(--success)" })}
-      ${kpi("🟡", "Warnings", fmtN(issues.filter(i => i.severity === "warning").length)}
-      ${kpi("ℹ️", "Info", fmtN(issues.filter(i => i.severity === "info").length)}
+      ${kpi("🟡", "Warnings", fmtN(issues.filter(i => i.severity === "warning").length))}
+      ${kpi("ℹ️", "Info", fmtN(issues.filter(i => i.severity === "info").length))}
     </div>
 
     <div class="card">
