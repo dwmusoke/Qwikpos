@@ -282,345 +282,73 @@ export async function renderDashboard(root) {
       </div>`;
   }
 
-   // --- Render ---
-   root.innerHTML = `
-     <!-- ═══ SECTION 1: EXECUTIVE KPIs ═══ -->
-     <div class="dash-section">
-       <div class="dash-section-header">
-         <h2 class="dash-section-title">Executive Summary</h2>
-       </div>
-       <div class="kpi-grid">
-         <div class="kpi-card">
-           <div class="kpi-icon" style="background:#eef7ff;">🧾</div>
-           <div class="kpi-content">
-             <div class="label">Today's Sales</div>
-             <div class="value">${fmtMoney(todayTotal, baseCurrency)}</div>
-             <div class="delta ${todayTrend !== null ? (Number(todayTrend) >= 0 ? "up" : "down") : ""}">${todayTrend !== null ? `${Number(todayTrend) >= 0 ? "↑" : "↓"} ${Math.abs(Number(todayTrend))}% vs yesterday` : "First sale today"}</div>
-           </div>
-         </div>
-         <div class="kpi-card">
-           <div class="kpi-icon" style="background:#eefaf0;">📅</div>
-           <div class="kpi-content">
-             <div class="label">Monthly Sales</div>
-             <div class="value">${fmtMoney(monthTotal, baseCurrency)}</div>
-             <div class="delta">${monthSales.length} transactions</div>
-           </div>
-         </div>
-         <div class="kpi-card">
-           <div class="kpi-icon" style="background:#f3f0ff;">📦</div>
-           <div class="kpi-content">
-             <div class="label">Inventory Value</div>
-             <div class="value">${fmtMoney(inventoryValue, baseCurrency)}</div>
-             <div class="delta">${STATE.products.length} SKUs</div>
-           </div>
-         </div>
-         <div class="kpi-card">
-           <div class="kpi-icon" style="background:#fff7ed;">👥</div>
-           <div class="kpi-content">
-             <div class="label">Receivables</div>
-             <div class="value">${fmtMoney(outstandingBalance, baseCurrency)}</div>
-             <div class="delta">${(customers || []).length} customers</div>
-           </div>
-         </div>
-         <div class="kpi-card">
-           <div class="kpi-icon" style="background:#fff1f2;">⚠️</div>
-           <div class="kpi-content">
-             <div class="label">Alerts</div>
-             <div class="value" style="color:${totalAlerts > 0 ? "var(--danger)" : "var(--text)"}">${totalAlerts}</div>
-             <div class="delta">${lowStock.length} low stock · ${expiryAlerts} expiring</div>
-           </div>
-         </div>
-         <div class="kpi-card">
-           <div class="kpi-icon" style="background:#f0fdf4;">✅</div>
-           <div class="kpi-content">
-             <div class="label">Business Health</div>
-             <div class="value">${allSales.length > 0 ? "Healthy" : "No Data"}</div>
-             <div class="delta">${allSales.length > 0 ? paidCount + "/" + allSales.length + " paid" : "—"}</div>
-           </div>
-         </div>
-       </div>
-     </div>
-
-     <!-- ═══ SECTION 2: SALES TRENDS ═══ -->
-     <div class="dash-section">
-       <div class="dash-section-header">
-         <h2 class="dash-section-title">Sales Trends</h2>
-         <span class="dash-section-sub">7‑day overview</span>
-       </div>
-       <div class="dash-grid dash-grid-2">
-         <div class="card card-chart">
-           <div class="card-title">Daily Sales</div>
-           <div class="line-chart-wrap">${lineChartSvg}</div>
-         </div>
-         <div class="card">
-           <div class="card-title">Payment Breakdown</div>
-           <div class="donut-wrap">
-             ${donutSvg}
-             <div class="donut-legend">
-               <div class="donut-legend-item">
-                 <div class="donut-legend-dot" style="background:#16a34a;"></div>
-                 <span class="donut-legend-label">Paid</span>
-                 <span class="donut-legend-value">${paidCount}</span>
-               </div>
-               <div class="donut-legend-item">
-                 <div class="donut-legend-dot" style="background:#f59e0b;"></div>
-                 <span class="donut-legend-label">Credit</span>
-                 <span class="donut-legend-value">${creditCount}</span>
-               </div>
-               ${otherCount > 0 ? `
-               <div class="donut-legend-item">
-                 <div class="donut-legend-dot" style="background:#9ca3af;"></div>
-                 <span class="donut-legend-label">Other</span>
-                 <span class="donut-legend-value">${otherCount}</span>
-               </div>` : ""}
-             </div>
-           </div>
-         </div>
-       </div>
-     </div>
-
-     <!-- ═══ SECTION 3: SALES SUMMARY + RECENT ═══ -->
-     <div class="dash-section">
-       <div class="dash-section-header">
-         <h2 class="dash-section-title">Sales Summary</h2>
-       </div>
-       <div class="dash-grid dash-grid-2">
-         <div class="card">
-           <div class="card-title">Period Comparison</div>
-           <div class="summary-compare">
-             <div class="sc-row"><span>Today</span><b>${fmtMoney(todayTotal, baseCurrency)}</b></div>
-             <div class="sc-row"><span>This Month</span><b>${fmtMoney(monthTotal, baseCurrency)}</b></div>
-             <div class="sc-row"><span>This Year</span><b>${fmtMoney(yearTotal, baseCurrency)}</b></div>
-             ${todayTrend !== null ? `<div class="sc-row sc-divider"><span>Yesterday vs Today</span><span class="${Number(todayTrend) >= 0 ? "text-success" : "text-danger"}">${Number(todayTrend) >= 0 ? "↑" : "↓"} ${Math.abs(Number(todayTrend))}%</span></div>` : ""}
-           </div>
-         </div>
-         <div class="card">
-           <div class="card-title">Recent Transactions</div>
-           ${recent.length ? `<div class="table-wrap"><table><thead><tr><th>Invoice</th><th>Time</th><th>Total</th><th>Status</th></tr></thead><tbody>${recent.map(s => `<tr><td>${escapeHtml(s.sale_number)}</td><td>${fmtDate(s.created_at)}</td><td>${fmtMoney(s.grand_total_base, baseCurrency)}</td><td><span class="badge ${s.payment_status === "paid" ? "badge-green" : s.payment_status === "credit" ? "badge-yellow" : "badge-gray"}">${s.payment_status}</span></td></tr>`).join("")}</tbody></table></div>` : '<div class="empty-state">No sales yet — head to <b>Sell (POS)</b> to record your first one.</div>'}
-         </div>
-       </div>
-     </div>
-
-     <!-- ═══ SECTION 4: TOP PRODUCTS + EFRIS ═══ -->
-     <div class="dash-section">
-       <div class="dash-section-header">
-         <h2 class="dash-section-title">Products & Compliance</h2>
-       </div>
-       <div class="dash-grid dash-grid-2">
-         <div class="card">
-           <div class="card-title">Top 5 Products (90 days)</div>
-           ${topProducts.length ? topProducts.map(([name, qty]) => `<div class="summary-row"><span>${escapeHtml(name)}</span><span><b>${qty}</b> sold</span></div>`).join("") : '<div class="empty-state">No sales data yet.</div>'}
-         </div>
-         <div class="card">
-           <div class="card-title">EFRIS Pipeline</div>
-           <div class="efris-pipeline">
-             ${["pending","queued","accepted","rejected","failed"].map(s => {
-               const labels = {pending:"Pending",queued:"Queued",accepted:"Accepted",rejected:"Rejected",failed:"Failed"};
-               return `<div class="efris-row"><span class="efris-label">${labels[s]}</span><span class="efris-count badge badge-gray">${efrisCounts[s] || 0}</span></div>`;
-             }).join("")}
-           </div>
-           ${Object.values(efrisCounts).reduce((a, v) => a + v, 0) === 0 ? '<div class="empty-state" style="margin-top:8px;">No EFRIS activity yet.</div>' : ""}
-         </div>
-       </div>
-     </div>
-
-     ${branchComparison}
-
-     <!-- ═══ SECTION 5: TAX & INVENTRIX HEALTH ═══ -->
-     <div class="dash-section">
-       <div class="dash-section-header">
-         <h2 class="dash-section-title">Tax & Inventory Health</h2>
-       </div>
-       <div class="dash-grid dash-grid-2">
-         <div class="card">
-           <div class="card-title">Tax Summary</div>
-           <div class="summary-compare">
-             <div class="sc-row"><span>VAT (Month)</span><b>${fmtMoney(monthVat, baseCurrency)}</b></div>
-             <div class="sc-row"><span>VAT (YTD)</span><b>${fmtMoney(monthVat, baseCurrency)}</b></div>
-             <div class="sc-row"><span>VAT Rate</span><b>${STATE.taxCategories.find(t => t.code === "VAT")?.rate || 18}%</b></div>
-           </div>
-         </div>
-         <div class="card">
-           <div class="card-title">Inventory Health</div>
-           <div class="summary-compare">
-             <div class="sc-row"><span>Low Stock Items</span><b style="color:${lowStock.length > 0 ? "var(--warning)" : "var(--success)"}">${lowStock.length}</b></div>
-             <div class="sc-row"><span>Expiring (≤30d)</span><b style="color:${expiryAlerts > 0 ? "var(--warning)" : "var(--success)"}">${expiryAlerts}</b></div>
-             <div class="sc-row"><span>Total SKUs</span><b>${STATE.products.length}</b></div>
-           </div>
-         </div>
-       </div>
-     </div>
-
-     <!-- ═══ SECTION 6: ALERTS ═══ -->
-     ${(() => {
-       const exp = STATE.products.filter(p => p.expiry_date && (new Date(p.expiry_date) - new Date()) / (1000*60*60*24) <= 30 && new Date(p.expiry_date) > new Date());
-       const expd = STATE.products.filter(p => p.expiry_date && new Date(p.expiry_date) < new Date());
-       const ba = expiringBatches || [];
-       if (lowStock.length === 0 && exp.length === 0 && expd.length === 0 && ba.length === 0) return "";
-       const expiryHtml = (d) => { const dt = new Date(d); return dt.toLocaleDateString("en", {month:"short",day:"numeric",year:"numeric"}); };
-       return `
-     <div class="dash-section">
-       <div class="dash-section-header">
-         <h2 class="dash-section-title">⚠️ Alerts</h2>
-         <span class="dash-section-sub">${lowStock.length + exp.length + expd.length + ba.length} items</span>
-       </div>
-       ${lowStock.length ? `
-       <div class="card card-alert">
-         <div class="card-title">Low Stock</div>
-         <div class="table-wrap"><table><thead><tr><th>Product</th><th>In Stock</th><th>Reorder Level</th></tr></thead><tbody>
-         ${lowStock.slice(0,10).map(p => `<tr><td>${escapeHtml(p.name)}</td><td style="color:var(--danger);font-weight:700;">${STATE.stockByProduct[p.id]||0}</td><td>${p.reorder_level}</td></tr>`).join("")}
-         </tbody></table></div>
-       </div>` : ""}
-       ${exp.length || expd.length ? `
-       <div class="card card-alert">
-         <div class="card-title">Expiry Alerts</div>
-         <div class="table-wrap"><table><thead><tr><th>Product</th><th>Expiry</th><th>Qty</th><th>Status</th></tr></thead><tbody>
-         ${expd.slice(0,5).map(p => `<tr><td>${escapeHtml(p.name)}</td><td>${expiryHtml(p.expiry_date)}</td><td>${STATE.stockByProduct[p.id]||0}</td><td><span class="badge badge-red">EXPIRED</span></td></tr>`).join("")}
-         ${exp.slice(0,5).map(p => { const days = Math.ceil((new Date(p.expiry_date)-new Date())/(1000*60*60*24)); return `<tr><td>${escapeHtml(p.name)}</td><td>${expiryHtml(p.expiry_date)}</td><td>${STATE.stockByProduct[p.id]||0}</td><td><span class="badge badge-yellow">${days}d left</span></td></tr>`; }).join("")}
-         </tbody></table></div>
-       </div>` : ""}
-     </div>`;
-     })()}
-
-     <div style="margin-top:16px;display:flex;justify-content:center;">
-       <button class="dash-expand-bar" id="dash-expand-btn">
-         <span id="dash-expand-icon">▶</span> Show Details
-       </button>
-     </div>
-   `;
-
-   // Wire expand/collapse
-   const expandBtn = root.querySelector("#dash-expand-btn");
-   let details = root.querySelector("#dash-details");
-   if (details) details.remove();
-
-   const toggleDetails = () => {
-     if (!details) {
-       details = document.createElement("div");
-       details.id = "dash-details";
-       details.classList.add("hidden");
-       expandBtn.parentNode.insertBefore(details, expandBtn.nextSibling);
-
-       details.innerHTML = `
-         <div class="kpi-grid" style="margin-top:16px">
-           <div class="kpi-card"><div class="kpi-icon">🏛️</div><div class="kpi-content"><div class="label">VAT (Month)</div><div class="value">${fmtMoney(monthVat, baseCurrency)}</div></div></div>
-           <div class="kpi-card"><div class="kpi-icon">🏛️</div><div class="kpi-content"><div class="label">YTD VAT</div><div class="value">${fmtMoney(monthVat, baseCurrency)}</div></div></div>
-           <div class="kpi-card ${expiryAlerts ? "kpi-accent-red" : ""}"><div class="kpi-icon">📅</div><div class="kpi-content"><div class="label">Expiring Batches</div><div class="value" style="color:${expiryAlerts ? "var(--danger)" : "inherit"}">${expiryAlerts}</div></div></div>
-         </div>
-       `;
-     }
-     const isHidden = details.classList.toggle("hidden");
-     expandBtn.querySelector("#dash-expand-icon").textContent = isHidden ? "▶" : "▼";
-     const textNode = expandBtn.childNodes[1] || expandBtn;
-     if (textNode.nodeType === 3) textNode.textContent = isHidden ? " Show Details" : " Hide Details";
-   };
-
-   if (expandBtn) expandBtn.addEventListener("click", toggleDetails);
-        </div>
-
-        <div class="card">
-          <div class="card-title">Top Products (90d)</div>
-          ${
-            topProducts.length
-              ? topProducts
-                  .map(
-                    ([name, qty]) => `
-            <div class="summary-row"><span>${escapeHtml(name)}</span><span><b>${qty}</b> sold</span></div>`,
-                  )
-                  .join("")
-              : `<div class="empty-state">No sales data yet.</div>`
-          }
-
-          <div class="card-title" style="margin-top:14px;">EFRIS Status</div>
-          <div class="flex gap" style="flex-wrap:wrap;">
-            <span class="badge badge-gray">Pending ${efrisCounts.pending}</span>
-            <span class="badge badge-blue">Queued ${efrisCounts.queued}</span>
-            <span class="badge badge-green">Accepted ${efrisCounts.accepted}</span>
-            <span class="badge badge-red">Rejected ${efrisCounts.rejected}</span>
-            <span class="badge badge-red">Failed ${efrisCounts.failed}</span>
-          </div>
-        </div>
+  // --- Render ---
+  const totalAlerts = lowStock.length + expiryAlerts + (outstandingBalance > 0 ? 1 : 0);
+  root.innerHTML = `
+    <!-- Executive KPIs -->
+    <div class="dash-section">
+      <div class="dash-section-header"><h2 class="dash-section-title">Executive Summary</h2></div>
+      <div class="kpi-grid">
+        <div class="kpi-card"><div class="kpi-icon" style="background:#eef7ff;">🧾</div><div class="kpi-content"><div class="label">Today's Sales</div><div class="value">${fmtMoney(todayTotal, baseCurrency)}</div><div class="delta ${todayTrend !== null ? (Number(todayTrend) >= 0 ? "up" : "down") : ""}">${todayTrend !== null ? `${Number(todayTrend) >= 0 ? "↑" : "↓"} ${Math.abs(Number(todayTrend))}% vs yesterday` : "First sale today"}</div></div></div>
+        <div class="kpi-card"><div class="kpi-icon" style="background:#eefaf0;">📅</div><div class="kpi-content"><div class="label">Monthly Sales</div><div class="value">${fmtMoney(monthTotal, baseCurrency)}</div><div class="delta">${monthSales.length} transactions</div></div></div>
+        <div class="kpi-card"><div class="kpi-icon" style="background:#f3f0ff;">📦</div><div class="kpi-content"><div class="label">Inventory Value</div><div class="value">${fmtMoney(inventoryValue, baseCurrency)}</div><div class="delta">${STATE.products.length} SKUs</div></div></div>
+        <div class="kpi-card"><div class="kpi-icon" style="background:#fff7ed;">👥</div><div class="kpi-content"><div class="label">Receivables</div><div class="value">${fmtMoney(outstandingBalance, baseCurrency)}</div><div class="delta">${(customers || []).length} customers</div></div></div>
+        <div class="kpi-card"><div class="kpi-icon" style="background:#fff1f2;">⚠️</div><div class="kpi-content"><div class="label">Alerts</div><div class="value" style="color:${totalAlerts > 0 ? "var(--danger)" : "var(--text)"}">${totalAlerts}</div><div class="delta">${lowStock.length} low stock · ${expiryAlerts} expiring</div></div></div>
+        <div class="kpi-card"><div class="kpi-icon" style="background:#f0fdf4;">✅</div><div class="kpi-content"><div class="label">Business Health</div><div class="value">${allSales.length > 0 ? "Healthy" : "No Data"}</div><div class="delta">${allSales.length > 0 ? `${paidCount}/${allSales.length} paid` : "—"}</div></div></div>
       </div>
-
-      ${branchComparison}
-
-      ${
-        lowStock.length
-          ? `
-      <div class="card" style="margin-bottom:16px">
-        <div class="card-title">⚠️ Low Stock Alerts</div>
-        <div class="table-wrap"><table>
-          <thead><tr><th>Product</th><th>In Stock</th><th>Reorder</th></tr></thead>
-          <tbody>
-            ${lowStock
-              .slice(0, 10)
-              .map(
-                (p) => `
-              <tr><td>${escapeHtml(p.name)}</td><td style="color:var(--danger);font-weight:700;">${STATE.stockByProduct[p.id] || 0}</td><td>${p.reorder_level}</td></tr>`,
-              )
-              .join("")}
-          </tbody>
-        </table></div>
-      </div>`
-          : ""
-      }
-
-      ${(() => {
-        const expiring = STATE.products.filter(
-          (p) =>
-            p.expiry_date &&
-            (new Date(p.expiry_date) - new Date()) / (1000 * 60 * 60 * 24) <=
-              30 &&
-            new Date(p.expiry_date) > new Date(),
-        );
-        const expired = STATE.products.filter(
-          (p) => p.expiry_date && new Date(p.expiry_date) < new Date(),
-        );
-        const batchAlerts = (expiringBatches || []);
-        if (!expiring.length && !expired.length && !batchAlerts.length) return "";
-        return `
-      <div class="card" style="margin-bottom:16px">
-        <div class="card-title">📅 Expiry Alerts</div>
-        <div class="table-wrap"><table>
-          <thead><tr><th>Product</th><th>Batch</th><th>Expiry</th><th>Qty</th><th>Status</th></tr></thead>
-          <tbody>
-            ${expired
-              .slice(0, 5)
-              .map(
-                (p) =>
-                  `<tr><td>${escapeHtml(p.name)}</td><td>—</td><td>${escapeHtml(p.expiry_date)}</td><td>${STATE.stockByProduct[p.id] || 0}</td><td><span class="badge badge-red">EXPIRED</span></td></tr>`,
-              )
-              .join("")}
-            ${expiring
-              .slice(0, 5)
-              .map((p) => {
-                const days = Math.ceil(
-                  (new Date(p.expiry_date) - new Date()) / (1000 * 60 * 60 * 24),
-                );
-                return `<tr><td>${escapeHtml(p.name)}</td><td>—</td><td>${escapeHtml(p.expiry_date)}</td><td>${STATE.stockByProduct[p.id] || 0}</td><td><span class="badge badge-yellow">${days}d left</span></td></tr>`;
-              })
-              .join("")}
-            ${batchAlerts.map(b => {
-              const days = Math.ceil((new Date(b.expiry_date) - new Date()) / (1000*60*60*24));
-              const badge = days < 0 ? "badge-red" : days <= 7 ? "badge-red" : "badge-yellow";
-              const label = days < 0 ? `EXPIRED ${Math.abs(days)}d ago` : `${days}d left`;
-              return `<tr><td>${escapeHtml(b.product?.name || "—")}</td><td>${escapeHtml(b.batch_number)}</td><td>${b.expiry_date}</td><td>${b.quantity} ${escapeHtml(b.product?.unit || "")}</td><td><span class="badge ${badge}">${label}</span></td></tr>`;
-            }).join("")}
-          </tbody>
-        </table></div>
-      </div>`;
-      })()}
     </div>
-  `;
 
-  // Wire expand/collapse
-  const expandBtn = root.querySelector("#dash-expand-btn");
-  const details = root.querySelector("#dash-details");
-  if (expandBtn && details) {
-    expandBtn.addEventListener("click", () => {
-      const isHidden = details.classList.toggle("hidden");
-      expandBtn.querySelector("#dash-expand-icon").textContent = isHidden ? "▶" : "▼";
-      expandBtn.childNodes[1].textContent = isHidden ? " Show Details" : " Hide Details";
-    });
-  }
+    <!-- Sales Trends -->
+    <div class="dash-section">
+      <div class="dash-section-header"><h2 class="dash-section-title">Sales Trends</h2><span class="dash-section-sub">7-day overview</span></div>
+      <div class="dash-grid dash-grid-2">
+        <div class="card card-chart"><div class="card-title">Daily Sales</div><div class="line-chart-wrap">${lineChartSvg}</div></div>
+        <div class="card"><div class="card-title">Payment Breakdown</div><div class="donut-wrap">${donutSvg}<div class="donut-legend"><div class="donut-legend-item"><div class="donut-legend-dot" style="background:#16a34a;"></div><span class="donut-legend-label">Paid</span><span class="donut-legend-value">${paidCount}</span></div><div class="donut-legend-item"><div class="donut-legend-dot" style="background:#f59e0b;"></div><span class="donut-legend-label">Credit</span><span class="donut-legend-value">${creditCount}</span></div>${otherCount > 0 ? `<div class="donut-legend-item"><div class="donut-legend-dot" style="background:#9ca3af;"></div><span class="donut-legend-label">Other</span><span class="donut-legend-value">${otherCount}</span></div>` : ""}</div></div></div>
+      </div>
+    </div>
+
+    <!-- Sales Summary -->
+    <div class="dash-section">
+      <div class="dash-section-header"><h2 class="dash-section-title">Sales Summary</h2></div>
+      <div class="dash-grid dash-grid-2">
+        <div class="card"><div class="card-title">Period Comparison</div><div class="summary-compare"><div class="sc-row"><span>Today</span><b>${fmtMoney(todayTotal, baseCurrency)}</b></div><div class="sc-row"><span>This Month</span><b>${fmtMoney(monthTotal, baseCurrency)}</b></div><div class="sc-row"><span>This Year</span><b>${fmtMoney(yearTotal, baseCurrency)}</b></div>${todayTrend !== null ? `<div class="sc-row sc-divider"><span>Yesterday vs Today</span><span class="${Number(todayTrend) >= 0 ? "text-success" : "text-danger"}">${Number(todayTrend) >= 0 ? "↑" : "↓"} ${Math.abs(Number(todayTrend))}%</span></div>` : ""}</div></div>
+        <div class="card"><div class="card-title">Recent Transactions</div>${recent.length ? `<div class="table-wrap"><table><thead><tr><th>Invoice</th><th>Time</th><th>Total</th><th>Status</th></tr></thead><tbody>${recent.map(s => `<tr><td>${escapeHtml(s.sale_number)}</td><td>${fmtDate(s.created_at)}</td><td>${fmtMoney(s.grand_total_base, baseCurrency)}</td><td><span class="badge ${s.payment_status === "paid" ? "badge-green" : s.payment_status === "credit" ? "badge-yellow" : "badge-gray"}">${s.payment_status}</span></td></tr>`).join("")}</tbody></table></div>` : '<div class="empty-state">No sales yet — head to <b>Sell (POS)</b> to record your first one.</div>'}</div>
+      </div>
+    </div>
+
+    <!-- Products & Compliance -->
+    <div class="dash-section">
+      <div class="dash-section-header"><h2 class="dash-section-title">Products & Compliance</h2></div>
+      <div class="dash-grid dash-grid-2">
+        <div class="card"><div class="card-title">Top 5 Products (90 days)</div>${topProducts.length ? topProducts.map(([name, qty]) => `<div class="summary-row"><span>${escapeHtml(name)}</span><span><b>${qty}</b> sold</span></div>`).join("") : '<div class="empty-state">No sales data yet.</div>'}</div>
+        <div class="card"><div class="card-title">EFRIS Pipeline</div><div class="efris-pipeline">${["pending","queued","accepted","rejected","failed"].map(s => { const labels = {pending:"Pending",queued:"Queued",accepted:"Accepted",rejected:"Rejected",failed:"Failed"}; return `<div class="efris-row"><span class="efris-label">${labels[s]}</span><span class="efris-count badge badge-gray">${efrisCounts[s] || 0}</span></div>`; }).join("")}</div>${Object.values(efrisCounts).reduce((a, v) => a + v, 0) === 0 ? '<div class="empty-state" style="margin-top:8px;">No EFRIS activity yet.</div>' : ""}</div>
+      </div>
+    </div>
+
+    ${branchComparison}
+
+    <!-- Tax & Inventory -->
+    <div class="dash-section">
+      <div class="dash-section-header"><h2 class="dash-section-title">Tax & Inventory Health</h2></div>
+      <div class="dash-grid dash-grid-2">
+        <div class="card"><div class="card-title">Tax Summary</div><div class="summary-compare"><div class="sc-row"><span>VAT (Month)</span><b>${fmtMoney(monthVat, baseCurrency)}</b></div><div class="sc-row"><span>VAT (YTD)</span><b>${fmtMoney(monthVat, baseCurrency)}</b></div><div class="sc-row"><span>VAT Rate</span><b>${STATE.taxCategories.find(t => t.code === "VAT")?.rate || 18}%</b></div></div></div>
+        <div class="card"><div class="card-title">Inventory Health</div><div class="summary-compare"><div class="sc-row"><span>Low Stock Items</span><b style="color:${lowStock.length > 0 ? "var(--warning)" : "var(--success)"}">${lowStock.length}</b></div><div class="sc-row"><span>Expiring (≤30d)</span><b style="color:${expiryAlerts > 0 ? "var(--warning)" : "var(--success)"}">${expiryAlerts}</b></div><div class="sc-row"><span>Total SKUs</span><b>${STATE.products.length}</b></div></div></div>
+      </div>
+    </div>
+
+    <!-- Alerts -->
+    ${(() => {
+      const exp = STATE.products.filter(p => p.expiry_date && (new Date(p.expiry_date) - new Date()) / (1000*60*60*24) <= 30 && new Date(p.expiry_date) > new Date());
+      const expd = STATE.products.filter(p => p.expiry_date && new Date(p.expiry_date) < new Date());
+      const ba = expiringBatches || [];
+      if (lowStock.length === 0 && exp.length === 0 && expd.length === 0 && ba.length === 0) return "";
+      const expiryHtml = (d) => { const dt = new Date(d); return dt.toLocaleDateString("en", {month:"short",day:"numeric",year:"numeric"}); };
+      return `
+    <div class="dash-section">
+      <div class="dash-section-header"><h2 class="dash-section-title">⚠️ Alerts</h2><span class="dash-section-sub">${lowStock.length + exp.length + expd.length + ba.length} items</span></div>
+      ${lowStock.length ? `<div class="card card-alert"><div class="card-title">Low Stock</div><div class="table-wrap"><table><thead><tr><th>Product</th><th>In Stock</th><th>Reorder Level</th></tr></thead><tbody>${lowStock.slice(0,10).map(p => `<tr><td>${escapeHtml(p.name)}</td><td style="color:var(--danger);font-weight:700;">${STATE.stockByProduct[p.id]||0}</td><td>${p.reorder_level}</td></tr>`).join("")}</tbody></table></div></div>` : ""}
+      ${exp.length || expd.length ? `<div class="card card-alert"><div class="card-title">Expiry Alerts</div><div class="table-wrap"><table><thead><tr><th>Product</th><th>Expiry</th><th>Qty</th><th>Status</th></tr></thead><tbody>${expd.slice(0,5).map(p => `<tr><td>${escapeHtml(p.name)}</td><td>${expiryHtml(p.expiry_date)}</td><td>${STATE.stockByProduct[p.id]||0}</td><td><span class="badge badge-red">EXPIRED</span></td></tr>`).join("")}${exp.slice(0,5).map(p => { const days = Math.ceil((new Date(p.expiry_date)-new Date())/(1000*60*60*24)); return `<tr><td>${escapeHtml(p.name)}</td><td>${expiryHtml(p.expiry_date)}</td><td>${STATE.stockByProduct[p.id]||0}</td><td><span class="badge badge-yellow">${days}d left</span></td></tr>`; }).join("")}</tbody></table></div></div>` : ""}
+    </div>`;
+    })()}
+  `;
 }
