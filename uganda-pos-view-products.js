@@ -879,49 +879,60 @@ function openImportModal() {
       URL.revokeObjectURL(url);
     });
     $('import-run').addEventListener('click', async () => {
-      const file = $('import-file').files[0];
-      if (!file) { toast('Select a CSV file', 'error'); return; }
-      const text = await file.text();
-      const lines = text.split('\n').filter((l) => l.trim());
-      if (lines.length < 2) { toast('CSV is empty', 'error'); return; }
-      const headers = lines[0].split(',').map((h) => h.trim().toLowerCase());
-      const nameIdx = headers.indexOf('name');
-      const priceIdx = headers.indexOf('selling_price');
-      if (nameIdx < 0 || priceIdx < 0) { toast('CSV must have name and selling_price columns', 'error'); return; }
+      const btn = $('import-run');
+      btn.disabled = true;
+      btn.textContent = 'Importing…';
+      try {
+        const file = $('import-file').files[0];
+        if (!file) { toast('Select a CSV file', 'error'); btn.disabled = false; btn.textContent = 'Import'; return; }
+        const text = await file.text();
+        const lines = text.split('\n').filter((l) => l.trim());
+        if (lines.length < 2) { toast('CSV is empty', 'error'); btn.disabled = false; btn.textContent = 'Import'; return; }
+        const headers = lines[0].split(',').map((h) => h.trim().toLowerCase());
+        const nameIdx = headers.indexOf('name');
+        const priceIdx = headers.indexOf('selling_price');
+        if (nameIdx < 0 || priceIdx < 0) { toast('CSV must have name and selling_price columns', 'error'); btn.disabled = false; btn.textContent = 'Import'; return; }
 
-      let count = 0;
-      for (let i = 1; i < lines.length; i++) {
-        const cols = lines[i].split(',');
-        const name = cols[nameIdx]?.trim();
-        const price = parseFloat(cols[priceIdx]);
-        if (!name || isNaN(price)) continue;
+        let count = 0;
+        let failed = 0;
+        for (let i = 1; i < lines.length; i++) {
+          const cols = lines[i].split(',');
+          const name = cols[nameIdx]?.trim();
+          const price = parseFloat(cols[priceIdx]);
+          if (!name || isNaN(price)) { failed++; continue; }
 
-        const { error } = await supabase.rpc('upsert_product', {
-          p_business_id: STATE.business.id,
-          p_name,
-          p_sku: cols[headers.indexOf('sku')]?.trim() || null,
-          p_barcode: cols[headers.indexOf('barcode')]?.trim() || null,
-          p_description: null,
-          p_category_id: null,
-          p_supplier_id: null,
-          p_unit: cols[headers.indexOf('unit')]?.trim() || 'pc',
-          p_cost_price: parseFloat(cols[headers.indexOf('cost_price')]) || 0,
-          p_selling_price: price,
-          p_wholesale_price: parseFloat(cols[headers.indexOf('wholesale_price')]) || null,
-          p_tax_category_code: cols[headers.indexOf('tax_category')]?.trim() || 'STD',
-          p_reorder_level: parseFloat(cols[headers.indexOf('reorder_level')]) || 5,
-          p_is_active: true,
-          p_brand_id: null,
-          p_id: null,
-          p_expiry_date: cols[headers.indexOf('expiry_date')]?.trim() || null,
-          p_has_batches: false,
-        });
-        if (error) continue;
-        count++;
+          const { error } = await supabase.rpc('upsert_product', {
+            p_business_id: STATE.business.id,
+            p_name: name,
+            p_sku: cols[headers.indexOf('sku')]?.trim() || null,
+            p_barcode: cols[headers.indexOf('barcode')]?.trim() || null,
+            p_description: null,
+            p_category_id: null,
+            p_supplier_id: null,
+            p_unit: cols[headers.indexOf('unit')]?.trim() || 'pc',
+            p_cost_price: parseFloat(cols[headers.indexOf('cost_price')]) || 0,
+            p_selling_price: price,
+            p_wholesale_price: parseFloat(cols[headers.indexOf('wholesale_price')]) || null,
+            p_tax_category_code: cols[headers.indexOf('tax_category')]?.trim() || 'STD',
+            p_reorder_level: parseFloat(cols[headers.indexOf('reorder_level')]) || 5,
+            p_is_active: true,
+            p_brand_id: null,
+            p_id: null,
+            p_expiry_date: cols[headers.indexOf('expiry_date')]?.trim() || null,
+            p_has_batches: false,
+          });
+          if (error) { console.warn('CSV import row failed', name, error); failed++; continue; }
+          count++;
+        }
+        toast(`Imported ${count} product(s) (${failed} skipped/failed)`, count > 0 ? 'success' : 'error');
+        await refreshProducts();
+        closeModal(); renderTab();
+      } catch (err) {
+        console.error('CSV import error', err);
+        toast('Import failed: ' + err.message, 'error');
+        btn.disabled = false;
+        btn.textContent = 'Import';
       }
-      toast(`Imported ${count} products`, 'success');
-      await refreshProducts();
-      closeModal(); renderTab();
     });
   }});
 }
