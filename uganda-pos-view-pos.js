@@ -55,7 +55,16 @@ function cartLines() {
 
 function cartTotals() {
   const lines = cartLines();
-  const subtotal = lines.reduce((a, l) => a + l.lineGross, 0);
+
+  // Compute per-line discount
+  const lineDiscounts = lines.map((l, i) => {
+    const item = STATE.cart[i];
+    const d = Math.min(item.discount || 0, l.lineGross);
+    return d;
+  });
+  const totalLineDiscount = lineDiscounts.reduce((a, d) => a + d, 0);
+  const subtotalBeforeLineDisc = lines.reduce((a, l) => a + l.lineGross, 0);
+  const subtotal = subtotalBeforeLineDisc - totalLineDiscount;
 
   // Calculate coupon discount
   let couponDiscount = 0;
@@ -75,21 +84,21 @@ function cartTotals() {
 
   const manualDiscount = Math.min(posDiscountInput || 0, subtotal - couponDiscount);
   const totalDiscount = couponDiscount + manualDiscount;
-  const ratio = subtotal > 0 ? totalDiscount / subtotal : 0;
   let vatTotal = 0;
-  const lineDetails = lines.map((l) => {
-    const netLine = l.lineGross * (1 - ratio);
+  const lineDetails = lines.map((l, i) => {
+    const lineDisc = lineDiscounts[i];
+    const netLine = l.lineGross - lineDisc;
+    const lineRatio = netLine > 0 ? (couponDiscount + manualDiscount) * (netLine / (subtotal || 1)) : 0;
+    const finalLine = netLine - lineRatio;
     const rate = taxRateFor(l.taxCode);
     const vatAmount =
-      Math.round(((netLine * rate) / (100 + rate) + Number.EPSILON) * 100) /
-      100;
+      Math.round(((finalLine * rate) / (100 + rate) + Number.EPSILON) * 100) / 100;
     vatTotal += vatAmount;
-    return { ...l, netLine, vatAmount, vatRate: rate };
+    return { ...l, lineDiscount: lineDisc, netLine: finalLine, vatAmount, vatRate: rate };
   });
-  const grandTotal =
-    Math.round((subtotal - totalDiscount + Number.EPSILON) * 100) / 100;
-  const finalTotal = Math.round((grandTotal + posDeliveryCost + Number.EPSILON) * 100) / 100;
-  return { lines: lineDetails, subtotal, couponDiscount, manualDiscount, totalDiscount, vatTotal, grandTotal, finalTotal };
+  const grandTotal = lineDetails.reduce((a, l) => a + l.netLine, 0);
+  const finalTotal = Math.round((grandTotal + vatTotal + posDeliveryCost + Number.EPSILON) * 100) / 100;
+  return { lines: lineDetails, subtotal, couponDiscount, manualDiscount, totalLineDiscount, totalDiscount, vatTotal, grandTotal, finalTotal };
 }
 
 export async function renderPOS(root) {
@@ -589,29 +598,49 @@ function renderCart() {
   const summaryEl = $("pos-cart-summary");
   if (!itemsEl || !summaryEl) return;
 
-  const { lines, subtotal, couponDiscount, manualDiscount, totalDiscount, vatTotal, grandTotal, finalTotal } = cartTotals();
+  const { lines, subtotal, couponDiscount, manualDiscount, totalLineDiscount, totalDiscount, vatTotal, grandTotal, finalTotal } = cartTotals();
+  const subtotalBeforeLineDisc = lines.reduce((a, l) => a + (l.lineGross || 0), 0);
 
   if (!lines.length) {
     itemsEl.innerHTML = `<div class="empty-state"><div class="big-icon">🛒</div>Cart is empty — tap a product to add it.</div>`;
   } else {
     itemsEl.innerHTML = lines
       .map(
-        (l) => `
-      <div class="cart-row" data-id="${l.productId}">
-        <div class="info">
-          <div class="name">${escapeHtml(l.name)}</div>
-          <div class="unit">
-            ${fmtMoneyRaw(l.unitPrice, posSaleCurrency)} × ${l.qty}
-            ${l.vatAmount > 0 ? `<span class="cart-item-tax"> · VAT ${fmtMoneyRaw(l.vatAmount, posSaleCurrency)}</span>` : ""}
+        (l, idx) => `
+      <div class="cart-row" data-id="${l.productId}" data-idx="${idx}">
+        <div class="cart-row-top">
+          <div class="info">
+            <div class="name">${escapeHtml(l.name)}</div>
+            <div class="unit">${fmtMoneyRaw(l.unitPrice, posSaleCurrency)} each</div>
+          </div>
+          <button class="cart-row-remove" data-action="remove" title="Remove item">✕</button>
+        </div>
+        <div class="cart-row-controls">
+          <div class="cart-qty-group">
+            <label>Qty</label>
+            <div class="qty-stepper">
+              <button data-action="dec" title="Decrease">−</button>
+              <span class="qty-val" data-action="edit-qty" title="Tap to type">${l.qty}</span>
+              <button data-action="inc" title="Increase">+</button>
+            </div>
+          </div>
+          <div class="cart-tax-group">
+            <label>Tax</label>
+            <select data-action="tax" class="cart-tax-select">
+              ${STATE.taxCategories.map(tc =>
+                `<option value="${tc.code}" ${tc.code === l.taxCode ? "selected" : ""}>${escapeHtml(tc.code)} (${tc.rate}%)</option>`
+              ).join("")}
+            </select>
+          </div>
+          <div class="cart-disc-group">
+            <label>Disc</label>
+            <input type="number" min="0" step="0.01" data-action="disc" class="cart-disc-input" value="${(l.lineDiscount || 0) > 0 ? l.lineDiscount : ""}" placeholder="0" />
+          </div>
+          <div class="cart-line-total">
+            <label>Total</label>
+            <div class="line-total">${fmtMoneyRaw(l.lineGross - (l.lineDiscount || 0), posSaleCurrency)}</div>
           </div>
         </div>
-        <div class="qty-stepper">
-          <button data-action="dec" title="Decrease">−</button>
-          <span class="qty-val" data-action="edit-qty" title="Tap to type quantity">${l.qty}</span>
-          <button data-action="inc" title="Increase">+</button>
-        </div>
-        <div class="line-total">${fmtMoneyRaw(l.lineGross, posSaleCurrency)}</div>
-        <button class="btn-ghost" data-action="remove" title="Remove" style="border:none;background:none;cursor:pointer;font-size:16px;padding:4px;">✕</button>
       </div>
     `,
       )
@@ -619,6 +648,10 @@ function renderCart() {
 
     qsa(".cart-row", itemsEl).forEach((row) => {
       const id = row.dataset.id;
+      const idx = parseInt(row.dataset.idx);
+      const item = STATE.cart[idx];
+      if (!item) return;
+
       row.querySelector('[data-action="inc"]').addEventListener("click", () => {
         changeQty(id, 1);
       });
@@ -628,11 +661,8 @@ function renderCart() {
       row.querySelector('[data-action="remove"]').addEventListener("click", () => {
         removeFromCart(id);
       });
-      // Tap qty number to type directly
       row.querySelector('[data-action="edit-qty"]').addEventListener("click", () => {
         const span = row.querySelector('[data-action="edit-qty"]');
-        const item = STATE.cart.find((i) => i.productId === id);
-        if (!item) return;
         const input = document.createElement("input");
         input.type = "number";
         input.min = "1";
@@ -653,6 +683,22 @@ function renderCart() {
           if (e.key === "Escape") { renderCart(); }
         });
       });
+      // Tax change
+      const taxSelect = row.querySelector('[data-action="tax"]');
+      if (taxSelect) {
+        taxSelect.addEventListener("change", () => {
+          item.taxCode = taxSelect.value;
+          renderCart();
+        });
+      }
+      // Per-line discount
+      const discInput = row.querySelector('[data-action="disc"]');
+      if (discInput) {
+        discInput.addEventListener("input", () => {
+          item.discount = parseFloat(discInput.value) || 0;
+          renderCart();
+        });
+      }
     });
   }
 
@@ -663,7 +709,7 @@ function renderCart() {
 
   summaryEl.innerHTML = `
     <div class="field" style="margin-bottom:8px;">
-      <label>Manual Discount (${posSaleCurrency})</label>
+      <label>Extra Discount (${posSaleCurrency})</label>
       <input type="number" min="0" step="0.01" id="pos-discount-input" value="${posDiscountInput || ""}" placeholder="0.00" />
     </div>
     ${
@@ -675,10 +721,11 @@ function renderCart() {
     </div>`
         : ""
     }
-    <div class="summary-row"><span>Subtotal</span><span>${fmtMoneyRaw(subtotal, posSaleCurrency)}</span></div>
+    <div class="summary-row"><span>Subtotal</span><span>${fmtMoneyRaw(subtotalBeforeLineDisc, posSaleCurrency)}</span></div>
+    ${totalLineDiscount > 0 ? `<div class="summary-row" style="color:var(--success);"><span>Item Discounts</span><span>− ${fmtMoneyRaw(totalLineDiscount, posSaleCurrency)}</span></div>` : ""}
+    <div class="summary-row"><span>After Discounts</span><span>${fmtMoneyRaw(subtotal, posSaleCurrency)}</span></div>
     ${couponDiscount > 0 ? `<div class="summary-row" style="color:var(--brand);"><span>🎟️ Coupon (${escapeHtml(STATE.cartCouponCode)})</span><span>− ${fmtMoneyRaw(couponDiscount, posSaleCurrency)}</span></div>` : ""}
-    ${manualDiscount > 0 ? `<div class="summary-row"><span>Manual Discount</span><span>− ${fmtMoneyRaw(manualDiscount, posSaleCurrency)}</span></div>` : ""}
-    ${totalDiscount > 0 ? `<div class="summary-row"><span>Total Discount</span><span>− ${fmtMoneyRaw(totalDiscount, posSaleCurrency)}</span></div>` : ""}
+    ${manualDiscount > 0 ? `<div class="summary-row"><span>Extra Discount</span><span>− ${fmtMoneyRaw(manualDiscount, posSaleCurrency)}</span></div>` : ""}
     <div class="summary-row"><span>Tax (incl.)</span><span>${fmtMoneyRaw(vatTotal, posSaleCurrency)}</span></div>
     ${posDeliveryCost > 0 ? `<div class="summary-row"><span>🚚 Delivery</span><span>+ ${fmtMoneyRaw(posDeliveryCost, posSaleCurrency)}</span></div>` : ""}
     <div class="summary-row total"><span>Total to Pay</span><span style="font-size:18px;">${fmtMoneyRaw(finalTotal, posSaleCurrency)}</span></div>
@@ -693,7 +740,6 @@ function renderCart() {
     posDiscountInput = parseFloat(e.target.value) || 0;
     renderCart();
   });
-  // preserve focus/cursor after re-render
   if (document.activeElement !== discountInputEl) {
     /* no-op */
   }
