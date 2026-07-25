@@ -144,9 +144,17 @@ async function navigateTo(route) {
 
   STATE.route = route;
   $("page-title").textContent = ROUTES[route].title;
+
+  // Update nav link active states
   qsa(".nav-link").forEach((l) =>
     l.classList.toggle("active", l.dataset.route === route),
   );
+  // Open parent module when a child route is active
+  qsa(".nav-module").forEach((m) => {
+    const hasActive = m.querySelector(".nav-link.active");
+    m.classList.toggle("open", !!hasActive);
+  });
+
   closeSidebarOnMobile();
   const root = $("view-root");
   root.innerHTML = `<div class="empty-state">Loading…</div>`;
@@ -200,7 +208,8 @@ function closeSidebarOnMobile() {
 // Shell wiring (sidebar, topbar, theme, logout)
 // ---------------------------------------------------------------------
 function wireShell() {
-  qsa(".nav-link").forEach((link) => {
+  // ── Nav children (data-route links) ──
+  qsa(".nav-link[data-route]").forEach((link) => {
     const route = link.dataset.route;
     const roles = link.dataset.role;
     const isSuperadminLink = link.dataset.superadmin === "true";
@@ -221,6 +230,18 @@ function wireShell() {
     }
 
     link.addEventListener("click", () => navigateTo(route));
+  });
+
+  // ── Nav parent module toggles ──
+  qsa(".nav-parent").forEach((parent) => {
+    parent.addEventListener("click", () => {
+      const module = parent.dataset.module;
+      const modEl = parent.closest(".nav-module");
+      if (modEl) modEl.classList.toggle("open");
+
+      // Navigate to the module's primary route (same name as module)
+      if (module && ROUTES[module]) navigateTo(module);
+    });
   });
 
   $("menu-btn").addEventListener("click", () => {

@@ -283,6 +283,7 @@ export async function renderDashboard(root) {
   }
 
   // --- Render ---
+  const totalAlerts = lowStock.length + expiryAlerts + (outstandingBalance > 0 ? 1 : 0);
   root.innerHTML = `
     <div class="kpi-grid">
       <div class="kpi-card kpi-accent-blue">
@@ -311,13 +312,6 @@ export async function renderDashboard(root) {
           <div class="delta up">${yearSales.length} txns</div>
         </div>
       </div>
-      <div class="kpi-card kpi-accent-orange">
-        <div class="kpi-icon">🏛️</div>
-        <div class="kpi-content">
-          <div class="label">VAT (Month)</div>
-          <div class="value">${fmtMoney(monthVat, baseCurrency)}</div>
-        </div>
-      </div>
       <div class="kpi-card kpi-accent-teal">
         <div class="kpi-icon">📦</div>
         <div class="kpi-content">
@@ -326,18 +320,12 @@ export async function renderDashboard(root) {
           <div class="delta">${STATE.products.length} SKUs</div>
         </div>
       </div>
-      <div class="kpi-card ${lowStock.length ? "kpi-accent-red" : ""}">
+      <div class="kpi-card ${totalAlerts > 0 ? "kpi-accent-red" : ""}">
         <div class="kpi-icon">⚠️</div>
         <div class="kpi-content">
-          <div class="label">Low Stock</div>
-          <div class="value" style="color:${lowStock.length ? "var(--danger)" : "inherit"}">${lowStock.length}</div>
-        </div>
-      </div>
-      <div class="kpi-card ${expiryAlerts ? "kpi-accent-red" : ""}">
-        <div class="kpi-icon">📅</div>
-        <div class="kpi-content">
-          <div class="label">Expiring Batches</div>
-          <div class="value" style="color:${expiryAlerts ? "var(--danger)" : "inherit"}">${expiryAlerts}</div>
+          <div class="label">Alerts</div>
+          <div class="value" style="color:${totalAlerts > 0 ? "var(--danger)" : "inherit"}">${totalAlerts}</div>
+          <div class="delta"><span style="font-size:10px;color:var(--text-muted)">${lowStock.length} low stock · ${expiryAlerts} expiring</span></div>
         </div>
       </div>
       <div class="kpi-card">
@@ -345,13 +333,6 @@ export async function renderDashboard(root) {
         <div class="kpi-content">
           <div class="label">Outstanding</div>
           <div class="value">${fmtMoney(outstandingBalance, baseCurrency)}</div>
-        </div>
-      </div>
-      <div class="kpi-card kpi-accent-indigo">
-        <div class="kpi-icon">🏛️</div>
-        <div class="kpi-content">
-          <div class="label">YTD VAT</div>
-          <div class="value">${fmtMoney(monthVat, baseCurrency)}</div>
         </div>
       </div>
     </div>
@@ -387,122 +368,165 @@ export async function renderDashboard(root) {
       </div>
     </div>
 
-    <div class="grid-2">
-      <div class="card">
-        <div class="card-title">Recent Transactions</div>
-        ${
-          recent.length
-            ? `<div class="table-wrap"><table>
-          <thead><tr><th>Invoice</th><th>Time</th><th>Total</th><th>Status</th></tr></thead>
+    <div style="margin-bottom:16px">
+      <button class="dash-expand-bar" id="dash-expand-btn">
+        <span id="dash-expand-icon">▶</span> Show Details
+      </button>
+    </div>
+
+    <div id="dash-details" class="hidden">
+      <div class="kpi-grid" style="margin-bottom:16px">
+        <div class="kpi-card kpi-accent-orange">
+          <div class="kpi-icon">🏛️</div>
+          <div class="kpi-content">
+            <div class="label">VAT (Month)</div>
+            <div class="value">${fmtMoney(monthVat, baseCurrency)}</div>
+          </div>
+        </div>
+        <div class="kpi-card kpi-accent-indigo">
+          <div class="kpi-icon">🏛️</div>
+          <div class="kpi-content">
+            <div class="label">YTD VAT</div>
+            <div class="value">${fmtMoney(monthVat, baseCurrency)}</div>
+          </div>
+        </div>
+        <div class="kpi-card ${expiryAlerts ? "kpi-accent-red" : ""}">
+          <div class="kpi-icon">📅</div>
+          <div class="kpi-content">
+            <div class="label">Expiring Batches</div>
+            <div class="value" style="color:${expiryAlerts ? "var(--danger)" : "inherit"}">${expiryAlerts}</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid-2" style="margin-bottom:16px">
+        <div class="card">
+          <div class="card-title">Recent Transactions</div>
+          ${
+            recent.length
+              ? `<div class="table-wrap"><table>
+            <thead><tr><th>Invoice</th><th>Time</th><th>Total</th><th>Status</th></tr></thead>
+            <tbody>
+              ${recent
+                .map(
+                  (s) => `
+                <tr>
+                  <td>${escapeHtml(s.sale_number)}</td>
+                  <td>${fmtDate(s.created_at)}</td>
+                  <td>${fmtMoney(s.grand_total_base, baseCurrency)}</td>
+                  <td><span class="badge ${s.payment_status === "paid" ? "badge-green" : s.payment_status === "credit" ? "badge-yellow" : "badge-gray"}">${s.payment_status}</span></td>
+                </tr>`,
+                )
+                .join("")}
+            </tbody>
+          </table></div>`
+              : `<div class="empty-state">No sales yet — head to <b>Sell (POS)</b> to record your first one.</div>`
+          }
+        </div>
+
+        <div class="card">
+          <div class="card-title">Top Products (90d)</div>
+          ${
+            topProducts.length
+              ? topProducts
+                  .map(
+                    ([name, qty]) => `
+            <div class="summary-row"><span>${escapeHtml(name)}</span><span><b>${qty}</b> sold</span></div>`,
+                  )
+                  .join("")
+              : `<div class="empty-state">No sales data yet.</div>`
+          }
+
+          <div class="card-title" style="margin-top:14px;">EFRIS Status</div>
+          <div class="flex gap" style="flex-wrap:wrap;">
+            <span class="badge badge-gray">Pending ${efrisCounts.pending}</span>
+            <span class="badge badge-blue">Queued ${efrisCounts.queued}</span>
+            <span class="badge badge-green">Accepted ${efrisCounts.accepted}</span>
+            <span class="badge badge-red">Rejected ${efrisCounts.rejected}</span>
+            <span class="badge badge-red">Failed ${efrisCounts.failed}</span>
+          </div>
+        </div>
+      </div>
+
+      ${branchComparison}
+
+      ${
+        lowStock.length
+          ? `
+      <div class="card" style="margin-bottom:16px">
+        <div class="card-title">⚠️ Low Stock Alerts</div>
+        <div class="table-wrap"><table>
+          <thead><tr><th>Product</th><th>In Stock</th><th>Reorder</th></tr></thead>
           <tbody>
-            ${recent
+            ${lowStock
+              .slice(0, 10)
               .map(
-                (s) => `
-              <tr>
-                <td>${escapeHtml(s.sale_number)}</td>
-                <td>${fmtDate(s.created_at)}</td>
-                <td>${fmtMoney(s.grand_total_base, baseCurrency)}</td>
-                <td><span class="badge ${s.payment_status === "paid" ? "badge-green" : s.payment_status === "credit" ? "badge-yellow" : "badge-gray"}">${s.payment_status}</span></td>
-              </tr>`,
+                (p) => `
+              <tr><td>${escapeHtml(p.name)}</td><td style="color:var(--danger);font-weight:700;">${STATE.stockByProduct[p.id] || 0}</td><td>${p.reorder_level}</td></tr>`,
               )
               .join("")}
           </tbody>
-        </table></div>`
-            : `<div class="empty-state">No sales yet — head to <b>Sell (POS)</b> to record your first one.</div>`
-        }
-      </div>
+        </table></div>
+      </div>`
+          : ""
+      }
 
-      <div class="card">
-        <div class="card-title">Top Products (90d)</div>
-        ${
-          topProducts.length
-            ? topProducts
-                .map(
-                  ([name, qty]) => `
-          <div class="summary-row"><span>${escapeHtml(name)}</span><span><b>${qty}</b> sold</span></div>`,
-                )
-                .join("")
-            : `<div class="empty-state">No sales data yet.</div>`
-        }
-
-        <div class="card-title" style="margin-top:14px;">EFRIS Status</div>
-        <div class="flex gap" style="flex-wrap:wrap;">
-          <span class="badge badge-gray">Pending ${efrisCounts.pending}</span>
-          <span class="badge badge-blue">Queued ${efrisCounts.queued}</span>
-          <span class="badge badge-green">Accepted ${efrisCounts.accepted}</span>
-          <span class="badge badge-red">Rejected ${efrisCounts.rejected}</span>
-          <span class="badge badge-red">Failed ${efrisCounts.failed}</span>
-        </div>
-      </div>
+      ${(() => {
+        const expiring = STATE.products.filter(
+          (p) =>
+            p.expiry_date &&
+            (new Date(p.expiry_date) - new Date()) / (1000 * 60 * 60 * 24) <=
+              30 &&
+            new Date(p.expiry_date) > new Date(),
+        );
+        const expired = STATE.products.filter(
+          (p) => p.expiry_date && new Date(p.expiry_date) < new Date(),
+        );
+        const batchAlerts = (expiringBatches || []);
+        if (!expiring.length && !expired.length && !batchAlerts.length) return "";
+        return `
+      <div class="card" style="margin-bottom:16px">
+        <div class="card-title">📅 Expiry Alerts</div>
+        <div class="table-wrap"><table>
+          <thead><tr><th>Product</th><th>Batch</th><th>Expiry</th><th>Qty</th><th>Status</th></tr></thead>
+          <tbody>
+            ${expired
+              .slice(0, 5)
+              .map(
+                (p) =>
+                  `<tr><td>${escapeHtml(p.name)}</td><td>—</td><td>${escapeHtml(p.expiry_date)}</td><td>${STATE.stockByProduct[p.id] || 0}</td><td><span class="badge badge-red">EXPIRED</span></td></tr>`,
+              )
+              .join("")}
+            ${expiring
+              .slice(0, 5)
+              .map((p) => {
+                const days = Math.ceil(
+                  (new Date(p.expiry_date) - new Date()) / (1000 * 60 * 60 * 24),
+                );
+                return `<tr><td>${escapeHtml(p.name)}</td><td>—</td><td>${escapeHtml(p.expiry_date)}</td><td>${STATE.stockByProduct[p.id] || 0}</td><td><span class="badge badge-yellow">${days}d left</span></td></tr>`;
+              })
+              .join("")}
+            ${batchAlerts.map(b => {
+              const days = Math.ceil((new Date(b.expiry_date) - new Date()) / (1000*60*60*24));
+              const badge = days < 0 ? "badge-red" : days <= 7 ? "badge-red" : "badge-yellow";
+              const label = days < 0 ? `EXPIRED ${Math.abs(days)}d ago` : `${days}d left`;
+              return `<tr><td>${escapeHtml(b.product?.name || "—")}</td><td>${escapeHtml(b.batch_number)}</td><td>${b.expiry_date}</td><td>${b.quantity} ${escapeHtml(b.product?.unit || "")}</td><td><span class="badge ${badge}">${label}</span></td></tr>`;
+            }).join("")}
+          </tbody>
+        </table></div>
+      </div>`;
+      })()}
     </div>
-
-    ${branchComparison}
-
-    ${
-      lowStock.length
-        ? `
-    <div class="card">
-      <div class="card-title">⚠️ Low Stock Alerts</div>
-      <div class="table-wrap"><table>
-        <thead><tr><th>Product</th><th>In Stock</th><th>Reorder</th></tr></thead>
-        <tbody>
-          ${lowStock
-            .slice(0, 10)
-            .map(
-              (p) => `
-            <tr><td>${escapeHtml(p.name)}</td><td style="color:var(--danger);font-weight:700;">${STATE.stockByProduct[p.id] || 0}</td><td>${p.reorder_level}</td></tr>`,
-            )
-            .join("")}
-        </tbody>
-      </table></div>
-    </div>`
-        : ""
-    }
-
-    ${(() => {
-      const expiring = STATE.products.filter(
-        (p) =>
-          p.expiry_date &&
-          (new Date(p.expiry_date) - new Date()) / (1000 * 60 * 60 * 24) <=
-            30 &&
-          new Date(p.expiry_date) > new Date(),
-      );
-      const expired = STATE.products.filter(
-        (p) => p.expiry_date && new Date(p.expiry_date) < new Date(),
-      );
-      const batchAlerts = (expiringBatches || []);
-      if (!expiring.length && !expired.length && !batchAlerts.length) return "";
-      return `
-    <div class="card">
-      <div class="card-title">📅 Expiry Alerts</div>
-      <div class="table-wrap"><table>
-        <thead><tr><th>Product</th><th>Batch</th><th>Expiry</th><th>Qty</th><th>Status</th></tr></thead>
-        <tbody>
-          ${expired
-            .slice(0, 5)
-            .map(
-              (p) =>
-                `<tr><td>${escapeHtml(p.name)}</td><td>—</td><td>${escapeHtml(p.expiry_date)}</td><td>${STATE.stockByProduct[p.id] || 0}</td><td><span class="badge badge-red">EXPIRED</span></td></tr>`,
-            )
-            .join("")}
-          ${expiring
-            .slice(0, 5)
-            .map((p) => {
-              const days = Math.ceil(
-                (new Date(p.expiry_date) - new Date()) / (1000 * 60 * 60 * 24),
-              );
-              return `<tr><td>${escapeHtml(p.name)}</td><td>—</td><td>${escapeHtml(p.expiry_date)}</td><td>${STATE.stockByProduct[p.id] || 0}</td><td><span class="badge badge-yellow">${days}d left</span></td></tr>`;
-            })
-            .join("")}
-          ${batchAlerts.map(b => {
-            const days = Math.ceil((new Date(b.expiry_date) - new Date()) / (1000*60*60*24));
-            const badge = days < 0 ? "badge-red" : days <= 7 ? "badge-red" : "badge-yellow";
-            const label = days < 0 ? `EXPIRED ${Math.abs(days)}d ago` : `${days}d left`;
-            return `<tr><td>${escapeHtml(b.product?.name || "—")}</td><td>${escapeHtml(b.batch_number)}</td><td>${b.expiry_date}</td><td>${b.quantity} ${escapeHtml(b.product?.unit || "")}</td><td><span class="badge ${badge}">${label}</span></td></tr>`;
-          }).join("")}
-        </tbody>
-      </table></div>
-    </div>`;
-    })()}
   `;
+
+  // Wire expand/collapse
+  const expandBtn = root.querySelector("#dash-expand-btn");
+  const details = root.querySelector("#dash-details");
+  if (expandBtn && details) {
+    expandBtn.addEventListener("click", () => {
+      const isHidden = details.classList.toggle("hidden");
+      expandBtn.querySelector("#dash-expand-icon").textContent = isHidden ? "▶" : "▼";
+      expandBtn.childNodes[1].textContent = isHidden ? " Show Details" : " Hide Details";
+    });
+  }
 }

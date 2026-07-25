@@ -16,6 +16,7 @@ import {
 } from "./uganda-pos-core.js";
 
 let biTab = "executive";
+let currentGroup = "Overview";
 const baseCurrency = () => STATE.business?.base_currency || "UGX";
 const num = (v) => Number(v || 0);
 const pct = (a, b) => b > 0 ? ((a / b) * 100).toFixed(1) : "0.0";
@@ -224,21 +225,42 @@ export async function renderBI(root) {
   root.innerHTML = `<div class="empty-state">Loading business intelligence…</div>`;
   const d = await fetchAllData();
 
+  const biGroups = {
+    Overview: ["executive", "insights", "forecasting"],
+    Performance: ["sales", "profitability"],
+    Finance: ["financial", "tax"],
+    Operations: ["inventory", "customers", "suppliers", "operations"],
+  };
+  const tabLabels = { executive: "Executive", insights: "Insights", forecasting: "Forecasting", sales: "Sales", profitability: "Profitability", financial: "Financial", tax: "Tax", inventory: "Inventory", customers: "Customers", suppliers: "Suppliers", operations: "Operations" };
+
   root.innerHTML = `
     <div class="view-header">
       <div>
         <h2>📊 Business Intelligence</h2>
         <p class="sub">${STATE.business.name} · ${baseCurrency()} · Last 90 days</p>
       </div>
-      <button class="btn btn-outline" id="bi-refresh">🔄 Refresh</button>
-    </div>
-    <div class="admin-tabs" id="bi-tabs">
-      ${["executive","sales","profitability","inventory","customers","suppliers","financial","tax","operations","insights","forecasting"].map(t =>
-        `<button class="admin-tab ${biTab===t?"active":""}" data-bitab="${t}">${t.charAt(0).toUpperCase()+t.slice(1)}</button>`
-      ).join("")}
+      <div style="display:flex;gap:8px;align-items:center">
+        <div style="position:relative">
+          <select id="bi-group-select" style="border-radius:var(--radius-sm);border:1px solid var(--border);padding:8px 14px;background:var(--surface);font-weight:600;font-size:13px;cursor:pointer">
+            ${Object.keys(biGroups).map(g => `<option value="${g}" ${currentGroup === g ? "selected" : ""}>${g}</option>`).join("")}
+          </select>
+        </div>
+        <div style="display:flex;gap:4px;flex-wrap:wrap" id="bi-sub-tabs">
+          ${biGroups[currentGroup].map(t =>
+            `<button class="admin-tab ${biTab===t?"active":""}" data-bitab="${t}">${tabLabels[t]}</button>`
+          ).join("")}
+        </div>
+        <button class="btn btn-outline btn-sm" id="bi-refresh">🔄</button>
+      </div>
     </div>
     <div id="bi-content"></div>
   `;
+
+  root.querySelector("#bi-group-select").addEventListener("change", (e) => {
+    currentGroup = e.target.value;
+    biTab = biGroups[currentGroup][0];
+    renderBI(root);
+  });
 
   root.querySelectorAll("[data-bitab]").forEach(btn => {
     btn.addEventListener("click", () => {

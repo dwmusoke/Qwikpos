@@ -334,126 +334,124 @@
           </div>
         </div>
 
-        <div class="nav-group-label">Operations</div>
         <button class="nav-link" data-route="dashboard" data-tooltip="Dashboard">
           <span class="icon">📊</span>
-          <span data-i18n="nav.dashboard">Dashboard</span>
+          <span class="nav-label">Dashboard</span>
         </button>
 
-        <div class="nav-group-label">Sales</div>
-        <button class="nav-link" data-route="sales" data-tooltip="Sales">
-          <span class="icon">💰</span> <span data-i18n="nav.sales">Sales</span>
-        </button>
-        <button class="nav-link" data-route="pos" data-tooltip="Sell (POS)">
-          <span class="icon">🧾</span>
-          <span data-i18n="nav.pos">Sell (POS)</span>
-        </button>
-        <button class="nav-link" data-route="orders" data-tooltip="Orders">
-          <span class="icon">📦</span> Orders
-        </button>
-        <button class="nav-link" data-route="quotations" data-tooltip="Quotations">
-          <span class="icon">📄</span>
-          <span data-i18n="nav.quotations">Quotations</span>
-        </button>
+        <!-- Sales Module -->
+        <div class="nav-module">
+          <button class="nav-link nav-parent" data-module="sales" data-tooltip="Sales">
+            <span class="icon">💰</span>
+            <span class="nav-label">Sales</span>
+            <span class="nav-chevron">▶</span>
+          </button>
+          <div class="nav-children">
+            <button class="nav-link" data-route="sales">Sales</button>
+            <button class="nav-link" data-route="pos">POS</button>
+            <button class="nav-link" data-route="orders">Orders</button>
+            <button class="nav-link" data-route="quotations">Quotations</button>
+          </div>
+        </div>
 
-        <div class="nav-group-label">Inventory</div>
-        <button class="nav-link" data-route="products" data-tooltip="Products">
-          <span class="icon">🏷️</span>
-          <span data-i18n="nav.products">Products</span>
-        </button>
-        <button class="nav-link" data-route="inventory" data-tooltip="Stock">
-          <span class="icon">📦</span> Stock
-          <span class="nav-badge hidden" id="low-stock-badge">0</span>
-        </button>
-        <button class="nav-link" data-route="purchases" data-tooltip="Purchases">
-          <span class="icon">🛒</span>
-          <span data-i18n="nav.purchases">Purchases</span>
-        </button>
-        <button class="nav-link" data-route="suppliers" data-tooltip="Suppliers">
-          <span class="icon">🚚</span>
-          <span data-i18n="nav.suppliers">Suppliers</span>
-        </button>
+        <!-- Inventory Module -->
+        <div class="nav-module">
+          <button class="nav-link nav-parent" data-module="inventory" data-tooltip="Inventory">
+            <span class="icon">📦</span>
+            <span class="nav-label">Inventory</span>
+            <span class="nav-chevron">▶</span>
+          </button>
+          <div class="nav-children">
+            <button class="nav-link" data-route="products">Products</button>
+            <button class="nav-link" data-route="inventory">Stock</button>
+            <button class="nav-link" data-route="purchases">Purchases</button>
+            <button class="nav-link" data-route="suppliers">Suppliers</button>
+          </div>
+        </div>
 
-        <div class="nav-group-label">CRM</div>
-        <button class="nav-link" data-route="customers" data-tooltip="Customers">
-          <span class="icon">👥</span>
-          <span data-i18n="nav.customers">Customers</span>
-        </button>
-        <button class="nav-link" data-route="leads" data-tooltip="Lead Management">
-          <span class="icon">💼</span>
-          <span data-i18n="nav.leads">Lead Management</span>
-        </button>
+        <!-- CRM Module -->
+        <div class="nav-module">
+          <button class="nav-link nav-parent" data-module="crm" data-tooltip="CRM">
+            <span class="icon">👥</span>
+            <span class="nav-label">CRM</span>
+            <span class="nav-chevron">▶</span>
+          </button>
+          <div class="nav-children">
+            <button class="nav-link" data-route="customers">Customers</button>
+            <button class="nav-link" data-route="leads">Leads</button>
+            <button class="nav-link" data-route="deliveries">Deliveries</button>
+          </div>
+        </div>
 
-        <div class="nav-group-label">Accounting</div>
-        <button class="nav-link" data-route="accounting" data-tooltip="Accounting">
-          <span class="icon">🧮</span>
-          <span data-i18n="nav.accounting">Accounting</span>
-        </button>
-        <button class="nav-link" data-route="reports" data-tooltip="Reports">
-          <span class="icon">📈</span>
-          <span data-i18n="nav.reports">Reports</span>
-        </button>
-        <button class="nav-link" data-route="bi" data-tooltip="Business Intelligence">
-          <span class="icon">📊</span> BI &amp; Analytics
-        </button>
+        <!-- Accounting Module -->
+        <div class="nav-module">
+          <button class="nav-link nav-parent" data-module="accounting" data-tooltip="Accounting">
+            <span class="icon">🧮</span>
+            <span class="nav-label">Accounting</span>
+            <span class="nav-chevron">▶</span>
+          </button>
+          <div class="nav-children">
+            <button class="nav-link" data-route="accounting">Accounting</button>
+            <button class="nav-link" data-route="reports">Reports</button>
+            <button class="nav-link" data-route="bi">BI &amp; Analytics</button>
+          </div>
+        </div>
 
-        <div class="nav-group-label">HR</div>
-        <button class="nav-link" data-route="hrm" data-tooltip="HRM">
-          <span class="icon">👥</span> <span data-i18n="nav.hrm">Employees</span>
-        </button>
+        <!-- HR Module -->
+        <div class="nav-module">
+          <button class="nav-link nav-parent" data-module="hr" data-tooltip="HR">
+            <span class="icon">👤</span>
+            <span class="nav-label">HR</span>
+            <span class="nav-chevron">▶</span>
+          </button>
+          <div class="nav-children">
+            <button class="nav-link" data-route="hrm">Employees</button>
+          </div>
+        </div>
 
-        <div class="nav-group-label">Administration</div>
-        <button class="nav-link" data-route="settings" data-role="admin,manager" data-tooltip="Settings">
-          <span class="icon">⚙️</span>
-          <span data-i18n="nav.settings">Settings</span>
-        </button>
-        <button class="nav-link" data-route="admin" data-superadmin="true" data-tooltip="Platform Admin">
-          <span class="icon">🛠️</span>
-          <span data-i18n="nav.admin">Platform Admin</span>
-        </button>
+        <!-- Communication Module -->
+        <div class="nav-module">
+          <button class="nav-link nav-parent" data-module="communication" data-tooltip="Communication">
+            <span class="icon">💬</span>
+            <span class="nav-label">Communication</span>
+            <span class="nav-chevron">▶</span>
+          </button>
+          <div class="nav-children">
+            <button class="nav-link" data-route="chat">Chat</button>
+            <button class="nav-link" data-route="notifications">Notifications</button>
+          </div>
+        </div>
 
-        <div class="nav-group-label">Communication</div>
-        <button class="nav-link" data-route="chat" data-tooltip="Chat">
-          <span class="icon">💬</span> <span data-i18n="nav.chat">Chat</span>
-          <span class="nav-badge hidden" id="chat-badge">0</span>
-        </button>
-        <button class="nav-link" data-route="notifications" data-tooltip="Notifications">
-          <span class="icon">🔔</span>
-          <span data-i18n="nav.notifications">Notifications</span>
-          <span class="nav-badge hidden" id="notif-sidebar-badge">0</span>
-        </button>
+        <!-- Compliance Module -->
+        <div class="nav-module">
+          <button class="nav-link nav-parent" data-module="compliance" data-tooltip="Compliance">
+            <span class="icon">🏛️</span>
+            <span class="nav-label">Compliance</span>
+            <span class="nav-chevron">▶</span>
+          </button>
+          <div class="nav-children">
+            <button class="nav-link" data-route="efris">EFRIS</button>
+            <button class="nav-link" data-route="audit">Audit</button>
+          </div>
+        </div>
 
-        <div class="nav-group-label">Compliance</div>
-        <button class="nav-link" data-route="efris" data-tooltip="EFRIS">
-          <span class="icon">🏛️</span> <span data-i18n="nav.efris">EFRIS</span>
-          <span class="nav-badge hidden" id="efris-badge">0</span>
-        </button>
-        <button class="nav-link" data-route="audit" data-tooltip="Audit Logs">
-          <span class="icon">📋</span>
-          <span data-i18n="nav.audit">Audit Logs</span>
-        </button>
-
-        <div class="nav-group-label">Other</div>
-        <button class="nav-link" data-route="templates" data-tooltip="Templates">
-          <span class="icon">🧾</span> Templates
-        </button>
-        <button class="nav-link" data-route="coupons" data-tooltip="Coupons">
-          <span class="icon">🎟️</span> Coupons
-        </button>
-        <button class="nav-link" data-route="deliveries" data-tooltip="Deliveries">
-          <span class="icon">🚚</span>
-          <span data-i18n="nav.deliveries">Deliveries</span>
-        </button>
-        <button class="nav-link" data-route="backup" data-tooltip="Backup">
-          <span class="icon">💾</span> Backup
-        </button>
-        <button class="nav-link" data-route="billing" data-role="admin" data-tooltip="Billing">
-          <span class="icon">💳</span>
-          <span data-i18n="nav.billing">Billing</span>
-        </button>
-        <button class="nav-link" data-route="profile" data-tooltip="My Profile">
-          <span class="icon">👤</span> My Profile
-        </button>
+        <!-- Administration Module -->
+        <div class="nav-module">
+          <button class="nav-link nav-parent" data-module="admin" data-tooltip="Administration">
+            <span class="icon">⚙️</span>
+            <span class="nav-label">Administration</span>
+            <span class="nav-chevron">▶</span>
+          </button>
+          <div class="nav-children">
+            <button class="nav-link" data-route="settings">Settings</button>
+            <button class="nav-link" data-route="templates">Templates</button>
+            <button class="nav-link" data-route="coupons">Coupons</button>
+            <button class="nav-link" data-route="backup">Backup</button>
+            <button class="nav-link" data-route="billing">Billing</button>
+            <button class="nav-link" data-route="profile">My Profile</button>
+            <button class="nav-link" data-route="admin">Platform Admin</button>
+          </div>
+        </div>
 
         <div class="sidebar-footer">
           <div class="offline-pill" id="trial-pill"></div>
