@@ -763,7 +763,7 @@ function renderCustomers(el, d) {
     <div class="kpi-grid" style="margin-bottom:16px">
       ${kpi("👥", "Total Customers", fmtN(d.customers.length))}
       ${kpi("🌟", "VIP Customers", fmtN(vip.length), { sub: "Top 20% by spend" })}
-      ${kpi("🔄", "Repeat Rate", d.customers.length > 0 ? `${pct(custData.filter(c => c.count > 1).length, d.customers.length))}%` : "N/A"}
+      ${kpi("🔄", "Repeat Rate", d.customers.length > 0 ? `${pct(custData.filter(c => c.count > 1).length, d.customers.length)}%` : "N/A")}
       ${kpi("💤", "Inactive (60d+)", fmtN(inactive.length), { color: inactive.length > 0 ? "var(--warning)" : "var(--success)" })}
       ${kpi("💳", "Credit Customers", fmtN(creditCustomers.length), { sub: fmtMoney(totalAR, baseCurrency()) + " outstanding" })}
       ${kpi("🛒", "Avg Basket", fmtMoney(d.avgOrderValue, baseCurrency()))}
