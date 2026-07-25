@@ -942,7 +942,7 @@ async function loadUnits() {
 }
 
 // ── BARCODE LABEL PRINTER ────────────────────────────────────────────
-const JSBARCODE_CDN = "https://cdnjs.cloudflare.com/ajax/libs/JsBarcode/3.11.5/JsBarcode.all.min.js";
+const JSBARCODE_CDN = "https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.11.5/JsBarcode.all.min.js";
 
 function printBarcodeLabels(items, size = "medium") {
   const normalized = items

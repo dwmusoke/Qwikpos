@@ -21,7 +21,7 @@ import {
 import { logAuditAction } from "./uganda-pos-view-audit.js";
 
 const JSBARCODE_CDN =
-  "https://cdnjs.cloudflare.com/ajax/libs/JsBarcode/3.11.5/JsBarcode.all.min.js";
+  "https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.11.5/JsBarcode.all.min.js";
 
 let invSearch = "";
 let invTab = "products";
