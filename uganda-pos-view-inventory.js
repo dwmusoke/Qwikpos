@@ -36,8 +36,10 @@ export async function renderInventory(root) {
 
     <div class="admin-tabs" id="inv-tabs">
       <button class="admin-tab ${invTab === "products" ? "active" : ""}" data-tab="products">Products</button>
+      <button class="admin-tab ${invTab === "batches" ? "active" : ""}" data-tab="batches">Batches</button>
       <button class="admin-tab ${invTab === "transfers" ? "active" : ""}" data-tab="transfers">Transfers</button>
       <button class="admin-tab ${invTab === "stockcount" ? "active" : ""}" data-tab="stockcount">Stock Count</button>
+      <button class="admin-tab ${invTab === "counthistory" ? "active" : ""}" data-tab="counthistory">Count History</button>
       <button class="admin-tab ${invTab === "movements" ? "active" : ""}" data-tab="movements">History</button>
       <button class="admin-tab ${invTab === "purchase" ? "active" : ""}" data-tab="purchase">Purchase Orders</button>
       <button class="admin-tab ${invTab === "production" ? "active" : ""}" data-tab="production">Production</button>
@@ -60,8 +62,10 @@ export async function renderInventory(root) {
   function renderInvTab() {
     const el = $("inv-tab-content");
     if (invTab === "products") renderProductsTab(el);
+    else if (invTab === "batches") renderBatchesTab(el);
     else if (invTab === "transfers") renderTransfersTab(el);
     else if (invTab === "stockcount") renderStockCountTab(el);
+    else if (invTab === "counthistory") renderCountHistoryTab(el);
     else if (invTab === "movements") renderMovementsTab(el);
     else if (invTab === "purchase") renderPurchaseTab(el);
     else if (invTab === "production") renderProductionTab(el);
@@ -399,6 +403,17 @@ function openStockModal(productId) {
       </select>
     </div>
     <div class="field"><label>Quantity</label><input type="number" step="0.01" id="sm-qty" value="0" /></div>
+    <div class="field"><label>Batch Number (optional)</label>
+      <div style="display:flex;gap:8px">
+        <select id="sm-batch" style="flex:1"><option value="">— No batch —</option></select>
+        <button class="btn btn-outline btn-sm" id="sm-new-batch-btn" style="white-space:nowrap">+ New</button>
+      </div>
+      <p class="help-text">Assign to a batch for expiry tracking. Leave empty for general stock.</p>
+    </div>
+    <div class="field-row" id="sm-new-batch-fields" style="display:none">
+      <div class="field"><label>New Batch #</label><input id="sm-new-batch-num" placeholder="e.g. BN-001" /></div>
+      <div class="field"><label>Expiry Date</label><input type="date" id="sm-new-batch-expiry" /></div>
+    </div>
     <div class="field"><label>Notes</label><input id="sm-notes" placeholder="Optional reference / reason" /></div>
     <div class="flex gap" style="margin-top:14px;">
       <button class="btn btn-outline btn-block" data-close-modal>Cancel</button>
@@ -407,7 +422,26 @@ function openStockModal(productId) {
   `,
     {
       onMount: () => {
-        // When branch changes, fetch and display that branch's stock
+        // Load existing batches for this product
+        async function loadBatchesForProduct() {
+          const batchSel = $("sm-batch");
+          if (!batchSel) return;
+          const branchId = $("sm-branch")?.value || STATE.branch?.id;
+          if (!branchId) return;
+          const { data: batches } = await supabase
+            .from("stock_batches")
+            .select("id, batch_number, quantity, expiry_date")
+            .eq("product_id", productId)
+            .eq("branch_id", branchId)
+            .order("expiry_date", { ascending: true, nullsFirst: false });
+          batchSel.innerHTML = `<option value="">— No batch —</option>` +
+            (batches || []).map(b =>
+              `<option value="${b.id}">${escapeHtml(b.batch_number)} (Qty: ${b.quantity}${b.expiry_date ? ', Exp: ' + b.expiry_date : ''})</option>`
+            ).join("");
+        }
+        loadBatchesForProduct();
+
+        // When branch changes, refresh batches and display stock
         const branchSel = $("sm-branch");
         if (branchSel) {
           branchSel.addEventListener("change", async () => {
@@ -419,8 +453,15 @@ function openStockModal(productId) {
               .maybeSingle();
             const qty = Number(data?.quantity || 0);
             $("sm-stock-info").innerHTML = `Current stock: <b>${qty} ${escapeHtml(p.unit || "pc")}</b>`;
+            loadBatchesForProduct();
           });
         }
+
+        // Toggle new batch fields
+        $("sm-new-batch-btn")?.addEventListener("click", () => {
+          const fields = $("sm-new-batch-fields");
+          if (fields) fields.style.display = fields.style.display === "none" ? "flex" : "none";
+        });
 
         $("save-stock-btn").addEventListener("click", async () => {
           const type = $("sm-type").value;
@@ -451,24 +492,66 @@ function openStockModal(productId) {
           else if (type === "adjustment") delta = qty - branchStock;
 
           const newQty = branchStock + delta;
+          const selectedBatchId = $("sm-batch")?.value || null;
+          const newBatchNum = $("sm-new-batch-num")?.value?.trim() || null;
+          const newBatchExpiry = $("sm-new-batch-expiry")?.value || null;
+          const useBatch = selectedBatchId || newBatchNum;
 
-          const { error: stockErr } = await supabase.rpc('upsert_product_stock', {
-            p_product_id: productId,
-            p_branch_id: branchId,
-            p_quantity: newQty,
-          });
-          if (stockErr) {
-            toast("Stock update failed: " + stockErr.message, "error");
-            return;
+          if (useBatch) {
+            // Batch-level adjustment
+            const batchNum = newBatchNum || (selectedBatchId
+              ? (await supabase.from("stock_batches").select("batch_number").eq("id", selectedBatchId).maybeSingle()).data?.batch_number
+              : null);
+            if (!batchNum) {
+              toast("Invalid batch selection", "error");
+              return;
+            }
+            // Fetch existing batch qty
+            let batchQty = 0;
+            if (selectedBatchId) {
+              const { data: bRow } = await supabase.from("stock_batches").select("quantity").eq("id", selectedBatchId).maybeSingle();
+              batchQty = Number(bRow?.quantity || 0);
+            }
+            let newBatchQty = batchQty + delta;
+            if (type === "adjustment") newBatchQty = qty; // absolute for adjustment
+
+            const { error: batchErr } = await supabase.rpc("adjust_stock_batch", {
+              p_product_id: productId,
+              p_branch_id: branchId,
+              p_batch_number: batchNum,
+              p_quantity: Math.max(0, newBatchQty),
+              p_expiry_date: newBatchExpiry || null,
+            });
+            if (batchErr) {
+              toast("Batch update failed: " + batchErr.message, "error");
+              return;
+            }
+            // Also update product_stock total
+            await supabase.rpc("upsert_product_stock", {
+              p_product_id: productId,
+              p_branch_id: branchId,
+              p_quantity: newQty,
+            });
+          } else {
+            // Simple stock update (no batch)
+            const { error: stockErr } = await supabase.rpc("upsert_product_stock", {
+              p_product_id: productId,
+              p_branch_id: branchId,
+              p_quantity: newQty,
+            });
+            if (stockErr) {
+              toast("Stock update failed: " + stockErr.message, "error");
+              return;
+            }
           }
 
-          await supabase.rpc('insert_stock_movement', {
+          await supabase.rpc("insert_stock_movement", {
             p_business_id: STATE.business.id,
             p_branch_id: branchId,
             p_product_id: productId,
             p_type: type,
             p_quantity: type === "adjustment" ? delta : qty,
-            p_notes: $("sm-notes").value || null,
+            p_notes: $("sm-notes").value || (useBatch ? `Batch: ${newBatchNum || selectedBatchId}` : null),
             p_created_by: STATE.appUser.id,
           });
 
@@ -480,6 +563,180 @@ function openStockModal(productId) {
       },
     },
   );
+}
+
+// ---------------------------------------------------------------------
+// BATCHES TAB — per-batch stock tracking with expiry dates
+// ---------------------------------------------------------------------
+async function renderBatchesTab(el) {
+  const branchId = STATE.branch?.id;
+  el.innerHTML = `
+    <div class="flex gap" style="margin-bottom:14px;flex-wrap:wrap">
+      <div class="pos-search-row" style="flex:1;min-width:200px;max-width:380px">
+        <input id="batch-search" placeholder="Search batches by product, batch number…" />
+      </div>
+      <button class="btn btn-primary" id="add-batch-btn">+ Add Batch</button>
+    </div>
+    <div class="table-wrap" style="max-height:600px;overflow-y:auto">
+      <table>
+        <thead><tr><th>Product</th><th>Batch #</th><th>Expiry</th><th>Qty</th><th>Cost</th><th>Total</th><th>Status</th><th></th></tr></thead>
+        <tbody id="batch-table-body"></tbody>
+      </table>
+    </div>
+  `;
+
+  async function loadBatches(search) {
+    const tbody = $("batch-table-body");
+    if (!tbody) return;
+    let q = supabase
+      .from("stock_batches")
+      .select("*, product:products(name, sku, unit), branch:branches(name)")
+      .eq("business_id", STATE.business.id)
+      .order("expiry_date", { ascending: true, nullsFirst: false })
+      .order("created_at", { ascending: false });
+    if (branchId) q = q.eq("branch_id", branchId);
+    const { data: batches } = await q;
+
+    let list = batches || [];
+    if (search) {
+      const s = search.toLowerCase();
+      list = list.filter(b =>
+        (b.product?.name || "").toLowerCase().includes(s) ||
+        (b.batch_number || "").toLowerCase().includes(s) ||
+        (b.product?.sku || "").toLowerCase().includes(s)
+      );
+    }
+
+    if (!list.length) {
+      tbody.innerHTML = `<tr><td colspan="8"><div class="empty-state">No batches found. Click "Add Batch" to start tracking batch stock.</div></td></tr>`;
+      return;
+    }
+
+    const now = new Date();
+    tbody.innerHTML = list.map(b => {
+      const exp = b.expiry_date ? new Date(b.expiry_date) : null;
+      const daysLeft = exp ? Math.ceil((exp - now) / (1000*60*60*24)) : null;
+      let statusHtml = "";
+      if (daysLeft !== null) {
+        if (daysLeft < 0) statusHtml = `<span class="badge badge-red">EXPIRED ${Math.abs(daysLeft)}d ago</span>`;
+        else if (daysLeft <= 7) statusHtml = `<span class="badge badge-red">EXPIRING ${daysLeft}d</span>`;
+        else if (daysLeft <= 30) statusHtml = `<span class="badge badge-yellow">Exp in ${daysLeft}d</span>`;
+        else statusHtml = `<span class="badge badge-green">OK (${daysLeft}d)</span>`;
+      } else {
+        statusHtml = `<span class="badge badge-blue">No expiry</span>`;
+      }
+      return `
+      <tr>
+        <td><b>${escapeHtml(b.product?.name || "—")}</b><br><span class="text-muted" style="font-size:11px">${escapeHtml(b.product?.sku || "")}</span></td>
+        <td>${escapeHtml(b.batch_number)}</td>
+        <td>${b.expiry_date || "—"}</td>
+        <td><span class="badge badge-blue">${b.quantity} ${escapeHtml(b.product?.unit || "pc")}</span></td>
+        <td>${fmtMoney(b.cost_price)}</td>
+        <td>${fmtMoney(b.cost_price * b.quantity)}</td>
+        <td>${statusHtml}</td>
+        <td class="flex gap">
+          <button class="btn btn-outline btn-sm" data-edit-batch="${b.id}">Edit</button>
+          <button class="btn btn-outline btn-sm btn-danger" data-del-batch="${b.id}" data-batch-name="${escapeHtml(b.batch_number)}" data-batch-qty="${b.quantity}">Del</button>
+        </td>
+      </tr>`;
+    }).join("");
+
+    qsa("[data-edit-batch]", tbody).forEach(btn => {
+      btn.addEventListener("click", () => openBatchModal(btn.dataset.editBatch));
+    });
+    qsa("[data-del-batch]", tbody).forEach(btn => {
+      btn.addEventListener("click", async () => {
+        if (!confirm(`Delete batch "${btn.dataset.batchName}" (${btn.dataset.batchQty} units)? This cannot be undone.`)) return;
+        const { error } = await supabase.rpc("delete_stock_batch", { p_batch_id: btn.dataset.delBatch });
+        if (error) { toast("Delete failed: " + error.message, "error"); return; }
+        toast("Batch deleted", "success");
+        await refreshProducts();
+        loadBatches($("batch-search")?.value || "");
+      });
+    });
+  }
+
+  $("batch-search")?.addEventListener("input", (e) => loadBatches(e.target.value));
+  $("add-batch-btn")?.addEventListener("click", () => openBatchModal());
+  loadBatches();
+}
+
+function openBatchModal(batchId) {
+  const editing = !!batchId;
+  openModal(`
+    <div class="modal-title-row"><h3>${editing ? "Edit" : "Add"} Batch</h3></div>
+    <div class="field"><label>Product *</label>
+      <select id="bm-product"><option value="">Select product…</option>${STATE.products.map(p => `<option value="${p.id}">${escapeHtml(p.name)} (${escapeHtml(p.sku || "—")})</option>`).join("")}</select>
+    </div>
+    <div class="field"><label>Batch Number *</label><input id="bm-batch" placeholder="e.g. BN-2026-001" /></div>
+    <div class="field-row">
+      <div class="field"><label>Expiry Date</label><input type="date" id="bm-expiry" /></div>
+      <div class="field"><label>Cost Price</label><input type="number" step="0.01" id="bm-cost" value="0" /></div>
+    </div>
+    <div class="field"><label>Quantity</label><input type="number" step="0.01" id="bm-qty" value="0" /></div>
+    <div class="field"><label>Notes</label><input id="bm-notes" placeholder="Optional notes" /></div>
+    <div class="flex gap" style="margin-top:14px;">
+      <button class="btn btn-outline btn-block" data-close-modal>Cancel</button>
+      <button class="btn btn-primary btn-block" id="bm-save">${editing ? "Save Changes" : "Add Batch"}</button>
+    </div>
+  `, {
+    onMount: () => {
+      if (editing) {
+        supabase.from("stock_batches").select("*").eq("id", batchId).maybeSingle().then(({ data: b }) => {
+          if (b) {
+            $("bm-product").value = b.product_id;
+            $("bm-batch").value = b.batch_number || "";
+            $("bm-expiry").value = b.expiry_date || "";
+            $("bm-cost").value = b.cost_price ?? 0;
+            $("bm-qty").value = b.quantity ?? 0;
+            $("bm-notes").value = b.notes || "";
+          }
+        });
+      }
+      $("bm-save").addEventListener("click", async () => {
+        const productId = $("bm-product").value;
+        const batchNum = $("bm-batch").value.trim();
+        const expiry = $("bm-expiry").value || null;
+        const cost = parseFloat($("bm-cost").value) || 0;
+        const qty = parseFloat($("bm-qty").value) || 0;
+        const notes = $("bm-notes").value.trim() || null;
+        if (!productId || !batchNum) {
+          toast("Product and batch number are required", "error");
+          return;
+        }
+        if (qty < 0) {
+          toast("Quantity cannot be negative", "error");
+          return;
+        }
+        const { error } = await supabase.rpc("adjust_stock_batch", {
+          p_product_id: productId,
+          p_branch_id: STATE.branch?.id,
+          p_batch_number: batchNum,
+          p_quantity: qty,
+          p_expiry_date: expiry,
+          p_cost_price: cost,
+          p_notes: notes,
+        });
+        if (error) {
+          toast("Save failed: " + error.message, "error");
+          return;
+        }
+        await supabase.rpc("insert_stock_movement", {
+          p_business_id: STATE.business.id,
+          p_branch_id: STATE.branch?.id,
+          p_product_id: productId,
+          p_type: qty > 0 ? "in" : "adjustment",
+          p_quantity: qty,
+          p_notes: `Batch ${batchNum}${notes ? ": " + notes : ""}`,
+          p_created_by: STATE.appUser.id,
+        });
+        toast(editing ? "Batch updated" : "Batch added", "success");
+        closeModal();
+        await refreshProducts();
+        renderBatchesTab($("inv-tab-content"));
+      });
+    },
+  });
 }
 
 // ---------------------------------------------------------------------
@@ -955,30 +1212,179 @@ function renderStockCountTab(el) {
     a.click();
   });
 
-  // Save adjustments
+  // Save adjustments (now saves as a count session)
   $("count-save-btn")?.addEventListener("click", async () => {
-    let adjusted = 0;
-    let lastErr = null;
-    for (const p of STATE.products) {
+    const changedProducts = STATE.products.filter(p => {
       const sys = countData[p.id]?.system;
       const counted = countData[p.id]?.counted;
-      if (counted === undefined || counted === sys) continue;
+      return counted !== undefined && counted !== sys;
+    });
 
+    if (!changedProducts.length) {
+      toast("No variances to save", "default");
+      return;
+    }
+
+    // Create a count session header
+    const { data: countSession, error: sessionErr } = await supabase
+      .from("stock_counts")
+      .insert({
+        business_id: STATE.business.id,
+        branch_id: STATE.branch.id,
+        count_date: new Date().toISOString().slice(0, 10),
+        status: "completed",
+        notes: `Manual count — ${changedProducts.length} products adjusted`,
+        counted_by: STATE.appUser.id,
+        completed_at: new Date().toISOString(),
+      })
+      .select()
+      .single();
+
+    if (sessionErr) {
+      toast("Failed to save count session: " + sessionErr.message, "error");
+      return;
+    }
+
+    // Insert count items for ALL products (including unchanged ones for the record)
+    const items = STATE.products.map(p => ({
+      count_id: countSession.id,
+      product_id: p.id,
+      system_qty: countData[p.id].system,
+      counted_qty: countData[p.id].counted,
+    }));
+
+    // Batch insert in chunks of 50
+    for (let i = 0; i < items.length; i += 50) {
+      const chunk = items.slice(i, i + 50);
+      await supabase.from("stock_count_items").insert(chunk);
+    }
+
+    // Apply the actual stock adjustments
+    let adjusted = 0;
+    for (const p of changedProducts) {
+      const sys = countData[p.id].system;
+      const counted = countData[p.id].counted;
       const delta = counted - sys;
-      const { error: upsertErr } = await supabase.rpc("upsert_product_stock", { p_product_id: p.id, p_branch_id: STATE.branch.id, p_quantity: counted });
-      if (upsertErr) { lastErr = upsertErr; continue; }
 
-      const { error: movErr } = await supabase.rpc("insert_stock_movement", { p_business_id: STATE.business.id, p_branch_id: STATE.branch.id, p_product_id: p.id, p_type: "adjustment", p_quantity: delta, p_notes: `Stock count: ${sys} → ${counted}`, p_created_by: STATE.appUser.id });
-      if (movErr) { lastErr = movErr; continue; }
-      if (movErr) { lastErr = movErr; continue; }
+      await supabase.rpc("upsert_product_stock", {
+        p_product_id: p.id,
+        p_branch_id: STATE.branch.id,
+        p_quantity: counted,
+      });
+
+      await supabase.rpc("insert_stock_movement", {
+        p_business_id: STATE.business.id,
+        p_branch_id: STATE.branch.id,
+        p_product_id: p.id,
+        p_type: "adjustment",
+        p_quantity: delta,
+        p_notes: `Stock count ${countSession.id.slice(0, 8)}: ${sys} → ${counted}`,
+        p_created_by: STATE.appUser.id,
+      });
       adjusted++;
     }
-    if (lastErr) {
-      toast("Stock save error: " + lastErr.message, "error");
-    }
-    toast(`Adjusted ${adjusted} products`, adjusted > 0 ? "success" : "default");
+
+    toast(`Count session saved — ${adjusted} products adjusted`, "success");
     await refreshProducts();
     renderStockCountTab(el);
+  });
+}
+
+// ---------------------------------------------------------------------
+// COUNT HISTORY TAB — view past stock count sessions
+// ---------------------------------------------------------------------
+async function renderCountHistoryTab(el) {
+  el.innerHTML = `
+    <div class="card">
+      <div class="card-title">Stock Count History — ${escapeHtml(STATE.branch?.name || "All Branches")}</div>
+      <div class="table-wrap" style="max-height:600px;overflow-y:auto">
+        <table>
+          <thead><tr><th>Date</th><th>Status</th><th>Products</th><th>Variances</th><th>Counted By</th><th></th></tr></thead>
+          <tbody id="count-history-body"></tbody>
+        </table>
+      </div>
+    </div>
+  `;
+
+  const tbody = $("count-history-body");
+  let q = supabase
+    .from("stock_counts")
+    .select("*, counted_by_user:app_users!stock_counts_counted_by_fkey(name)")
+    .eq("business_id", STATE.business.id)
+    .order("created_at", { ascending: false })
+    .limit(50);
+  if (STATE.branch) q = q.eq("branch_id", STATE.branch.id);
+  const { data: sessions } = await q;
+
+  if (!sessions?.length) {
+    tbody.innerHTML = `<tr><td colspan="6"><div class="empty-state">No count sessions yet. Go to Stock Count to create one.</div></td></tr>`;
+    return;
+  }
+
+  // Load item counts for each session
+  const sessionIds = sessions.map(s => s.id);
+  const { data: allItems } = await supabase
+    .from("stock_count_items")
+    .select("count_id, system_qty, counted_qty, variance")
+    .in("count_id", sessionIds);
+
+  const itemsByCount = {};
+  (allItems || []).forEach(item => {
+    if (!itemsByCount[item.count_id]) itemsByCount[item.count_id] = [];
+    itemsByCount[item.count_id].push(item);
+  });
+
+  tbody.innerHTML = sessions.map(s => {
+    const items = itemsByCount[s.id] || [];
+    const totalProducts = items.length;
+    const variances = items.filter(i => i.variance !== 0).length;
+    const statusBadge = s.status === "completed" ? "badge-green"
+      : s.status === "draft" ? "badge-yellow"
+      : s.status === "cancelled" ? "badge-red" : "badge-blue";
+
+    return `
+    <tr>
+      <td>${fmtDate(s.created_at)}</td>
+      <td><span class="badge ${statusBadge}">${s.status}</span></td>
+      <td>${totalProducts}</td>
+      <td>${variances > 0 ? `<span class="badge badge-red">${variances} adjusted</span>` : '<span class="badge badge-green">Matched</span>'}</td>
+      <td>${escapeHtml(s.counted_by_user?.name || "—")}</td>
+      <td><button class="btn btn-outline btn-sm" data-view-count="${s.id}">View</button></td>
+    </tr>`;
+  }).join("");
+
+  qsa("[data-view-count]", tbody).forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const { data: items } = await supabase
+        .from("stock_count_items")
+        .select("*, product:products(name, sku)")
+        .eq("count_id", btn.dataset.viewCount);
+      if (!items?.length) {
+        toast("No items in this count", "default");
+        return;
+      }
+      openModal(`
+        <div class="modal-title-row"><h3>Stock Count — ${fmtDate(items[0]?.created_at)}</h3></div>
+        <div class="table-wrap" style="max-height:400px;overflow-y:auto">
+          <table>
+            <thead><tr><th>Product</th><th>SKU</th><th>System</th><th>Counted</th><th>Variance</th></tr></thead>
+            <tbody>
+              ${items.map(i => `
+              <tr>
+                <td>${escapeHtml(i.product?.name || "—")}</td>
+                <td>${escapeHtml(i.product?.sku || "—")}</td>
+                <td>${i.system_qty}</td>
+                <td>${i.counted_qty}</td>
+                <td><span class="badge ${i.variance === 0 ? "badge-green" : i.variance > 0 ? "badge-blue" : "badge-red"}">${i.variance > 0 ? "+" : ""}${i.variance}</span></td>
+              </tr>`).join("")}
+            </tbody>
+          </table>
+        </div>
+        <div class="flex gap" style="margin-top:14px;justify-content:flex-end">
+          <button class="btn btn-outline" data-close-modal>Close</button>
+        </div>
+      `);
+    });
   });
 }
 

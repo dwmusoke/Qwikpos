@@ -23,6 +23,7 @@ export async function renderDashboard(root) {
     { data: efrisRows },
     { data: customers },
     { data: branchSales },
+    { data: expiringBatches },
   ] = await Promise.all([
     supabase
       .from("sales")
@@ -50,6 +51,15 @@ export async function renderDashboard(root) {
             new Date(new Date().getFullYear(), 0, 1).toISOString(),
           )
       : { data: [] },
+    supabase
+      .from("stock_batches")
+      .select("*, product:products(name, unit), branch:branches(name)")
+      .eq("business_id", STATE.business.id)
+      .gt("quantity", 0)
+      .not("expiry_date", "is", null)
+      .lte("expiry_date", new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10))
+      .order("expiry_date", { ascending: true })
+      .limit(20),
   ]);
 
   const allSales = (sales || []).filter(
@@ -82,6 +92,7 @@ export async function renderDashboard(root) {
   const monthVat = sumConverted(monthSales, "vat_total");
 
   const lowStock = lowStockProducts();
+  const expiryAlerts = (expiringBatches || []).length;
   const inventoryValue = STATE.products.reduce(
     (a, p) => a + Number(p.cost_price || 0) * (STATE.stockByProduct[p.id] || 0),
     0,
@@ -322,6 +333,13 @@ export async function renderDashboard(root) {
           <div class="value" style="color:${lowStock.length ? "var(--danger)" : "inherit"}">${lowStock.length}</div>
         </div>
       </div>
+      <div class="kpi-card ${expiryAlerts ? "kpi-accent-red" : ""}">
+        <div class="kpi-icon">📅</div>
+        <div class="kpi-content">
+          <div class="label">Expiring Batches</div>
+          <div class="value" style="color:${expiryAlerts ? "var(--danger)" : "inherit"}">${expiryAlerts}</div>
+        </div>
+      </div>
       <div class="kpi-card">
         <div class="kpi-icon">👥</div>
         <div class="kpi-content">
@@ -452,18 +470,19 @@ export async function renderDashboard(root) {
       const expired = STATE.products.filter(
         (p) => p.expiry_date && new Date(p.expiry_date) < new Date(),
       );
-      if (!expiring.length && !expired.length) return "";
+      const batchAlerts = (expiringBatches || []);
+      if (!expiring.length && !expired.length && !batchAlerts.length) return "";
       return `
     <div class="card">
       <div class="card-title">📅 Expiry Alerts</div>
       <div class="table-wrap"><table>
-        <thead><tr><th>Product</th><th>Expiry</th><th>Status</th><th>Stock</th></tr></thead>
+        <thead><tr><th>Product</th><th>Batch</th><th>Expiry</th><th>Qty</th><th>Status</th></tr></thead>
         <tbody>
           ${expired
             .slice(0, 5)
             .map(
               (p) =>
-                `<tr><td>${escapeHtml(p.name)}</td><td>${escapeHtml(p.expiry_date)}</td><td><span class="badge badge-red">EXPIRED</span></td><td>${STATE.stockByProduct[p.id] || 0}</td></tr>`,
+                `<tr><td>${escapeHtml(p.name)}</td><td>—</td><td>${escapeHtml(p.expiry_date)}</td><td>${STATE.stockByProduct[p.id] || 0}</td><td><span class="badge badge-red">EXPIRED</span></td></tr>`,
             )
             .join("")}
           ${expiring
@@ -472,9 +491,15 @@ export async function renderDashboard(root) {
               const days = Math.ceil(
                 (new Date(p.expiry_date) - new Date()) / (1000 * 60 * 60 * 24),
               );
-              return `<tr><td>${escapeHtml(p.name)}</td><td>${escapeHtml(p.expiry_date)}</td><td><span class="badge badge-yellow">${days}d left</span></td><td>${STATE.stockByProduct[p.id] || 0}</td></tr>`;
+              return `<tr><td>${escapeHtml(p.name)}</td><td>—</td><td>${escapeHtml(p.expiry_date)}</td><td>${STATE.stockByProduct[p.id] || 0}</td><td><span class="badge badge-yellow">${days}d left</span></td></tr>`;
             })
             .join("")}
+          ${batchAlerts.map(b => {
+            const days = Math.ceil((new Date(b.expiry_date) - new Date()) / (1000*60*60*24));
+            const badge = days < 0 ? "badge-red" : days <= 7 ? "badge-red" : "badge-yellow";
+            const label = days < 0 ? `EXPIRED ${Math.abs(days)}d ago` : `${days}d left`;
+            return `<tr><td>${escapeHtml(b.product?.name || "—")}</td><td>${escapeHtml(b.batch_number)}</td><td>${b.expiry_date}</td><td>${b.quantity} ${escapeHtml(b.product?.unit || "")}</td><td><span class="badge ${badge}">${label}</span></td></tr>`;
+          }).join("")}
         </tbody>
       </table></div>
     </div>`;
