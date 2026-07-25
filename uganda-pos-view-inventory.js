@@ -368,7 +368,7 @@ function openProductModal(productId) {
               const { data: urlData } = supabase.storage
                 .from("product-images")
                 .getPublicUrl(path);
-              await supabase.rpc("upsert_product", { p_id: saved.id, p_image_url: urlData.publicUrl, p_business_id: STATE.business.id, p_name: name, p_selling_price: price, p_unit: unitVal });
+              await supabase.from("products").update({ image_url: urlData.publicUrl }).eq("id", saved.id);
             }
           }
 
@@ -883,6 +883,8 @@ function openImportModal() {
               p_is_active: true,
               p_brand_id: null,
               p_id: null,
+              p_expiry_date: row.expiry_date || null,
+              p_has_batches: false,
             });
 
             if (error) {
