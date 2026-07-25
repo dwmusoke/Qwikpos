@@ -315,7 +315,32 @@ body.sidebar-expanded .nav-link {
 body.sidebar-expanded .nav-link .icon { display: none; }
 body.sidebar-expanded .nav-children .nav-link {
   height: auto;
-  padding: 8px 10px 8px 16px;
+  padding: 8px 10px 8px 36px;
+  font-size: 13px;
+  font-weight: 400;
+  color: rgba(255,255,255,0.65);
+  position: relative;
+}
+body.sidebar-expanded .nav-children .nav-link::before {
+  content: "";
+  position: absolute;
+  left: 18px;
+  top: 8px;
+  bottom: 8px;
+  width: 2px;
+  background: rgba(255,255,255,0.12);
+  border-radius: 1px;
+}
+body.sidebar-expanded .nav-children .nav-link:hover::before {
+  background: var(--accent);
+}
+body.sidebar-expanded .nav-children .nav-link.active {
+  color: #fff;
+  font-weight: 600;
+  background: rgba(255,255,255,0.12);
+}
+body.sidebar-expanded .nav-children .nav-link.active::before {
+  background: var(--accent);
 }
 .nav-label {
   opacity: 0;
