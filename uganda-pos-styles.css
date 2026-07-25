@@ -312,9 +312,10 @@ body.sidebar-expanded .nav-link {
   gap: 12px;
   border-radius: 12px;
 }
+body.sidebar-expanded .nav-link .icon { display: none; }
 body.sidebar-expanded .nav-children .nav-link {
   height: auto;
-  padding: 8px 10px 8px 36px;
+  padding: 8px 10px 8px 16px;
 }
 .nav-label {
   opacity: 0;
