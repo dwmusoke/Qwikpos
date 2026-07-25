@@ -391,8 +391,8 @@ body.sidebar-expanded .sidebar {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 12px 14px;
-  border-radius: var(--radius);
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
   color: var(--text);
   text-decoration: none;
   cursor: pointer;
@@ -406,6 +406,7 @@ body.sidebar-expanded .sidebar {
   transition: all var(--dur-fast) var(--ease);
   position: relative;
   white-space: nowrap;
+  height: 40px;
 }
 .nav-link:hover {
   background: var(--surface-2);
@@ -501,23 +502,23 @@ body.sidebar-expanded .sidebar {
 
 /* ── Expanded state ── */
 body.sidebar-expanded .sidebar-inner .nav-link {
-  height: 48px;
-  padding: 12px 16px;
+  height: 42px;
+  padding: 10px 16px;
   gap: 12px;
-  border-radius: var(--radius);
+  border-radius: var(--radius-sm);
   margin-bottom: 0;
 }
 /* Expanded top-level nav items: keep parent icons as brand-colored badges */
 body.sidebar-expanded .sidebar-inner > .nav-link .icon,
 body.sidebar-expanded .sidebar-inner .nav-module > .nav-link .icon {
-  width: 30px;
-  height: 30px;
+  width: 28px;
+  height: 28px;
   opacity: 1;
   overflow: visible;
-  font-size: 18px;
+  font-size: 16px;
   background: var(--brand);
   color: #fff;
-  border-radius: var(--radius-xs);
+  border-radius: 6px;
   transition: background var(--dur-fast) var(--ease);
 }
 body.sidebar-expanded .sidebar-inner .nav-module > .nav-link:hover .icon {
