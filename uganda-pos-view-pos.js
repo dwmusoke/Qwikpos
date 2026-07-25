@@ -371,6 +371,7 @@ function renderProductGrid() {
         ${qtyInCart > 0 ? `<span class="qty-badge">${qtyInCart}</span>` : ""}
         ${p.image_url ? `<div class="product-card-img"><img src="${escapeHtml(p.image_url)}" alt="" /></div>` : `<div class="product-emoji">${escapeHtml(categoryIcon(p.category_id))}</div>`}
         <div class="pname">${escapeHtml(p.name)}</div>
+        ${p.sku ? `<div class="psku">SKU: ${escapeHtml(p.sku)}</div>` : ""}
         <div class="pprice">${fmtMoneyRaw(fromBase(p.selling_price, posSaleCurrency), posSaleCurrency)}</div>
         <div class="pstock ${low ? "low" : ""}">${stock} ${escapeHtml(p.unit || "pc")} ${hasExpiry ? expiryBadge : ""}</div>
       </button>`;

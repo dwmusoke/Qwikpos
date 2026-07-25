@@ -1696,14 +1696,14 @@ tbody tr:hover {
 
 .product-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(135px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
   gap: 10px;
   overflow-y: auto;
   padding-bottom: 12px;
 }
 @media (max-width: 640px) {
   .product-grid {
-    grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
     gap: 8px;
   }
 }
@@ -1719,6 +1719,8 @@ tbody tr:hover {
   gap: 6px;
   transition: all var(--dur-fast) var(--ease);
   -webkit-tap-highlight-color: transparent;
+  min-height: 220px;
+  max-height: 240px;
 }
 .product-card:hover {
   border-color: var(--brand);
@@ -1750,7 +1752,27 @@ tbody tr:hover {
   color: var(--danger);
   font-weight: 700;
 }
-.product-emoji { font-size: 22px; }
+.product-card-img {
+  width: 100%;
+  height: 110px;
+  background: var(--surface-2);
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+.product-card-img img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.product-emoji { font-size: 22px; height:110px; display:flex; align-items:center; justify-content:center; }
+.psku {
+  font-size: 11px;
+  color: var(--text-muted);
+  line-height: 1.2;
+}
 
 /* Product card qty badge (when item is in cart) */
 .product-card .qty-badge {
