@@ -399,6 +399,9 @@ body:not(.sidebar-expanded) .nav-module:focus-within .nav-children {
   pointer-events: auto;
 }
 
+/* Hide flyout headers in expanded sidebar (they're for collapsed flyout only) */
+body.sidebar-expanded .nav-children .flyout-header { display: none; }
+
 /* Flyout section header */
 body:not(.sidebar-expanded) .nav-children .flyout-header {
   display: flex;
