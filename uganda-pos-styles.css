@@ -380,7 +380,7 @@ body.sidebar-expanded .sidebar {
   padding: var(--space-sm);
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
   flex: 1;
   overflow-y: auto;
   overflow-x: hidden;
@@ -391,16 +391,16 @@ body.sidebar-expanded .sidebar {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 10px 14px;
-  border-radius: var(--radius-sm);
+  padding: 11px 14px;
+  border-radius: 10px;
   color: var(--text);
   text-decoration: none;
   cursor: pointer;
   font-size: 13px;
   font-weight: 500;
   border: 1px solid var(--border);
-  background: var(--surface);
-  box-shadow: var(--shadow-xs);
+  background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+  box-shadow: 0 6px 18px rgba(0,0,0,0.05);
   width: 100%;
   text-align: left;
   transition: all var(--dur-fast) var(--ease);
@@ -409,17 +409,17 @@ body.sidebar-expanded .sidebar {
   height: 40px;
 }
 .nav-link:hover {
-  background: var(--surface-2);
+  background: linear-gradient(135deg, #f5f7fb 0%, #eef2f7 100%);
   border-color: var(--border-strong);
   color: var(--text);
-  box-shadow: var(--shadow);
+  box-shadow: 0 10px 24px rgba(0,0,0,0.06);
 }
 .nav-link.active {
-  background: var(--surface-2);
+  background: linear-gradient(135deg, rgba(15,107,74,0.08), rgba(15,107,74,0.14));
   border-color: var(--brand);
   color: var(--brand);
-  font-weight: 600;
-  box-shadow: var(--shadow);
+  font-weight: 700;
+  box-shadow: 0 10px 24px rgba(15,107,74,0.12);
 }
 
 /* Nav links in expanded sidebar — inherit brand-aware colors */
@@ -463,16 +463,16 @@ body.sidebar-expanded .sidebar {
   font-size: 15px;
   flex-shrink: 0;
   background: var(--surface-2);
-  border-radius: var(--radius-xs);
+  border-radius: 9px;
   transition: all var(--dur-fast) var(--ease);
 }
 .nav-module > .nav-link > .icon {
-  font-size: 18px;
+  font-size: 17px;
   width: 30px;
   height: 30px;
   background: var(--brand);
   color: #fff;
-  border-radius: var(--radius-xs);
+  border-radius: 10px;
 }
 .nav-module > .nav-link:hover > .icon {
   background: var(--brand-dark);
@@ -503,9 +503,9 @@ body.sidebar-expanded .sidebar {
 /* ── Expanded state ── */
 body.sidebar-expanded .sidebar-inner .nav-link {
   height: 42px;
-  padding: 10px 16px;
+  padding: 11px 16px;
   gap: 12px;
-  border-radius: var(--radius-sm);
+  border-radius: 10px;
   margin-bottom: 0;
 }
 /* Expanded top-level nav items: keep parent icons as brand-colored badges */
@@ -622,7 +622,7 @@ body.sidebar-expanded .nav-chevron {
   color: var(--text-muted);
   border-left: 2px solid var(--border);
   margin-left: 8px;
-  border-radius: var(--radius-sm);
+  border-radius: 8px;
 }
 .nav-children .nav-link:hover {
   color: var(--text);
