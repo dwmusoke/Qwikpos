@@ -346,13 +346,14 @@ a { color: inherit; text-decoration: none; }
   flex-direction: column;
   padding: 0;
   position: fixed;
-  top: var(--topbar-h);
-  left: 0;
-  bottom: 0;
-  height: calc(100vh - var(--topbar-h));
+  top: calc(var(--topbar-h) + 6px);
+  left: var(--space-sm);
+  bottom: var(--space-sm);
+  height: calc(100vh - var(--topbar-h) - 12px);
   overflow-y: auto;
   overflow-x: visible;
   z-index: 40;
+  border-radius: var(--radius);
   transition: width var(--dur-slow) var(--ease);
 }
 body.sidebar-expanded .sidebar {
@@ -820,11 +821,12 @@ body:not(.sidebar-expanded) .nav-module:hover .nav-parent::before {
   min-width: 0;
   display: flex;
   flex-direction: column;
-  margin-left: var(--sidebar-collapsed-w);
+  margin-left: calc(var(--sidebar-collapsed-w) + var(--space-md));
+  margin-right: var(--space-sm);
   transition: margin-left var(--dur-slow) var(--ease);
 }
 body.sidebar-expanded .main {
-  margin-left: var(--sidebar-w);
+  margin-left: calc(var(--sidebar-w) + var(--space-md));
 }
 
 .menu-btn {
@@ -2188,10 +2190,16 @@ tbody tr:hover {
     position: fixed;
     left: 0;
     top: 0;
+    height: 100%;
+    border-radius: 0;
     transform: translateX(-100%);
     box-shadow: var(--shadow-xl);
   }
   .sidebar.open { transform: translateX(0); }
+  .main {
+    margin-left: 0;
+    margin-right: 0;
+  }
   .sidebar-backdrop.show {
     display: block;
     position: fixed;
