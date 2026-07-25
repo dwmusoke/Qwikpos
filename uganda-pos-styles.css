@@ -1076,6 +1076,12 @@ body.sidebar-expanded .main {
   flex-wrap: wrap;
 }
 
+@media (max-width: 640px) {
+  .page-header { flex-direction: column; gap: var(--space-sm); }
+  .page-header-info h1 { font-size: 22px; }
+  .page-header-info p { font-size: 13px; }
+}
+
 /* ---------- 9. ENTERPRISE CARDS ---------- */
 .card {
   background: var(--surface);
@@ -2195,7 +2201,11 @@ tbody tr:hover {
     transform: translateX(-100%);
     box-shadow: var(--shadow-xl);
   }
-  .sidebar.open { transform: translateX(0); }
+  .sidebar.open {
+    transform: translateX(0);
+    height: calc(100% - var(--topbar-h));
+    top: var(--topbar-h);
+  }
   .main {
     margin-left: 0;
     margin-right: 0;
@@ -3231,6 +3241,25 @@ a:focus-visible {
   .qty-stepper button, .icon-btn, .menu-btn { min-height: 44px; }
   select, input, textarea { font-size: 16px !important; }
   .field input, .field select, .field textarea { padding: 14px 16px; }
+}
+
+/* Small screens — topbar cleanup */
+@media (max-width: 700px) {
+  .topbar-left .branch-sub { display: none; }
+  .topbar .topbar-cta-group { display: none !important; }
+  #lang-picker, #currency-picker { display: none !important; }
+  .topbar-center {
+    margin: 0 var(--space-sm);
+    padding: 4px 12px;
+    font-size: 11px;
+  }
+}
+@media (max-width: 480px) {
+  .topbar-left .brand-text { display: none; }
+  .topbar-divider { display: none; }
+  .topbar-center { display: none; }
+  .topbar-right .user-chip .avatar { width: 22px; height: 22px; font-size: 10px; }
+  .topbar-right .user-chip { padding: 2px 6px 2px 2px; }
 }
 
 /* Very small screens (< 400px) — make everything compact */
