@@ -923,6 +923,7 @@ function openImportModal() {
           });
           if (error) { console.warn('CSV import row failed', name, error); failed++; continue; }
           count++;
+          btn.textContent = `Importing… ${count}/${lines.length - 1}`;
         }
         toast(`Imported ${count} product(s) (${failed} skipped/failed)`, count > 0 ? 'success' : 'error');
         await refreshProducts();
