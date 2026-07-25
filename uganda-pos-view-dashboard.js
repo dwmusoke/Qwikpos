@@ -27,7 +27,7 @@ export async function renderDashboard(root) {
   ] = await Promise.all([
     supabase
       .from("sales")
-      .select("*, sale_items(*)")
+      .select("*, sale_items(*), payments(*)")
       .eq("business_id", STATE.business.id)
       .gte("created_at", since.toISOString())
       .order("created_at", { ascending: false }),
@@ -94,9 +94,10 @@ export async function renderDashboard(root) {
   const lowStock = lowStockProducts();
   const expiryAlerts = (expiringBatches || []).length;
   const inventoryValue = STATE.products.reduce(
-    (a, p) => a + Number(p.cost_price || 0) * (STATE.stockByProduct[p.id] || 0),
+    (a, p) => a + Number(p.selling_price || 0) * (STATE.stockByProduct[p.id] || 0),
     0,
   );
+  const skuCount = STATE.products.length;
   const outstandingBalance = (customers || []).reduce(
     (a, c) => a + Number(c.balance || 0),
     0,
@@ -282,6 +283,14 @@ export async function renderDashboard(root) {
       </div>`;
   }
 
+  // Payment totals for business health
+  const totalAmount = allSales.reduce((a, s) => a + Number(s.grand_total_base || 0), 0);
+  const paidAmount = allSales.reduce((a, s) => {
+    const pay = (s.payments || []).reduce((p, q) => p + Number(q.amount_base || 0), 0);
+    return a + pay;
+  }, 0);
+  const collectionPct = totalAmount > 0 ? Math.round((paidAmount / totalAmount) * 100) : 0;
+
   // --- Render ---
   const totalAlerts = lowStock.length + expiryAlerts + (outstandingBalance > 0 ? 1 : 0);
   root.innerHTML = `
@@ -291,10 +300,10 @@ export async function renderDashboard(root) {
       <div class="kpi-grid">
         <div class="kpi-card"><div class="kpi-icon" style="background:#eef7ff;">🧾</div><div class="kpi-content"><div class="label">Today's Sales</div><div class="value">${fmtMoney(todayTotal, baseCurrency)}</div><div class="delta ${todayTrend !== null ? (Number(todayTrend) >= 0 ? "up" : "down") : ""}">${todayTrend !== null ? `${Number(todayTrend) >= 0 ? "↑" : "↓"} ${Math.abs(Number(todayTrend))}% vs yesterday` : "First sale today"}</div></div></div>
         <div class="kpi-card"><div class="kpi-icon" style="background:#eefaf0;">📅</div><div class="kpi-content"><div class="label">Monthly Sales</div><div class="value">${fmtMoney(monthTotal, baseCurrency)}</div><div class="delta">${monthSales.length} transactions</div></div></div>
-        <div class="kpi-card"><div class="kpi-icon" style="background:#f3f0ff;">📦</div><div class="kpi-content"><div class="label">Inventory Value</div><div class="value">${fmtMoney(inventoryValue, baseCurrency)}</div><div class="delta">${STATE.products.length} SKUs</div></div></div>
+        <div class="kpi-card"><div class="kpi-icon" style="background:#f3f0ff;">📦</div><div class="kpi-content"><div class="label">Inventory Value</div><div class="value">${fmtMoney(inventoryValue, baseCurrency)}</div><div class="delta">${skuCount} SKUs</div></div></div>
         <div class="kpi-card"><div class="kpi-icon" style="background:#fff7ed;">👥</div><div class="kpi-content"><div class="label">Receivables</div><div class="value">${fmtMoney(outstandingBalance, baseCurrency)}</div><div class="delta">${(customers || []).length} customers</div></div></div>
         <div class="kpi-card"><div class="kpi-icon" style="background:#fff1f2;">⚠️</div><div class="kpi-content"><div class="label">Alerts</div><div class="value" style="color:${totalAlerts > 0 ? "var(--danger)" : "var(--text)"}">${totalAlerts}</div><div class="delta">${lowStock.length} low stock · ${expiryAlerts} expiring</div></div></div>
-        <div class="kpi-card"><div class="kpi-icon" style="background:#f0fdf4;">✅</div><div class="kpi-content"><div class="label">Business Health</div><div class="value">${allSales.length > 0 ? "Healthy" : "No Data"}</div><div class="delta">${allSales.length > 0 ? `${paidCount}/${allSales.length} paid` : "—"}</div></div></div>
+        <div class="kpi-card"><div class="kpi-icon" style="background:#f0fdf4;">✅</div><div class="kpi-content"><div class="label">Business Health</div><div class="value">${allSales.length > 0 ? "Healthy" : "No Data"}</div><div class="delta">${fmtMoney(paidAmount, baseCurrency)} / ${fmtMoney(totalAmount, baseCurrency)} · ${collectionPct}% collected</div></div></div>
       </div>
     </div>
 
