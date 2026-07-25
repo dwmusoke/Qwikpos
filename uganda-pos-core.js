@@ -421,7 +421,15 @@ export async function loadBootstrapData() {
   STATE.branches = branches || [];
   STATE.branch =
     branches?.find((b) => b.id === appUser.branch_id) || branches?.[0] || null;
-  STATE.currencies = currencies || [];
+  const DEFAULT_CURRENCIES = [
+    { code: "UGX", name: "Ugandan Shilling", symbol: "USh", is_base: false, is_active: true },
+    { code: "KES", name: "Kenyan Shilling", symbol: "KSh", is_base: false, is_active: true },
+    { code: "TZS", name: "Tanzanian Shilling", symbol: "TSh", is_base: false, is_active: true },
+    { code: "USD", name: "US Dollar", symbol: "$", is_base: false, is_active: true },
+    { code: "EUR", name: "Euro", symbol: "€", is_base: false, is_active: true },
+    { code: "GBP", name: "British Pound", symbol: "£", is_base: false, is_active: true },
+  ];
+  STATE.currencies = (currencies && currencies.length > 0) ? currencies : DEFAULT_CURRENCIES;
   STATE.categories = categories || [];
   STATE.taxCategories = taxCategories || [];
   STATE.brands = brands || [];
