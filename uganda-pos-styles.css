@@ -467,6 +467,17 @@ body.sidebar-expanded .sidebar {
   font-size: 18px;
   width: 30px;
   height: 30px;
+  background: var(--brand);
+  color: #fff;
+  border-radius: var(--radius-xs);
+}
+.nav-module > .nav-link:hover > .icon {
+  background: var(--brand-dark);
+  color: #fff;
+}
+.nav-module > .nav-link.active > .icon {
+  background: var(--brand-dark);
+  color: #fff;
 }
 .nav-module > .nav-link:hover > .icon {
   background: var(--brand);
@@ -494,7 +505,7 @@ body.sidebar-expanded .sidebar-inner .nav-link {
   border-radius: var(--radius);
   margin-bottom: 0;
 }
-/* Expanded top-level nav items: keep icons visible, styled as badges */
+/* Expanded top-level nav items: keep parent icons as brand-colored badges */
 body.sidebar-expanded .sidebar-inner > .nav-link .icon,
 body.sidebar-expanded .sidebar-inner .nav-module > .nav-link .icon {
   width: 30px;
@@ -502,15 +513,17 @@ body.sidebar-expanded .sidebar-inner .nav-module > .nav-link .icon {
   opacity: 1;
   overflow: visible;
   font-size: 18px;
-  background: var(--surface-2);
+  background: var(--brand);
+  color: #fff;
+  border-radius: var(--radius-xs);
   transition: background var(--dur-fast) var(--ease);
 }
 body.sidebar-expanded .sidebar-inner .nav-module > .nav-link:hover .icon {
-  background: var(--brand);
+  background: var(--brand-dark);
   color: #fff;
 }
 body.sidebar-expanded .sidebar-inner .nav-module > .nav-link.active .icon {
-  background: var(--brand);
+  background: var(--brand-dark);
   color: #fff;
 }
 
