@@ -2002,10 +2002,10 @@ function printBarcodeLabels(items, size = "medium") {
   }
 
   const sizes = {
-    small: { width: "50mm", height: "30mm", barcodeH: 30, fontSize: 9, nameSize: 8, priceSize: 10, bizSize: 7 },
-    medium: { width: "50mm", height: "40mm", barcodeH: 40, fontSize: 10, nameSize: 10, priceSize: 12, bizSize: 8 },
-    large: { width: "70mm", height: "50mm", barcodeH: 50, fontSize: 12, nameSize: 12, priceSize: 14, bizSize: 9 },
-    xl: { width: "100mm", height: "60mm", barcodeH: 55, fontSize: 14, nameSize: 14, priceSize: 16, bizSize: 10 },
+    small: { width: "50mm", height: "30mm", barcodeH: 30, fontSize: 9, nameSize: 8, bizSize: 7 },
+    medium: { width: "50mm", height: "40mm", barcodeH: 40, fontSize: 10, nameSize: 10, bizSize: 8 },
+    large: { width: "70mm", height: "50mm", barcodeH: 50, fontSize: 12, nameSize: 12, bizSize: 9 },
+    xl: { width: "100mm", height: "60mm", barcodeH: 55, fontSize: 14, nameSize: 14, bizSize: 10 },
   };
   const s = sizes[size] || sizes.medium;
 
@@ -2032,7 +2032,6 @@ function printBarcodeLabels(items, size = "medium") {
       .label .biz { font-size: ${s.bizSize}pt; color: #666; margin-bottom: 1mm; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
       .label .name { font-size: ${s.nameSize}pt; font-weight: 700; margin: 1mm 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
       .label svg { width: 90%; height: auto; margin: 1mm 0; }
-      .label .price { font-size: ${s.priceSize}pt; font-weight: 800; color: #222; margin-top: 1mm; }
       .label .sku { font-size: 7pt; color: #999; }
       @media print {
         body { padding: 0; }
@@ -2054,7 +2053,6 @@ function printBarcodeLabels(items, size = "medium") {
           <div class="biz">${escapeHtml(STATE.business?.name || "")}</div>
           <div class="name">${escapeHtml(l.product.name)}</div>
           <svg id="${l.id}"></svg>
-          <div class="price">${fmtMoney(l.product.selling_price)}</div>
           <div class="sku">${escapeHtml(l.code)}</div>
         </div>
       `,

@@ -434,7 +434,7 @@ async function renderTaxTab(output, range) {
     const out = $("tax-output");
     out.innerHTML = `<div class="empty-state">Loading…</div>`;
 
-    const [{ data: sales }, { data: expenses }] = await Promise.all([
+    const [{ data: sales, error: salesErr }, { data: expenses, error: expErr }] = await Promise.all([
       supabase
         .from("sales")
         .select("*, sale_items(*)")
@@ -443,11 +443,15 @@ async function renderTaxTab(output, range) {
         .lte("created_at", `${to}T23:59:59`),
       supabase
         .from("expenses")
-        .select("amount, currency, exchange_rate, category")
+        .select("amount, amount_base, currency_code, category")
         .eq("business_id", STATE.business.id)
-        .gte("created_at", `${from}T00:00:00`)
-        .lte("created_at", `${to}T23:59:59`),
+        .gte("expense_date", from)
+        .lte("expense_date", to),
     ]);
+
+    if (expErr && (expErr.code === "42P01" || expErr.message?.includes("does not exist") || expErr.message?.includes("schema cache"))) {
+      console.warn("Expenses table not found — tax report will exclude input VAT.");
+    }
 
     const validSales = (sales || []).filter(
       (s) => s.status !== "voided" && s.sale_type !== "quotation",
@@ -537,6 +541,26 @@ async function renderTaxTab(output, range) {
 }
 
 // ── EXPENSE REPORT ──────────────────────────────────────────────────
+const EXPENSES_SETUP_SQL = `-- Run this in Supabase SQL Editor to create the expenses table:
+create table if not exists expenses (
+  id uuid primary key default gen_random_uuid(),
+  business_id uuid references businesses(id) on delete cascade,
+  branch_id uuid references branches(id),
+  category text not null,
+  description text,
+  amount numeric(18,2) not null,
+  currency_code text not null default 'UGX',
+  amount_base numeric(18,2) not null,
+  payment_method text default 'cash' check (payment_method in ('cash','mobile_money','bank','card','credit')),
+  expense_date date not null default current_date,
+  created_by uuid references app_users(id),
+  created_at timestamptz default now()
+);
+alter table expenses enable row level security;
+create policy business_isolation_expenses on expenses
+  for all using (business_id = auth_business_id())
+  with check (business_id = auth_business_id());`;
+
 async function renderExpensesTab(output, range) {
   output.innerHTML = `
     <div class="card">${rangeFormHtml("expenses", range)}</div>
@@ -546,10 +570,7 @@ async function renderExpensesTab(output, range) {
 
   $("expenses-run").addEventListener("click", () => load());
   $("expenses-export").addEventListener("click", () => {
-    if (!lastExpenses.length) {
-      load().then(exportExpenses);
-      return;
-    }
+    if (!lastExpenses.length) { load().then(exportExpenses); return; }
     exportExpenses();
   });
   await load();
@@ -560,104 +581,120 @@ async function renderExpensesTab(output, range) {
     const out = $("expenses-output");
     out.innerHTML = `<div class="empty-state">Loading…</div>`;
 
-    const { data: expenses } = await supabase
+    const { data: expenses, error } = await supabase
       .from("expenses")
       .select("*")
       .eq("business_id", STATE.business.id)
-      .gte("created_at", `${from}T00:00:00`)
-      .lte("created_at", `${to}T23:59:59`)
-      .order("created_at", { ascending: false });
+      .gte("expense_date", from)
+      .lte("expense_date", to)
+      .order("expense_date", { ascending: false });
+
+    if (error && (error.code === "42P01" || error.message?.includes("does not exist") || error.message?.includes("schema cache"))) {
+      out.innerHTML = `
+        <div class="card" style="border-left:4px solid var(--warning,#f59e0b);">
+          <div class="card-title" style="color:var(--warning,#b45309);">⚠️ Expenses table not found</div>
+          <p style="margin:0 0 8px;color:var(--text-muted);">The <code>expenses</code> table hasn't been created in your database yet. Run the SQL below in your Supabase SQL Editor to set it up.</p>
+          <pre style="background:var(--bg-alt,#f8f9fa);padding:12px;border-radius:6px;font-size:12px;overflow-x:auto;white-space:pre-wrap;">${escapeHtml(EXPENSES_SETUP_SQL)}</pre>
+          <button class="btn btn-secondary" style="margin-top:12px;" onclick="navigator.clipboard.writeText(${JSON.stringify(EXPENSES_SETUP_SQL).replace(/"/g, '&quot;')}).then(()=>this.textContent='Copied!')">📋 Copy SQL</button>
+        </div>`;
+      return;
+    }
 
     lastExpenses = expenses || [];
-    const totalExpenses = lastExpenses.reduce(
-      (a, e) => a + Number(e.amount || 0) * Number(e.exchange_rate || 1),
-      0,
-    );
+
+    if (!lastExpenses.length) {
+      out.innerHTML = `<div class="empty-state"><div class="big-icon">📭</div>No expenses recorded in this date range.</div>`;
+      return;
+    }
+
+    const totalExpenses = lastExpenses.reduce((a, e) => a + Number(e.amount_base || e.amount || 0), 0);
+    const avgExpense = totalExpenses / lastExpenses.length;
 
     const categoryTotals = {};
     lastExpenses.forEach((e) => {
       const cat = e.category || "Other";
-      categoryTotals[cat] =
-        (categoryTotals[cat] || 0) +
-        Number(e.amount || 0) * Number(e.exchange_rate || 1);
+      categoryTotals[cat] = (categoryTotals[cat] || 0) + Number(e.amount_base || e.amount || 0);
     });
-    const catRanking = Object.entries(categoryTotals).sort(
-      (a, b) => b[1] - a[1],
-    );
+    const catRanking = Object.entries(categoryTotals).sort((a, b) => b[1] - a[1]);
     const topCat = catRanking[0];
+    const maxCatAmt = topCat ? topCat[1] : 1;
 
     const methodTotals = {};
     lastExpenses.forEach((e) => {
       const m = e.payment_method || "cash";
-      methodTotals[m] =
-        (methodTotals[m] || 0) +
-        Number(e.amount || 0) * Number(e.exchange_rate || 1);
+      methodTotals[m] = (methodTotals[m] || 0) + Number(e.amount_base || e.amount || 0);
     });
+    const methodRanking = Object.entries(methodTotals).sort((a, b) => b[1] - a[1]);
+
+    const maxMethodAmt = methodRanking.length ? methodRanking[0][1] : 1;
 
     out.innerHTML = `
       <div class="kpi-grid">
         <div class="kpi-card"><div class="label">Total Expenses</div><div class="value">${fmtMoney(totalExpenses)}</div><div class="delta">${lastExpenses.length} entries</div></div>
-        <div class="kpi-card"><div class="label">Avg. Expense</div><div class="value">${fmtMoney(lastExpenses.length ? totalExpenses / lastExpenses.length : 0)}</div></div>
+        <div class="kpi-card"><div class="label">Avg. Expense</div><div class="value">${fmtMoney(avgExpense)}</div></div>
         <div class="kpi-card"><div class="label">Top Category</div><div class="value">${topCat ? fmtMoney(topCat[1]) : "—"}</div><div class="delta">${topCat ? topCat[0] : "—"}</div></div>
       </div>
+
       <div class="grid-2">
         <div class="card">
           <div class="card-title">Expenses by Category</div>
-          ${
-            catRanking.length
-              ? catRanking
-                  .map(
-                    ([cat, amt]) => `
-            <div class="summary-row"><span>${escapeHtml(cat)}</span><span>${fmtMoney(amt)} <span class="text-muted">(${((amt / totalExpenses) * 100).toFixed(1)}%)</span></span></div>`,
-                  )
-                  .join("")
-              : '<div class="empty-state">No expenses in this range.</div>'
-          }
+          <div class="category-bars">
+            ${catRanking.map(([cat, amt]) => {
+              const pct = totalExpenses > 0 ? ((amt / totalExpenses) * 100) : 0;
+              return `
+              <div class="cat-bar-row">
+                <div class="cat-bar-label"><span class="cat-bar-name">${escapeHtml(cat)}</span><span class="cat-bar-amt">${fmtMoney(amt)}</span></div>
+                <div class="cat-bar-track"><div class="cat-bar-fill" style="width:${pct}%"></div></div>
+                <div class="cat-bar-meta">${pct.toFixed(1)}% of total</div>
+              </div>`;
+            }).join("")}
+          </div>
         </div>
         <div class="card">
-          <div class="card-title">Expenses by Payment Method</div>
-          ${
-            Object.entries(methodTotals).length
-              ? Object.entries(methodTotals)
-                  .map(
-                    ([m, amt]) => `
-              <div class="summary-row"><span style="text-transform:capitalize;">${escapeHtml(m)}</span><span>${fmtMoney(amt)}</span></div>`,
-                  )
-                  .join("")
-              : '<div class="empty-state">No expenses in this range.</div>'
-          }
+          <div class="card-title">By Payment Method</div>
+          <div class="category-bars">
+            ${methodRanking.map(([m, amt]) => {
+              const pct = totalExpenses > 0 ? ((amt / totalExpenses) * 100) : 0;
+              return `
+              <div class="cat-bar-row">
+                <div class="cat-bar-label"><span class="cat-bar-name" style="text-transform:capitalize;">${escapeHtml(m)}</span><span class="cat-bar-amt">${fmtMoney(amt)}</span></div>
+                <div class="cat-bar-track"><div class="cat-bar-fill method-fill" style="width:${pct}%"></div></div>
+                <div class="cat-bar-meta">${pct.toFixed(1)}% of total</div>
+              </div>`;
+            }).join("")}
+          </div>
         </div>
       </div>
+
       <div class="card">
-        <div class="card-title">Expense Details (${lastExpenses.length})</div>
-        <div class="table-wrap" style="max-height:360px; overflow-y:auto;"><table>
-          <thead><tr><th>Date</th><th>Category</th><th>Description</th><th>Method</th><th>Amount</th></tr></thead>
-          <tbody>
-            ${lastExpenses
-              .map(
-                (e) => `
-              <tr>
-                <td>${fmtDate(e.created_at)}</td>
-                <td><span class="badge badge-gray">${escapeHtml(e.category || "—")}</span></td>
-                <td>${escapeHtml(e.description || "—")}</td>
-                <td style="text-transform:capitalize;">${escapeHtml(e.payment_method || "cash")}</td>
-                <td>${fmtMoney(Number(e.amount || 0) * Number(e.exchange_rate || 1))}</td>
-              </tr>`,
-              )
-              .join("")}
-          </tbody></table></div>
+        <div class="card-title">Expense Details</div>
+        <div class="table-wrap" style="max-height:400px; overflow-y:auto;">
+          <table>
+            <thead><tr><th>Date</th><th>Category</th><th>Description</th><th>Method</th><th style="text-align:right;">Amount</th></tr></thead>
+            <tbody>
+              ${lastExpenses.map((e) => `
+                <tr>
+                  <td>${fmtDate(e.expense_date || e.created_at)}</td>
+                  <td><span class="badge badge-gray">${escapeHtml(e.category || "—")}</span></td>
+                  <td>${escapeHtml(e.description || "—")}</td>
+                  <td style="text-transform:capitalize;">${escapeHtml(e.payment_method || "cash")}</td>
+                  <td style="text-align:right;font-weight:600;">${fmtMoney(Number(e.amount_base || e.amount || 0))}</td>
+                </tr>`).join("")}
+            </tbody>
+          </table>
+        </div>
       </div>`;
   }
 
   function exportExpenses() {
     downloadCsv(
       lastExpenses.map((e) => [
-        e.created_at,
+        e.expense_date || e.created_at,
         e.category,
         e.description,
         e.payment_method,
-        e.amount,
-        e.currency,
+        e.amount_base || e.amount,
+        e.currency_code,
       ]),
       ["Date", "Category", "Description", "Method", "Amount", "Currency"],
       `expense-report-${$("expenses-from").value}-to-${$("expenses-to").value}.csv`,

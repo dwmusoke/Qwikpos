@@ -38,6 +38,7 @@ let posDeliveryLocation = "";
 let posDeliveryCost = 0;
 let posContactPhone = "";
 let posContactEmail = "";
+let posTaxEnabled = true;
 
 function taxRateFor(code) {
   const t = STATE.taxCategories.find((t) => t.code === code);
@@ -85,20 +86,24 @@ function cartTotals() {
   const manualDiscount = Math.min(posDiscountInput || 0, subtotal - couponDiscount);
   const totalDiscount = couponDiscount + manualDiscount;
   let vatTotal = 0;
+  const taxByCategory = {};
   const lineDetails = lines.map((l, i) => {
     const lineDisc = lineDiscounts[i];
     const netLine = l.lineGross - lineDisc;
     const lineRatio = netLine > 0 ? (couponDiscount + manualDiscount) * (netLine / (subtotal || 1)) : 0;
     const finalLine = netLine - lineRatio;
-    const rate = taxRateFor(l.taxCode);
+    const rate = posTaxEnabled ? taxRateFor(l.taxCode) : 0;
     const vatAmount =
       Math.round(((finalLine * rate) / (100 + rate) + Number.EPSILON) * 100) / 100;
     vatTotal += vatAmount;
+    const catKey = l.taxCode || "NONE";
+    if (!taxByCategory[catKey]) taxByCategory[catKey] = 0;
+    taxByCategory[catKey] += vatAmount;
     return { ...l, lineDiscount: lineDisc, netLine: finalLine, vatAmount, vatRate: rate };
   });
   const grandTotal = lineDetails.reduce((a, l) => a + l.netLine, 0);
   const finalTotal = Math.round((grandTotal + vatTotal + posDeliveryCost + Number.EPSILON) * 100) / 100;
-  return { lines: lineDetails, subtotal, couponDiscount, manualDiscount, totalLineDiscount, totalDiscount, vatTotal, grandTotal, finalTotal };
+  return { lines: lineDetails, subtotal, couponDiscount, manualDiscount, totalLineDiscount, totalDiscount, vatTotal, grandTotal, finalTotal, taxByCategory };
 }
 
 export async function renderPOS(root) {
@@ -750,7 +755,23 @@ function renderCart() {
     <div class="summary-row"><span>After Discounts</span><span>${fmtMoneyRaw(subtotal, posSaleCurrency)}</span></div>
     ${couponDiscount > 0 ? `<div class="summary-row" style="color:var(--brand);"><span>🎟️ Coupon (${escapeHtml(STATE.cartCouponCode)})</span><span>− ${fmtMoneyRaw(couponDiscount, posSaleCurrency)}</span></div>` : ""}
     ${manualDiscount > 0 ? `<div class="summary-row"><span>Extra Discount</span><span>− ${fmtMoneyRaw(manualDiscount, posSaleCurrency)}</span></div>` : ""}
-    <div class="summary-row"><span>Tax (incl.)</span><span>${fmtMoneyRaw(vatTotal, posSaleCurrency)}</span></div>
+    <div class="summary-row tax-toggle-row">
+      <span>Tax</span>
+      <label class="tax-toggle">
+        <input type="checkbox" id="pos-tax-toggle" ${posTaxEnabled ? "checked" : ""} />
+        <span class="tax-toggle-slider"></span>
+      </label>
+    </div>
+    ${posTaxEnabled
+      ? Object.keys(taxByCategory).length > 0
+        ? Object.entries(taxByCategory).map(([cat, amt]) => {
+            const tc = STATE.taxCategories.find(t => t.code === cat);
+            const label = tc ? `${tc.code} (${tc.rate}%)` : cat;
+            return `<div class="summary-row tax-detail"><span class="tax-label">${escapeHtml(label)}</span><span>${fmtMoneyRaw(amt, posSaleCurrency)}</span></div>`;
+          }).join("")
+        : `<div class="summary-row tax-detail"><span class="tax-label">No tax applied</span><span>${fmtMoneyRaw(0, posSaleCurrency)}</span></div>`
+      : ""
+    }
     ${posDeliveryCost > 0 ? `<div class="summary-row"><span>🚚 Delivery</span><span>+ ${fmtMoneyRaw(posDeliveryCost, posSaleCurrency)}</span></div>` : ""}
     <div class="summary-row total"><span>Total to Pay</span><span style="font-size:18px;">${fmtMoneyRaw(finalTotal, posSaleCurrency)}</span></div>
     <button class="btn btn-primary btn-block" id="pos-checkout-btn" style="margin-top:10px;font-size:15px;padding:14px;" ${!lines.length ? "disabled" : ""}>
@@ -766,6 +787,14 @@ function renderCart() {
   });
   if (document.activeElement !== discountInputEl) {
     /* no-op */
+  }
+
+  const taxToggle = $("pos-tax-toggle");
+  if (taxToggle) {
+    taxToggle.addEventListener("change", () => {
+      posTaxEnabled = taxToggle.checked;
+      renderCart();
+    });
   }
 
   const checkoutBtn = $("pos-checkout-btn");

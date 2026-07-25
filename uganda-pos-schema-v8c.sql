@@ -230,7 +230,9 @@ create or replace function upsert_product(
   p_id uuid default null,
   p_efris_commodity_category_id text default null,
   p_efris_measure_unit text default null,
-  p_reset_efris_registration boolean default false
+  p_reset_efris_registration boolean default false,
+  p_expiry_date date default null,
+  p_has_batches boolean default false
 ) returns jsonb
 language plpgsql security definer as $$
 declare
@@ -239,10 +241,10 @@ begin
   if p_id is null then
     insert into products (business_id, name, sku, barcode, description, category_id, supplier_id, unit,
       cost_price, selling_price, wholesale_price, tax_category_code, reorder_level, image_url, is_active, brand_id,
-      efris_commodity_category_id, efris_measure_unit)
+      efris_commodity_category_id, efris_measure_unit, expiry_date, has_batches)
     values (p_business_id, p_name, p_sku, p_barcode, p_description, p_category_id, p_supplier_id, p_unit,
       p_cost_price, p_selling_price, p_wholesale_price, p_tax_category_code, p_reorder_level, p_image_url, p_is_active, p_brand_id,
-      p_efris_commodity_category_id, p_efris_measure_unit)
+      p_efris_commodity_category_id, p_efris_measure_unit, p_expiry_date, p_has_batches)
     returning to_jsonb(products.*) into v_product;
   else
     update products set
@@ -253,14 +255,16 @@ begin
       image_url = p_image_url, is_active = p_is_active, brand_id = p_brand_id,
       efris_commodity_category_id = p_efris_commodity_category_id,
       efris_measure_unit = p_efris_measure_unit,
-      efris_registered_at = case when p_reset_efris_registration then null else efris_registered_at end
+      efris_registered_at = case when p_reset_efris_registration then null else efris_registered_at end,
+      expiry_date = p_expiry_date,
+      has_batches = p_has_batches
     where id = p_id
     returning to_jsonb(products.*) into v_product;
   end if;
   return v_product;
 end;
 $$;
-grant execute on function upsert_product(uuid, text, text, text, text, uuid, uuid, text, numeric, numeric, numeric, text, numeric, text, boolean, uuid, uuid, text, text, boolean) to authenticated;
+grant execute on function upsert_product(uuid, text, text, text, text, uuid, uuid, text, numeric, numeric, numeric, text, numeric, text, boolean, uuid, uuid, text, text, boolean, date, boolean) to authenticated;
 
 -- Orders table (referenced by uganda-pos-view-orders.js, not in base schema)
 create table if not exists orders (
@@ -299,6 +303,9 @@ alter table customers add column if not exists notes text;
 
 -- Products: add missing brand_id column (links to brands table from v5)
 alter table products add column if not exists brand_id uuid references brands(id);
+
+-- Products: add has_batches flag for batch tracking
+alter table products add column if not exists has_batches boolean default false;
 
 -- Businesses: document template config columns
 alter table businesses add column if not exists tpl_primary_color text default '#0f6b4a';
