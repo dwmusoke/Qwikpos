@@ -53,6 +53,7 @@ import { renderSuppliers } from "./uganda-pos-view-suppliers.js";
 import { renderEfris } from "./uganda-pos-view-efris.js";
 import { renderReports } from "./uganda-pos-view-reports.js";
 import { renderAccounting } from "./uganda-pos-view-accounting.js";
+import { renderBI } from "./uganda-pos-view-bi.js";
 import { renderSettings } from "./uganda-pos-view-settings.js";
 import { renderChat } from "./uganda-pos-view-chat.js";
 import { renderAdmin } from "./uganda-pos-view-admin.js";
@@ -99,6 +100,7 @@ const ROUTES = {
     render: renderAccounting,
     feature: "accounting",
   },
+  bi: { title: "Business Intelligence", render: renderBI },
   settings: { title: "Settings", render: renderSettings },
   chat: { title: "Team Chat", render: renderChat },
   notifications: { title: "Notifications", render: renderNotifications },
