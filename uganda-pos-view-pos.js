@@ -126,86 +126,88 @@ export async function renderPOS(root) {
           <button class="btn btn-ghost btn-sm" id="pos-clear-cart" data-i18n="pos.clear">Clear</button>
         </div>
 
-        <div class="pos-mode-toggle" id="pos-mode-toggle" style="display:flex; gap:6px; padding:0 16px 10px;">
-          <button class="chip ${posMode === "sale" ? "active" : ""}" data-mode="sale" style="flex:1;">🧾 Sale</button>
-          <button class="chip ${posMode === "quotation" ? "active" : ""}" data-mode="quotation" style="flex:1;">📄 Quotation</button>
-        </div>
-
-        <div style="padding:0 16px; display:flex; flex-direction:column; gap:8px;">
-          <div class="field" style="margin-bottom:0;">
-            <label>🏪 Store / Branch</label>
-            <select id="pos-branch-select">
-              ${STATE.branches.map((b) => `<option value="${b.id}" ${b.id === posBranchId ? "selected" : ""}>${escapeHtml(b.name)}${b.is_main ? " (Main)" : ""}</option>`).join("")}
-            </select>
+        <div class="cart-scroll">
+          <div class="pos-mode-toggle" id="pos-mode-toggle" style="display:flex; gap:6px; padding:0 16px 10px;">
+            <button class="chip ${posMode === "sale" ? "active" : ""}" data-mode="sale" style="flex:1;">🧾 Sale</button>
+            <button class="chip ${posMode === "quotation" ? "active" : ""}" data-mode="quotation" style="flex:1;">📄 Quotation</button>
           </div>
 
-          <div class="field" style="margin-bottom:0; position:relative;">
-            <label>👤 Customer</label>
-            <div style="display:flex;gap:6px;">
-              <input type="text" id="pos-customer-input" placeholder="Search or type new name…" autocomplete="off" value="${(STATE.customers.find(c => c.id === STATE.cartCustomerId)?.name) || ""}" style="flex:1;" />
-              <button class="btn btn-outline btn-sm" id="pos-customer-add-btn" title="Add new customer" style="padding:0 10px;">+ New</button>
-            </div>
-            <div id="pos-customer-dropdown" style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-xs);max-height:160px;overflow-y:auto;z-index:100;box-shadow:var(--shadow-md);"></div>
-          </div>
-
-          <div class="field" style="margin-bottom:0;">
-            <label>📞 Contact</label>
-            <div style="display:flex;gap:6px;">
-              <input type="tel" id="pos-contact-phone" placeholder="Phone" autocomplete="off" value="${posContactPhone}" style="flex:1;" />
-              <input type="email" id="pos-contact-email" placeholder="Email (optional)" autocomplete="off" value="${posContactEmail}" style="flex:1;" />
-            </div>
-          </div>
-
-          <div class="field" style="margin-bottom:0;">
-            <label>🎟️ Coupon Code</label>
-            <div style="display:flex;gap:6px;">
-              <input type="text" id="pos-coupon-input" placeholder="Enter coupon code" autocomplete="off" value="${STATE.cartCouponCode || ""}" style="flex:1;text-transform:uppercase;" />
-              <button class="btn btn-outline btn-sm" id="pos-coupon-apply-btn" style="padding:0 10px;">Apply</button>
-            </div>
-            <div id="pos-coupon-msg" style="font-size:12px;margin-top:4px;"></div>
-          </div>
-
-          <div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-top:1px dashed var(--border);border-bottom:1px dashed var(--border);margin:2px 0;">
-            <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;margin:0;">
-              <input type="checkbox" id="pos-delivery-toggle" ${posDelivery ? "checked" : ""} style="width:18px;height:18px;" />
-              <span>🚚 Delivery Required</span>
-            </label>
-          </div>
-
-          <div id="pos-delivery-fields" style="display:${posDelivery ? "flex" : "none"};flex-direction:column;gap:6px;padding-top:4px;">
+          <div class="cart-fields">
             <div class="field" style="margin-bottom:0;">
-              <label>📍 Delivery Address</label>
-              <input type="text" id="pos-delivery-address" placeholder="Street address, area…" autocomplete="off" value="${posDeliveryAddress}" />
+              <label>🏪 Store / Branch</label>
+              <select id="pos-branch-select">
+                ${STATE.branches.map((b) => `<option value="${b.id}" ${b.id === posBranchId ? "selected" : ""}>${escapeHtml(b.name)}${b.is_main ? " (Main)" : ""}</option>`).join("")}
+              </select>
             </div>
-            <div class="field" style="margin-bottom:0;">
-              <label>🗺️ Location / Landmark</label>
-              <input type="text" id="pos-delivery-location" placeholder="Nearby landmark, GPS coords…" autocomplete="off" value="${posDeliveryLocation}" />
-            </div>
-            <div class="field" style="margin-bottom:0;">
-              <label>Delivery Fee (${posSaleCurrency})</label>
-              <input type="number" min="0" step="0.01" id="pos-delivery-cost" value="${posDeliveryCost || ""}" placeholder="0.00" />
-            </div>
-          </div>
 
-          <div class="field" style="margin-bottom:0;">
-            <label>💵 Currency</label>
-            <select id="pos-currency-select" ${hasFeature("multi_currency") ? "" : 'disabled title="Upgrade to Growth or Pro for multi-currency sales"'}>
-              ${(hasFeature("multi_currency")
-                ? STATE.currencies
-                : STATE.currencies.filter(
-                    (c) => c.code === STATE.business.base_currency,
-                  )
-              )
-                .map(
-                  (c) =>
-                    `<option value="${c.code}" ${c.code === posSaleCurrency ? "selected" : ""}>${c.code} — ${escapeHtml(c.name)}</option>`,
+            <div class="field" style="margin-bottom:0; position:relative;">
+              <label>👤 Customer</label>
+              <div style="display:flex;gap:6px;">
+                <input type="text" id="pos-customer-input" placeholder="Search or type new name…" autocomplete="off" value="${(STATE.customers.find(c => c.id === STATE.cartCustomerId)?.name) || ""}" style="flex:1;" />
+                <button class="btn btn-outline btn-sm" id="pos-customer-add-btn" title="Add new customer" style="padding:0 10px;">+ New</button>
+              </div>
+              <div id="pos-customer-dropdown" style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-xs);max-height:160px;overflow-y:auto;z-index:100;box-shadow:var(--shadow-md);"></div>
+            </div>
+
+            <div class="field" style="margin-bottom:0;">
+              <label>📞 Contact</label>
+              <div style="display:flex;gap:6px;">
+                <input type="tel" id="pos-contact-phone" placeholder="Phone" autocomplete="off" value="${posContactPhone}" style="flex:1;" />
+                <input type="email" id="pos-contact-email" placeholder="Email (optional)" autocomplete="off" value="${posContactEmail}" style="flex:1;" />
+              </div>
+            </div>
+
+            <div class="field" style="margin-bottom:0;">
+              <label>🎟️ Coupon Code</label>
+              <div style="display:flex;gap:6px;">
+                <input type="text" id="pos-coupon-input" placeholder="Enter coupon code" autocomplete="off" value="${STATE.cartCouponCode || ""}" style="flex:1;text-transform:uppercase;" />
+                <button class="btn btn-outline btn-sm" id="pos-coupon-apply-btn" style="padding:0 10px;">Apply</button>
+              </div>
+              <div id="pos-coupon-msg" style="font-size:12px;margin-top:4px;"></div>
+            </div>
+
+            <div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-top:1px dashed var(--border);border-bottom:1px dashed var(--border);margin:2px 0;">
+              <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;margin:0;">
+                <input type="checkbox" id="pos-delivery-toggle" ${posDelivery ? "checked" : ""} style="width:18px;height:18px;" />
+                <span>🚚 Delivery Required</span>
+              </label>
+            </div>
+
+            <div id="pos-delivery-fields" style="display:${posDelivery ? "flex" : "none"};flex-direction:column;gap:6px;padding-top:4px;">
+              <div class="field" style="margin-bottom:0;">
+                <label>📍 Delivery Address</label>
+                <input type="text" id="pos-delivery-address" placeholder="Street address, area…" autocomplete="off" value="${posDeliveryAddress}" />
+              </div>
+              <div class="field" style="margin-bottom:0;">
+                <label>🗺️ Location / Landmark</label>
+                <input type="text" id="pos-delivery-location" placeholder="Nearby landmark, GPS coords…" autocomplete="off" value="${posDeliveryLocation}" />
+              </div>
+              <div class="field" style="margin-bottom:0;">
+                <label>Delivery Fee (${posSaleCurrency})</label>
+                <input type="number" min="0" step="0.01" id="pos-delivery-cost" value="${posDeliveryCost || ""}" placeholder="0.00" />
+              </div>
+            </div>
+
+            <div class="field" style="margin-bottom:0;">
+              <label>💵 Currency</label>
+              <select id="pos-currency-select" ${hasFeature("multi_currency") ? "" : 'disabled title="Upgrade to Growth or Pro for multi-currency sales"'}>
+                ${(hasFeature("multi_currency")
+                  ? STATE.currencies
+                  : STATE.currencies.filter(
+                      (c) => c.code === STATE.business.base_currency,
+                    )
                 )
-                .join("")}
-            </select>
+                  .map(
+                    (c) =>
+                      `<option value="${c.code}" ${c.code === posSaleCurrency ? "selected" : ""}>${c.code} — ${escapeHtml(c.name)}</option>`,
+                  )
+                  .join("")}
+              </select>
+            </div>
           </div>
-        </div>
 
-        <div class="cart-items" id="pos-cart-items"></div>
+          <div class="cart-items" id="pos-cart-items"></div>
+        </div>
 
         <div class="cart-summary" id="pos-cart-summary"></div>
       </div>

@@ -1528,8 +1528,41 @@ tbody tr:hover {
 }
 
 /* Cart panel fields compact */
+.cart-scroll {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+}
+.cart-fields {
+  padding: 0 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
 .cart-panel .field {
   margin-bottom: 0;
+}
+.cart-panel .field label {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 3px;
+  display: block;
+}
+.cart-panel .field input,
+.cart-panel .field select {
+  width: 100%;
+  padding: 9px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xs);
+  background: var(--surface-2);
+  color: var(--text);
+  transition: all var(--dur-fast);
+}
+.cart-panel .field input::placeholder {
+  color: var(--text-faint);
 }
 .cart-panel .field label {
   font-size: 11px;
@@ -1573,8 +1606,6 @@ tbody tr:hover {
   }
 }
 .cart-items {
-  flex: 1;
-  overflow-y: auto;
   padding: 8px 14px;
 }
 .cart-row {
