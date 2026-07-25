@@ -332,7 +332,7 @@ body.sidebar-expanded .sidebar {
 .sidebar-inner {
   margin: var(--space-sm);
   padding: var(--space-xs);
-  background: var(--surface);
+  background: var(--brand-lighter);
   border-radius: var(--radius);
   box-shadow: var(--shadow);
   display: flex;
@@ -378,14 +378,17 @@ body.sidebar-expanded .sidebar {
   color: var(--text-muted);
 }
 .sidebar-inner .nav-link:hover {
-  background: var(--surface-2);
-  color: var(--text);
+  background: var(--brand-light);
+  color: var(--brand-dark);
 }
 .sidebar-inner .nav-link.active {
-  background: var(--brand-light);
-  color: var(--brand);
+  background: var(--brand);
+  color: #fff;
   font-weight: 600;
-  box-shadow: none;
+  box-shadow: var(--shadow-focus);
+}
+.sidebar-inner .nav-link.active .icon {
+  filter: brightness(10);
 }
 .nav-link .icon {
   width: 22px;
@@ -484,12 +487,12 @@ body.sidebar-expanded .nav-chevron {
   color: var(--text-muted);
 }
 .sidebar-inner .nav-children .nav-link:hover {
-  color: var(--text);
-  background: var(--surface-2);
+  color: var(--brand-dark);
+  background: var(--brand-light);
 }
 .sidebar-inner .nav-children .nav-link.active {
-  color: var(--brand);
-  background: var(--brand-light);
+  color: #fff;
+  background: var(--brand);
   font-weight: 500;
 }
 
@@ -758,6 +761,11 @@ body:not(.sidebar-expanded) .nav-module:hover .nav-parent::before {
   min-width: 0;
   display: flex;
   flex-direction: column;
+  margin-left: var(--sidebar-collapsed-w);
+  transition: margin-left var(--dur-slow) var(--ease);
+}
+body.sidebar-expanded .main {
+  margin-left: var(--sidebar-w);
 }
 
 .menu-btn {
