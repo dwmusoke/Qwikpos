@@ -1336,8 +1336,13 @@ tbody tr:hover {
   text-overflow: ellipsis;
 }
 .cart-row .info .unit {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--text-muted);
+  margin-top: 2px;
+}
+.cart-item-tax {
+  color: var(--brand);
+  font-weight: 500;
 }
 
 .qty-stepper {

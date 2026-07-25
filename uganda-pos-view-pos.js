@@ -600,7 +600,10 @@ function renderCart() {
       <div class="cart-row" data-id="${l.productId}">
         <div class="info">
           <div class="name">${escapeHtml(l.name)}</div>
-          <div class="unit">${fmtMoneyRaw(l.unitPrice, posSaleCurrency)} each</div>
+          <div class="unit">
+            ${fmtMoneyRaw(l.unitPrice, posSaleCurrency)} × ${l.qty}
+            ${l.vatAmount > 0 ? `<span class="cart-item-tax"> · VAT ${fmtMoneyRaw(l.vatAmount, posSaleCurrency)}</span>` : ""}
+          </div>
         </div>
         <div class="qty-stepper">
           <button data-action="dec" title="Decrease">−</button>
