@@ -312,6 +312,9 @@ alter table products add column if not exists efris_commodity_category_id text;
 alter table products add column if not exists efris_measure_unit text;
 alter table products add column if not exists efris_registered_at timestamptz;
 
+-- Tax categories: add description column
+alter table tax_categories add column if not exists description text;
+
 -- Businesses: document template config columns
 alter table businesses add column if not exists tpl_primary_color text default '#0f6b4a';
 alter table businesses add column if not exists tpl_font_size text default '13';
