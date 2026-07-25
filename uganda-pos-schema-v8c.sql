@@ -307,7 +307,9 @@ alter table products add column if not exists brand_id uuid references brands(id
 -- Products: add has_batches flag for batch tracking
 alter table products add column if not exists has_batches boolean default false;
 
--- Products: add efris_registered_at timestamp
+-- Products: add efris columns
+alter table products add column if not exists efris_commodity_category_id text;
+alter table products add column if not exists efris_measure_unit text;
 alter table products add column if not exists efris_registered_at timestamptz;
 
 -- Businesses: document template config columns
