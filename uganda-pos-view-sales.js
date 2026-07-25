@@ -88,16 +88,22 @@ async function renderSalesListTab(body) {
 
     const total = lastSales.reduce((a, s) => a + Number(s.grand_total_base || 0), 0);
     const vat = lastSales.reduce((a, s) => a + Number(s.vat_total || 0) * Number(s.exchange_rate || 1), 0);
-    const paid = lastSales.filter((s) => s.payment_status === 'paid').length;
-    const partial = lastSales.filter((s) => s.payment_status === 'partial').length;
-    const credit = lastSales.filter((s) => s.payment_status === 'credit').length;
+    const paidCount = lastSales.filter((s) => s.payment_status === 'paid').length;
+    const partialCount = lastSales.filter((s) => s.payment_status === 'partial').length;
+    const creditCount = lastSales.filter((s) => s.payment_status === 'credit').length;
+    const paidAmount = lastSales.reduce((a, s) => a + (s.payment_status === 'paid' ? Number(s.grand_total_base || 0) : 0), 0);
+    const partialAmount = lastSales.reduce((a, s) => a + (s.payment_status === 'partial' ? Number(s.grand_total_base || 0) : 0), 0);
+    const creditAmount = lastSales.reduce((a, s) => a + (s.payment_status === 'credit' ? Number(s.grand_total_base || 0) : 0), 0);
 
     out.innerHTML = `
-      <div class="kpi-grid">
-        <div class="kpi-card"><div class="label">Total Sales</div><div class="value">${fmtMoney(total)}</div><div class="delta">${lastSales.length} transactions</div></div>
-        <div class="kpi-card"><div class="label">VAT Collected</div><div class="value">${fmtMoney(vat)}</div></div>
-        <div class="kpi-card"><div class="label">Paid</div><div class="value">${paid}</div></div>
-        <div class="kpi-card"><div class="label">Partial / Credit</div><div class="value">${partial + credit}</div><div class="delta">${partial} partial · ${credit} credit</div></div>
+      <div class="dash-section" style="margin-bottom:16px;">
+        <div class="dash-section-header"><h2 class="dash-section-title">Sales KPIs</h2></div>
+        <div class="kpi-grid">
+          <div class="kpi-card"><div class="label">Total Sales</div><div class="value">${fmtMoney(total, STATE.business?.base_currency)}</div><div class="delta">${lastSales.length} transactions</div></div>
+          <div class="kpi-card"><div class="label">VAT Collected</div><div class="value">${fmtMoney(vat, STATE.business?.base_currency)}</div></div>
+          <div class="kpi-card"><div class="label">Paid</div><div class="value">${fmtMoney(paidAmount, STATE.business?.base_currency)}</div><div class="delta">${paidCount} transactions</div></div>
+          <div class="kpi-card"><div class="label">Partial / Credit</div><div class="value">${fmtMoney(partialAmount + creditAmount, STATE.business?.base_currency)}</div><div class="delta">${partialCount} partial · ${creditCount} credit</div></div>
+        </div>
       </div>
       <div class="card">
         <div class="card-title">Sales (${lastSales.length})</div>
