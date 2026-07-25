@@ -86,7 +86,8 @@ create table if not exists tax_categories (
 );
 
 insert into tax_categories (code, name, rate, efris_tax_code) values
-  ('STD', 'Standard Rated (18%)', 18.00, '01'),
+  ('VAT', 'VAT Standard (18%)', 18.00, '01'),
+  ('STD', 'Standard Rated', 18.00, '01'),
   ('ZERO', 'Zero Rated', 0.00, '02'),
   ('EXEMPT', 'Exempt', 0.00, '03'),
   ('DEEMED', 'Deemed VAT', 18.00, '04')
