@@ -20,7 +20,13 @@ export async function renderSettings(root) {
       </div>
       <div class="field-row">
         <div class="field"><label>Phone</label><input id="st-phone" value="${escapeHtml(STATE.business.phone || '')}" /></div>
-        <div class="field"><label>Base Currency</label><input value="${escapeHtml(STATE.business.base_currency)}" disabled title="Set once at signup — contact support to change" /></div>
+        <div class="field"><label>Base Currency</label>
+          <select id="st-base-currency">
+            ${STATE.currencies.filter(c => c.code !== 'ALL').map(c =>
+              `<option value="${c.code}" ${c.code === STATE.business.base_currency ? "selected" : ""}>${escapeHtml(c.code)} — ${escapeHtml(c.name || '')}</option>`
+            ).join("")}
+          </select>
+        </div>
       </div>
       <div class="field"><label>Address</label><input id="st-address" value="${escapeHtml(STATE.business.address || '')}" /></div>
       <button class="btn btn-primary" id="save-profile-btn">Save Profile</button>
@@ -362,12 +368,19 @@ export async function renderSettings(root) {
   `;
 
   $('save-profile-btn').addEventListener('click', async () => {
+    const newCurrency = $('st-base-currency')?.value || STATE.business.base_currency;
     const { error } = await supabase.from('businesses').update({
       name: $('st-name').value.trim(), tin: $('st-tin').value.trim() || null,
       phone: $('st-phone').value.trim() || null, address: $('st-address').value.trim() || null,
+      base_currency: newCurrency,
     }).eq('id', STATE.business.id);
     if (error) { toast('Save failed: ' + error.message, 'error'); return; }
-    Object.assign(STATE.business, { name: $('st-name').value.trim(), tin: $('st-tin').value.trim(), phone: $('st-phone').value.trim(), address: $('st-address').value.trim() });
+    Object.assign(STATE.business, {
+      name: $('st-name').value.trim(), tin: $('st-tin').value.trim(),
+      phone: $('st-phone').value.trim(), address: $('st-address').value.trim(),
+      base_currency: newCurrency,
+    });
+    STATE.displayCurrency = newCurrency;
     $('sidebar-business-name').textContent = STATE.business.name;
     toast('Profile saved', 'success');
   });
