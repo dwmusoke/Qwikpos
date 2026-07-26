@@ -1122,6 +1122,27 @@ export async function submitSaleToSupabase(payload) {
     },
   });
 
+  // Auto-create delivery record if this sale requires delivery
+  if (payload.delivery) {
+    try {
+      const { data: deliveryData, error: delErr } = await supabase.rpc("create_delivery_from_sale", {
+        p_sale_id: sale.id,
+        p_priority: "normal",
+      });
+      if (delErr) console.warn("Auto-create delivery failed:", delErr);
+      else if (deliveryData) {
+        createNotification({
+          title: "Delivery scheduled",
+          body: `${deliveryData.delivery_number} — ${payload.delivery_address || "No address"}`,
+          type: "delivery",
+          route: "deliveries",
+        }).catch(() => {});
+      }
+    } catch (e) {
+      console.warn("Auto-create delivery failed:", e);
+    }
+  }
+
   // ---- EFRIS: stage a fiscal invoice for this sale. The invoice is only
   // submitted to URA when you press "Submit" on the EFRIS tab (or
   // automatically once you enable live mode) — see uganda-pos-view-efris.js ----
