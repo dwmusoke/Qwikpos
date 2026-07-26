@@ -35,11 +35,11 @@ create table if not exists plans (
 
 insert into plans (code, name, description, price_ugx, sort_order, features) values
   ('starter', 'Starter', 'For a single till getting started with digital sales.', 60000, 1,
-    '{"max_branches":1,"max_users":3,"multi_currency":false,"efris":false,"reports_export":false,"accounting":false,"priority_support":false}'::jsonb),
+    '{"max_branches":1,"max_users":3,"multi_currency":false,"efris":false,"reports_export":false,"accounting":false,"priority_support":false,"sandbox_access":false}'::jsonb),
   ('growth', 'Growth', 'Multi-currency selling and EFRIS-ready invoicing.', 150000, 2,
-    '{"max_branches":2,"max_users":8,"multi_currency":true,"efris":true,"reports_export":true,"accounting":true,"priority_support":false}'::jsonb),
+    '{"max_branches":2,"max_users":8,"multi_currency":true,"efris":true,"reports_export":true,"accounting":true,"priority_support":false,"sandbox_access":true}'::jsonb),
   ('pro', 'Pro', 'Multi-branch operations with full reporting and support.', 300000, 3,
-    '{"max_branches":999,"max_users":999,"multi_currency":true,"efris":true,"reports_export":true,"accounting":true,"priority_support":true}'::jsonb)
+    '{"max_branches":999,"max_users":999,"multi_currency":true,"efris":true,"reports_export":true,"accounting":true,"priority_support":true,"sandbox_access":true}'::jsonb)
 on conflict (code) do nothing;
 
 -- ---------------------------------------------------------------------

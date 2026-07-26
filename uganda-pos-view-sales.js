@@ -7,6 +7,7 @@ import {
   fmtMoney, fmtDate, sanitizeCsvValue, refreshProducts, stockFor,
   makePaginationState, paginationHtml, wirePagination,
   printHtml, receiptHtml, emptyStateHtml,
+  buildEfrisCreditDebitPayload,
 } from './uganda-pos-core.js';
 
 let activeTab = 'list';
@@ -113,10 +114,10 @@ async function renderSalesListTab(body) {
       <div class="dash-section" style="margin-bottom:16px;">
         <div class="dash-section-header"><h2 class="dash-section-title">Sales KPIs</h2></div>
         <div class="kpi-grid">
-          <div class="kpi-card"><div class="label">Total Sales</div><div class="value">${fmtMoney(total, STATE.business?.base_currency)}</div><div class="delta">${lastSales.length} transactions</div></div>
-          <div class="kpi-card"><div class="label">VAT Collected</div><div class="value">${fmtMoney(vat, STATE.business?.base_currency)}</div></div>
-          <div class="kpi-card"><div class="label">Paid</div><div class="value">${fmtMoney(paidAmount, STATE.business?.base_currency)}</div><div class="delta">${paidCount} transactions</div></div>
-          <div class="kpi-card"><div class="label">Partial / Credit</div><div class="value">${fmtMoney(partialAmount + creditAmount, STATE.business?.base_currency)}</div><div class="delta">${partialCount} partial · ${creditCount} credit</div></div>
+          <div class="kpi-card"><div class="kpi-icon" style="background:#eef7ff;">🧾</div><div class="kpi-content"><div class="label">Total Sales</div><div class="value">${fmtMoney(total, STATE.business?.base_currency)}</div><div class="delta">${lastSales.length} transactions</div></div></div>
+          <div class="kpi-card"><div class="kpi-icon" style="background:#f3f0ff;">🏛️</div><div class="kpi-content"><div class="label">VAT Collected</div><div class="value">${fmtMoney(vat, STATE.business?.base_currency)}</div></div></div>
+          <div class="kpi-card"><div class="kpi-icon" style="background:#eefaf0;">✅</div><div class="kpi-content"><div class="label">Paid</div><div class="value">${fmtMoney(paidAmount, STATE.business?.base_currency)}</div><div class="delta">${paidCount} transactions</div></div></div>
+          <div class="kpi-card"><div class="kpi-icon" style="background:#fff7ed;">⏳</div><div class="kpi-content"><div class="label">Partial / Credit</div><div class="value">${fmtMoney(partialAmount + creditAmount, STATE.business?.base_currency)}</div><div class="delta">${partialCount} partial · ${creditCount} credit</div></div></div>
         </div>
       </div>
       <div class="card">
@@ -261,6 +262,50 @@ async function renderReturnsTab(body) {
         }
       }
       await supabase.from('sales_returns').update({ status: 'completed' }).eq('id', ret.id);
+
+      // Create EFRIS credit note if requested and live mode is on
+      if (ret.efris_credit_note && STATE.business.efris_live_enabled && ret.sale_id) {
+        try {
+          const { data: origSale } = await supabase.from('sales').select('*').eq('id', ret.sale_id).single();
+          if (origSale) {
+            const { data: origInvoice } = await supabase.from('efris_invoices')
+              .select('*').eq('sale_id', ret.sale_id).eq('status', 'accepted')
+              .order('created_at', { ascending: false }).limit(1).maybeSingle();
+            const returnItemsForEfris = (ret.items || []).map((it) => ({
+              ...it,
+              tax_category_code: 'VAT',
+              product_name: it.product?.name || 'Returned item',
+            }));
+            const payload = buildEfrisCreditDebitPayload({
+              originalInvoice: origInvoice,
+              returnItems: returnItemsForEfris,
+              business: STATE.business,
+              customer: origSale.customer_id ? { id: origSale.customer_id } : null,
+              reason: ret.reason || `Credit note for ${ret.return_number}`,
+              invoiceType: '2',
+              operator: STATE.appUser?.full_name || 'Cashier',
+            });
+            await supabase.from('efris_invoices').insert({
+              business_id: STATE.business.id,
+              sale_id: ret.sale_id,
+              fiscal_invoice_number: `CN-${ret.return_number}`,
+              invoice_type: '2',
+              original_invoice_id: origInvoice?.id || null,
+              supplier_tin: STATE.business.tin,
+              gross_amount: payload.invoice?.summary?.grossAmount || 0,
+              vat_amount: payload.invoice?.summary?.taxAmount || 0,
+              currency_code: origSale.currency_code || 'UGX',
+              status: 'pending',
+              payload_json: payload,
+              customer_name: origSale.customer?.name || 'Walk-in',
+            });
+            toast('EFRIS credit note staged — submit from EFRIS tab', 'default', 5000);
+          }
+        } catch (e) {
+          toast('Failed to create EFRIS credit note: ' + e.message, 'error', 6000);
+        }
+      }
+
       toast('Return approved, stock restored', 'success');
       loadReturns();
     }));
@@ -292,6 +337,7 @@ async function initiateReturn(saleId) {
          </div>
          <div class="field"><label>Reason</label><input id="ret-reason" placeholder="Reason for return" /></div>
          <div class="field"><label>Refund Method</label><select id="ret-method"><option value="cash">Cash</option><option value="mobile_money">Mobile Money</option><option value="bank">Bank Transfer</option><option value="card">Card</option><option value="exchange">Exchange</option></select></div>
+         ${STATE.business.efris_live_enabled ? `<label style="display:flex;align-items:center;gap:8px;margin-top:8px;font-size:12.5px;"><input type="checkbox" id="ret-efris-credit" checked /> Create EFRIS credit note on approval</label>` : ''}
          <button class="btn btn-primary btn-block" id="ret-submit" style="margin-top:14px;">Submit Return</button>`}
     </div>
     <button class="btn btn-secondary btn-block" data-close-modal style="margin-top:8px;">Cancel</button>
@@ -329,6 +375,7 @@ async function initiateReturn(saleId) {
           reason: $('ret-reason').value.trim() || null,
           refund_amount: totalRefund, refund_method: $('ret-method').value,
           status: 'pending', created_by: STATE.appUser.id,
+          efris_credit_note: $('ret-efris-credit')?.checked || false,
         });
         if (error) { toast('Failed: ' + error.message, 'error'); return; }
 

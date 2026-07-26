@@ -462,8 +462,8 @@ create policy business_isolation_payments on payments
   with check (sale_id in (select id from sales where business_id = auth_business_id()));
 
 -- NOTE: branches, currencies, exchange_rates, categories, suppliers,
--- product_stock, stock_movements, purchase_orders/_items, supplier_payments,
--- tax_categories, efris_queue and audit_log do not have RLS enabled yet —
+-- product_stock, stock_movements, purchase_orders/_items, supplier_payments
+-- and tax_categories do not have RLS enabled yet —
 -- they're reachable by any authenticated user for now. Add business-scoped
 -- policies (same pattern as above) before storing real multi-tenant data.
 -- =====================================================================

@@ -18,6 +18,7 @@ import {
   refreshProducts,
   stockFor,
   queueOfflineSale,
+  queueOfflineEfris,
   buildEfrisPayload,
   hasFeature,
   createNotification,
@@ -1050,6 +1051,21 @@ async function finalizeSale(payments) {
 
   if (!navigator.onLine) {
     queueOfflineSale(payload);
+    // Also queue the EFRIS payload for later submission
+    try {
+      const customer = STATE.customers.find((c) => c.id === payload.customer_id);
+      const efrisPayload = buildEfrisPayload({
+        sale: payload,
+        items: payload.items,
+        business: STATE.business,
+        customer,
+        payments: payload.payments,
+        operator: STATE.appUser?.full_name,
+      });
+      queueOfflineEfris({ efrisPayload, salePayload: payload });
+    } catch (e) {
+      console.warn("Offline EFRIS queue failed:", e);
+    }
     toast(
       "You are offline — sale saved and will sync automatically.",
       "default",

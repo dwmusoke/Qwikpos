@@ -66,6 +66,15 @@ export async function renderEfris(root) {
         : ""
     }
 
+    ${
+      STATE.business.efris_live_enabled && !STATE.business.efris_device_no
+        ? `
+    <div class="card" style="border-color:var(--danger); background:rgba(248,113,113,0.05); margin-bottom:16px;">
+      <b>⚠️ Device number not set.</b> Your submissions will fall back to <code>${escapeHtml(STATE.business.tin || 'YOUR_TIN')}_01</code> which may not be a valid URA-issued device number. Add your registered device number in <b>Settings → EFRIS</b> before submitting real invoices.
+    </div>`
+        : ""
+    }
+
     <div class="category-chips" style="margin-bottom:14px;">
       ${["all", "pending", "queued", "accepted", "rejected", "failed"]
         .map(
@@ -98,7 +107,9 @@ export async function renderEfris(root) {
       .map(
         (inv) => `
       <tr>
-        <td><b>${escapeHtml(inv.fiscal_invoice_number)}</b></td>
+        <td><b>${escapeHtml(inv.fiscal_invoice_number)}</b>
+          ${inv.invoice_type === '2' ? '<span class="badge badge-blue" style="font-size:9px;margin-left:4px;">CN</span>' : inv.invoice_type === '3' ? '<span class="badge badge-yellow" style="font-size:9px;margin-left:4px;">DN</span>' : ''}
+        </td>
         <td>${escapeHtml(inv.sales?.sale_number || "—")}</td>
         <td>${escapeHtml(inv.customer_name || "Walk-in")}</td>
         <td>${fmtMoneyRaw(Number(inv.gross_amount || 0), inv.currency_code)}</td>
@@ -171,12 +182,20 @@ async function submitInvoiceLive(invoiceId) {
   );
 
   if (error || !data?.success) {
-    toast(
-      "EFRIS submission failed: " +
-        (data?.error || error?.message || "unknown error"),
-      "error",
-      8000,
-    );
+    if (data?.retryScheduled) {
+      toast(
+        `EFRIS rejected — retry ${data.retriesLeft ? `${data.retriesLeft} left` : "scheduled"}: ${data.error}`,
+        "default",
+        6000,
+      );
+    } else {
+      toast(
+        "EFRIS submission failed: " +
+          (data?.error || error?.message || "unknown error"),
+        "error",
+        8000,
+      );
+    }
   } else {
     toast(
       `EFRIS invoice accepted ✅ FDN: ${data.invoiceNo || ""}`,

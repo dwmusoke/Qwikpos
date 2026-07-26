@@ -245,7 +245,13 @@ Deno.serve(async (req) => {
                 `PROD-${product.id.slice(0, 8)}`,
               measureUnit: product.efris_measure_unit || "101",
               unitPrice: String(product.selling_price ?? 0),
-              currency: "101",
+              currency: (() => {
+                const map: Record<string, string> = {
+                  UGX: "101", USD: "102", EUR: "103", GBP: "104", KES: "105",
+                  TZS: "106", NGN: "107", ZAR: "108", CNY: "109",
+                };
+                return map[business.base_currency || "UGX"] || "101";
+              })(),
               commodityCategoryId: product.efris_commodity_category_id,
               haveExciseTax: "102",
               havePieceUnit: "102",
@@ -318,6 +324,52 @@ Deno.serve(async (req) => {
 
     if (invData?.response !== "OK") {
       const errorMessage = invData?.message || "EFRIS rejected the invoice";
+
+      // Load current retry info to decide whether to auto-retry
+      const { data: queueEntry } = await admin
+        .from("efris_queue")
+        .select("retries, max_retries")
+        .eq("efris_invoice_id", efrisInvoiceId)
+        .single();
+
+      const currentRetries = queueEntry?.retries || 0;
+      const maxRetries = queueEntry?.max_retries || 3;
+
+      if (currentRetries < maxRetries) {
+        // Schedule a retry with exponential backoff (30s, 60s, 120s...)
+        const backoffMs = 30000 * Math.pow(2, currentRetries);
+        const nextRetryAt = new Date(Date.now() + backoffMs).toISOString();
+        await admin
+          .from("efris_queue")
+          .update({
+            status: "pending",
+            last_error: errorMessage,
+            retries: currentRetries + 1,
+            next_retry_at: nextRetryAt,
+          })
+          .eq("efris_invoice_id", efrisInvoiceId);
+        await admin
+          .from("efris_invoices")
+          .update({
+            status: "queued",
+            error_message: `Retry ${currentRetries + 1}/${maxRetries} scheduled — ${errorMessage}`,
+            response_json: invData,
+          })
+          .eq("id", efrisInvoiceId);
+        return json(
+          {
+            success: false,
+            error: errorMessage,
+            retryScheduled: true,
+            nextRetryAt,
+            retriesLeft: maxRetries - currentRetries - 1,
+          },
+          200,
+          corsHeaders,
+        );
+      }
+
+      // Max retries exhausted — mark as rejected
       await admin
         .from("efris_invoices")
         .update({
@@ -329,7 +381,7 @@ Deno.serve(async (req) => {
         .eq("id", efrisInvoiceId);
       await admin
         .from("efris_queue")
-        .update({ status: "failed", last_error: errorMessage })
+        .update({ status: "failed", last_error: errorMessage, retries: currentRetries + 1 })
         .eq("efris_invoice_id", efrisInvoiceId);
       return json({ success: false, error: errorMessage }, 400, corsHeaders);
     }

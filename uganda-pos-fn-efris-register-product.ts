@@ -142,6 +142,14 @@ export async function registerProduct(
   }
 
   const goodsCode = product.sku || product.barcode || product.id;
+
+  // Map business base currency to EFRIS currency code
+  const EFRIS_CURRENCY_MAP: Record<string, string> = {
+    UGX: "101", USD: "102", EUR: "103", GBP: "104", KES: "105",
+    TZS: "106", NGN: "107", ZAR: "108", CNY: "109",
+  };
+  const efrisCurrencyCode = EFRIS_CURRENCY_MAP[business.base_currency || "UGX"] || "101";
+
   const payload = {
     goods: [
       {
@@ -150,7 +158,7 @@ export async function registerProduct(
         goodsCode,
         measureUnit: product.efris_measure_unit || "101",
         unitPrice: String(product.selling_price ?? 0),
-        currency: "101", // UGX in EFRIS's currencyType dictionary
+        currency: efrisCurrencyCode,
         commodityCategoryId: product.efris_commodity_category_id,
         haveExciseTax: "102",
         havePieceUnit: "102",

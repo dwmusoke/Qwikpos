@@ -14,6 +14,7 @@ import {
   fmtDate,
   hasRole,
 } from "./uganda-pos-core.js";
+import { renderSandboxAdmin } from "./uganda-pos-view-sandbox-admin.js";
 
 let _activeTab = "overview";
 
@@ -97,6 +98,7 @@ export async function renderAdmin(root) {
       <button class="admin-tab ${_activeTab === "plans" ? "active" : ""}" data-tab="plans">Plans & Payments</button>
       <button class="admin-tab ${_activeTab === "settings" ? "active" : ""}" data-tab="settings">Settings</button>
       <button class="admin-tab ${_activeTab === "roles" ? "active" : ""}" data-tab="roles">Roles & Permissions</button>
+      <button class="admin-tab ${_activeTab === "sandbox" ? "active" : ""}" data-tab="sandbox">Sandbox API</button>
     </div>
 
     <div id="admin-tab-content"></div>
@@ -141,6 +143,7 @@ export async function renderAdmin(root) {
     else if (_activeTab === "settings")
       renderPlatformSettings(el, { platformSettings });
     else if (_activeTab === "roles") renderRoles(el);
+    else if (_activeTab === "sandbox") renderSandboxAdmin(el);
   }
 
   renderTabContent();

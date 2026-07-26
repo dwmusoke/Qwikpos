@@ -22,6 +22,8 @@ import {
   submitSaleToSupabase,
   offlineQueueCount,
   flushOfflineQueue,
+  offlineEfrisQueueCount,
+  flushOfflineEfrisQueue,
   loadBootstrapData,
   isSubscriptionActive,
   applyTheme,
@@ -61,6 +63,8 @@ import { renderBilling } from "./uganda-pos-view-billing.js";
 import { renderCoupons } from "./uganda-pos-view-coupons.js";
 import { renderOrders } from "./uganda-pos-view-orders.js";
 import { renderProfile } from "./uganda-pos-view-profile.js";
+import { renderSandboxDocs } from "./uganda-pos-view-sandbox-docs.js";
+import { renderSandboxAdmin } from "./uganda-pos-view-sandbox-admin.js";
 import {
   initSignupScreen,
   finishPendingSignupIfAny,
@@ -121,6 +125,8 @@ const ROUTES = {
     title: "Billing",
     render: (root) => renderBilling(root, { paywall: false }),
   },
+  "sandbox-docs": { title: "Sandbox API Docs", render: renderSandboxDocs },
+  "sandbox-admin": { title: "Sandbox API Admin", render: renderSandboxAdmin, superadminOnly: true },
   admin: { title: "Platform Admin", render: renderAdmin, superadminOnly: true },
 };
 
@@ -389,10 +395,13 @@ function wireConnectivity() {
   const pill = $("offline-pill");
   const update = () => {
     const online = navigator.onLine;
-    pill.classList.toggle("show", !online || offlineQueueCount() > 0);
-    if (online && offlineQueueCount() > 0) {
+    const hasOffline = offlineQueueCount() > 0 || offlineEfrisQueueCount() > 0;
+    pill.classList.toggle("show", !online || hasOffline);
+    if (online && hasOffline) {
       flushOfflineQueue(submitSaleToSupabase).then(() => {
-        pill.classList.toggle("show", offlineQueueCount() > 0);
+        flushOfflineEfrisQueue().then(() => {
+          pill.classList.toggle("show", offlineQueueCount() > 0 || offlineEfrisQueueCount() > 0);
+        });
       });
     }
   };

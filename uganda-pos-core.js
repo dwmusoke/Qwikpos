@@ -440,6 +440,7 @@ export async function loadBootstrapData() {
   STATE.taxCategories = (taxCategories && taxCategories.length > 0) ? taxCategories : DEFAULT_TAX_CATEGORIES;
   STATE.brands = brands || [];
   STATE.units = units || [];
+  STATE.variantTypes = [];
   STATE.displayCurrency = business?.base_currency || "UGX";
 
   // latest rate per currency
@@ -460,6 +461,7 @@ export async function loadBootstrapData() {
     ),
     refreshBrands().catch((e) => console.warn("refreshBrands failed:", e)),
     refreshUnits().catch((e) => console.warn("refreshUnits failed:", e)),
+    refreshVariantTypes().catch((e) => console.warn("refreshVariantTypes failed:", e)),
     refreshCoupons().catch((e) => console.warn("refreshCoupons failed:", e)),
     loadSubscription().catch((e) =>
       console.warn("loadSubscription failed:", e),
@@ -628,6 +630,16 @@ export async function refreshUnits() {
     .eq("is_active", true)
     .order("name");
   STATE.units = data || [];
+}
+
+export async function refreshVariantTypes() {
+  if (!STATE.business) return;
+  const { data } = await supabase
+    .from("variant_types")
+    .select("*")
+    .eq("business_id", STATE.business.id)
+    .order("sort_order");
+  STATE.variantTypes = data || [];
 }
 
 export function stockFor(productId) {
@@ -903,6 +915,61 @@ export async function flushOfflineQueue(insertSaleFn) {
 }
 
 // ---------------------------------------------------------------------
+// 8b. OFFLINE EFRIS QUEUE (EFRIS payloads staged while offline are
+//     submitted automatically once the connection returns)
+// ---------------------------------------------------------------------
+const EFRIS_OFFLINE_KEY = "ugpos_offline_efris";
+
+export function queueOfflineEfris(efrisPayload) {
+  let list = [];
+  try {
+    list = JSON.parse(localStorage.getItem(EFRIS_OFFLINE_KEY) || "[]");
+  } catch (e) {
+    list = [];
+  }
+  list.push(efrisPayload);
+  localStorage.setItem(EFRIS_OFFLINE_KEY, JSON.stringify(list));
+}
+
+export function offlineEfrisQueueCount() {
+  try {
+    return JSON.parse(localStorage.getItem(EFRIS_OFFLINE_KEY) || "[]").length;
+  } catch (e) {
+    return 0;
+  }
+}
+
+export async function flushOfflineEfrisQueue() {
+  const list = JSON.parse(localStorage.getItem(EFRIS_OFFLINE_KEY) || "[]");
+  if (!list.length) return;
+  const remaining = [];
+  let synced = 0;
+  for (const entry of list) {
+    try {
+      const { data, error } = await supabase.functions.invoke(
+        "efris-submit-invoice",
+        { body: { efrisInvoiceId: entry.efrisInvoiceId } },
+      );
+      if (error || !data?.success) {
+        remaining.push(entry);
+      } else {
+        synced++;
+      }
+    } catch (e) {
+      remaining.push(entry);
+    }
+  }
+  localStorage.setItem(EFRIS_OFFLINE_KEY, JSON.stringify(remaining));
+  if (remaining.length === 0 && synced > 0) {
+    toast(`Offline EFRIS invoices submitted (${synced}).`, "success");
+  } else if (remaining.length > 0 && synced > 0) {
+    toast(`${synced} of ${list.length} offline EFRIS invoices submitted. ${remaining.length} will retry.`, "default", 5000);
+  } else if (remaining.length > 0) {
+    toast(`Could not submit ${remaining.length} offline EFRIS invoice(s) — will retry when online.`, "error", 5000);
+  }
+}
+
+// ---------------------------------------------------------------------
 // 9. EFRIS (URA E-INVOICING) HELPERS
 //
 // buildEfrisPayload() emits the exact request shape the EFRIS Simplified
@@ -1055,6 +1122,118 @@ export function buildEfrisPayload({
               orderNumber: "a",
             },
           ],
+    },
+  };
+}
+
+// Build a credit/debit note payload referencing a previously fiscalised invoice.
+// invoiceType: "2" = credit note (refund/reduction), "3" = debit note (additional charge)
+export function buildEfrisCreditDebitPayload({
+  originalInvoice,
+  returnItems,
+  business,
+  customer,
+  reason,
+  invoiceType = "2",
+  operator,
+}) {
+  const goodsDetails = returnItems.map((it, idx) => {
+    const product = STATE.products.find((p) => p.id === it.product_id);
+    const taxCode = EFRIS_TAX_CODE[it.tax_category_code] || "01";
+    const taxRate = EFRIS_TAX_RATE[it.tax_category_code] ?? "0.18";
+    const qty = Math.abs(Number(it.quantity) || 0);
+    const unitPrice = Number(it.unit_price) || 0;
+    const lineTotal = round2(qty * unitPrice);
+    const vatAmount = taxRate === "-" ? 0 : round2(lineTotal * Number(taxRate));
+    return {
+      item: it.product_name || product?.name || "Item",
+      itemCode: product?.sku || product?.barcode || it.product_id || "",
+      qty: String(qty),
+      unitOfMeasure: product?.efris_measure_unit || "101",
+      unitPrice: String(unitPrice),
+      total: String(lineTotal),
+      taxRate,
+      tax: String(vatAmount),
+      orderNumber: String(idx),
+      discountFlag: "2",
+      deemedFlag: "2",
+      exciseFlag: "2",
+      goodsCategoryId: product?.efris_commodity_category_id || "",
+      _taxCode: taxCode,
+    };
+  });
+
+  const taxGroups = {};
+  goodsDetails.forEach((g) => {
+    const key = g._taxCode;
+    const gross = Number(g.total);
+    const tax = g.taxRate === "-" ? 0 : Number(g.tax);
+    if (!taxGroups[key]) taxGroups[key] = { taxRate: g.taxRate, gross: 0, tax: 0 };
+    taxGroups[key].gross += gross;
+    taxGroups[key].tax += tax;
+  });
+
+  const taxDetails = Object.entries(taxGroups).map(([code, g]) => ({
+    taxCategoryCode: code,
+    netAmount: round2(g.gross - g.tax).toFixed(2),
+    taxRate: g.taxRate,
+    taxAmount: round2(g.tax).toFixed(2),
+    grossAmount: round2(g.gross).toFixed(2),
+  }));
+
+  const grossAmount = taxDetails.reduce((a, t) => a + Number(t.grossAmount), 0);
+  const taxAmount = taxDetails.reduce((a, t) => a + Number(t.taxAmount), 0);
+
+  return {
+    invoice: {
+      sellerDetails: {
+        tin: business?.tin || "",
+        legalName: business?.name || "",
+        businessName: business?.name || "",
+        emailAddress: business?.email || "",
+        referenceNo: originalInvoice?.fiscal_invoice_number || "",
+        isCheckReferenceNo: "1",
+      },
+      basicInformation: {
+        invoiceNo: "",
+        antifakeCode: "",
+        deviceNo:
+          business?.efris_device_no ||
+          (business?.tin ? `${business.tin}_01` : ""),
+        issuedDate: efrisNow(),
+        operator: operator || "Cashier",
+        currency: originalInvoice?.currency_code || "UGX",
+        invoiceType,
+        invoiceKind: "1",
+        dataSource: "103",
+      },
+      buyerDetails: customer?.tin
+        ? {
+            buyerType: "0",
+            buyerLegalName: customer?.name || "Customer",
+            buyerTin: customer.tin,
+          }
+        : {
+            buyerType: "1",
+            buyerLegalName: customer?.name || "Walk-in Customer",
+          },
+      goodsDetails: goodsDetails.map(({ _taxCode, ...g }) => g),
+      taxDetails,
+      summary: {
+        netAmount: round2(grossAmount - taxAmount).toFixed(2),
+        taxAmount: taxAmount.toFixed(2),
+        grossAmount: grossAmount.toFixed(2),
+        itemCount: String(goodsDetails.length),
+        modeCode: "1",
+        remarks: reason || (invoiceType === "2" ? "Credit note" : "Debit note"),
+      },
+      payWay: [
+        {
+          paymentMode: "102",
+          paymentAmount: grossAmount.toFixed(2),
+          orderNumber: "a",
+        },
+      ],
     },
   };
 }

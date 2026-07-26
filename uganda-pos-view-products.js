@@ -4,7 +4,7 @@
 // =====================================================================
 import {
   supabase, STATE, $, qsa, escapeHtml, toast, openModal, closeModal,
-  fmtMoney, refreshProducts, stockFor, sanitizeCsvValue,
+  fmtMoney, refreshProducts, refreshVariantTypes, stockFor, sanitizeCsvValue,
   makePaginationState, paginationHtml, wirePagination,
   emptyStateHtml, resizeImage,
 } from './uganda-pos-core.js';
@@ -25,6 +25,7 @@ export async function renderProductsModule(root) {
         ['tax', '🏛️ Tax Types'],
         ['units', '📏 Units'],
         ['brands', '⭐ Brands'],
+        ['variant-types', '🎨 Variant Types'],
         ['variants', '🔀 Variants'],
         ['labels', '🖨️ Print Labels'],
       ].map(([k, l]) => `<button class="chip ${activeTab === k ? 'active' : ''}" data-tab="${k}">${l}</button>`).join('')}
@@ -50,6 +51,7 @@ export async function renderProductsModule(root) {
     else if (activeTab === 'tax') await renderTaxTab(body);
     else if (activeTab === 'units') await renderUnitsTab(body);
     else if (activeTab === 'brands') await renderBrandsTab(body);
+    else if (activeTab === 'variant-types') await renderVariantTypesTab(body);
     else if (activeTab === 'variants') await renderVariantsTab(body);
     else if (activeTab === 'labels') await renderLabelsTab(body);
   }
@@ -172,6 +174,15 @@ async function openProductModal(productId) {
         <p class="help-text">JPG, PNG or WebP. Max 2MB.</p>
       </div>
     </div>
+    <div class="field-row" style="align-items:end;">
+      <div class="field" style="flex:1;">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+          <input type="checkbox" id="pf-has-variants" ${p.has_variants ? 'checked' : ''} style="width:auto;" />
+          This product has variants (Size, Color, etc.)
+        </label>
+        <p class="help-text" style="margin:4px 0 0;">Enable this to track stock and pricing per variant.</p>
+      </div>
+    </div>
     <div class="flex gap" style="margin-top:14px;">
       <button class="btn btn-secondary btn-block" data-close-modal>Cancel</button>
       <button class="btn btn-primary btn-block" id="save-product-btn">${editing ? 'Save Changes' : 'Add Product'}</button>
@@ -182,6 +193,9 @@ async function openProductModal(productId) {
       const unitSel = $('pf-unit');
       const customWrap = $('pf-unit-custom-wrap');
       unitSel?.addEventListener('change', () => { customWrap.style.display = unitSel.value === '_custom' ? '' : 'none'; });
+
+      // Has variants toggle
+      const hasVariantsCb = $('pf-has-variants');
 
       // Barcode scanner
       $('pf-scan-btn')?.addEventListener('click', async () => {
@@ -246,6 +260,7 @@ async function openProductModal(productId) {
           tax_category_code: $('pf-tax').value || 'STD',
           reorder_level: parseFloat($('pf-reorder').value) || 0,
           expiry_date: $('pf-expiry').value || null,
+          has_variants: hasVariantsCb?.checked || false,
         };
 
         let saved;
@@ -299,6 +314,11 @@ async function openProductModal(productId) {
           if (error) { toast('Failed: ' + error.message, 'error'); return; }
           saved = data;
           logAuditAction({ action: 'create', entityType: 'product', entityId: saved?.id, entityName: name, newValue: record });
+        }
+
+        // Update has_variants flag (not in upsert_product RPC)
+        if (saved?.id) {
+          await supabase.from('products').update({ has_variants: record.has_variants }).eq('id', saved.id);
         }
 
         // Upload image (auto-resized)
@@ -683,25 +703,93 @@ async function openVariantModal(variantId) {
       <div class="field"><label>Cost Price</label><input type="number" step="0.01" id="vf-cost" value="${v.cost_price ?? ''}" /></div>
       <div class="field"><label>Selling Price</label><input type="number" step="0.01" id="vf-price" value="${v.selling_price ?? ''}" /></div>
     </div>
-    <div class="field"><label>Attributes (JSON)</label><textarea id="vf-attrs" rows="3">${JSON.stringify(v.attributes || {}, null, 2)}</textarea></div>
+    <div class="field" style="border:1px solid var(--border);border-radius:8px;padding:12px;background:var(--bg-subtle);">
+      <label style="margin-bottom:8px;display:block;">Attributes</label>
+      <div id="vf-attr-section">
+        ${(STATE.variantTypes || []).length > 0 ? `
+          <div class="field-row" style="margin-bottom:8px;">
+            <div class="field" style="flex:1;"><label>Add Attribute</label>
+              <select id="vf-attr-type">
+                <option value="">— Select Type —</option>
+                ${(STATE.variantTypes || []).map(vt => `<option value="${vt.id}">${escapeHtml(vt.name)}</option>`).join('')}
+              </select>
+            </div>
+            <div class="field" style="flex:1;"><label>Value</label>
+              <select id="vf-attr-value" disabled><option value="">Select type first</option></select>
+            </div>
+            <button class="btn btn-secondary btn-sm" id="vf-attr-add" style="margin-top:22px;">Add</button>
+          </div>
+          <div id="vf-attr-list" class="field-row" style="flex-wrap:wrap;gap:6px;">
+            ${Object.entries(v.attributes || {}).map(([k, val]) => `<span class="chip chip-sm" data-attr-key="${escapeHtml(k)}">${escapeHtml(k)}: ${escapeHtml(val)} <button class="btn btn-ghost btn-xs" style="margin-left:4px;padding:0 4px;" data-remove-attr="${escapeHtml(k)}">&times;</button></span>`).join('')}
+          </div>
+        ` : '<p class="help-text">No variant types defined. Go to Products → Variant Types to create some.</p>'}
+      </div>
+      <details style="margin-top:8px;">
+        <summary style="cursor:pointer;font-size:12px;color:var(--text-muted);">Edit raw JSON</summary>
+        <textarea id="vf-attrs" rows="2" style="margin-top:6px;font-size:12px;">${JSON.stringify(v.attributes || {}, null, 2)}</textarea>
+      </details>
+    </div>
     <div class="flex gap" style="margin-top:14px;">
       <button class="btn btn-secondary btn-block" data-close-modal>Cancel</button>
       <button class="btn btn-primary btn-block" id="vf-save">${editing ? 'Save' : 'Add Variant'}</button>
     </div>
   `, { onMount: () => {
+    // Variant type → options dropdown
+    const attrTypeSel = $('vf-attr-type');
+    const attrValueSel = $('vf-attr-value');
+    const attrs = { ...(v.attributes || {}) };
+
+    function refreshAttrList() {
+      const list = $('vf-attr-list');
+      if (list) {
+        list.innerHTML = Object.entries(attrs).map(([k, val]) => `<span class="chip chip-sm" data-attr-key="${escapeHtml(k)}">${escapeHtml(k)}: ${escapeHtml(val)} <button class="btn btn-ghost btn-xs" style="margin-left:4px;padding:0 4px;" data-remove-attr="${escapeHtml(k)}">&times;</button></span>`).join('');
+        list.querySelectorAll('[data-remove-attr]').forEach(btn => {
+          btn.addEventListener('click', () => { delete attrs[btn.dataset.removeAttr]; refreshAttrList(); });
+        });
+      }
+      // Sync raw JSON
+      const rawEl = $('vf-attrs');
+      if (rawEl) rawEl.value = JSON.stringify(attrs, null, 2);
+    }
+
+    attrTypeSel?.addEventListener('change', () => {
+      const vt = (STATE.variantTypes || []).find(t => t.id === attrTypeSel.value);
+      attrValueSel.innerHTML = vt
+        ? `<option value="">— Select —</option>${vt.options.map(o => `<option value="${escapeHtml(o)}">${escapeHtml(o)}</option>`).join('')}`
+        : '<option value="">Select type first</option>';
+      attrValueSel.disabled = !vt;
+    });
+
+    $('vf-attr-add')?.addEventListener('click', () => {
+      const type = (STATE.variantTypes || []).find(t => t.id === attrTypeSel.value);
+      const val = attrValueSel.value;
+      if (!type || !val) { toast('Select a type and value', 'error'); return; }
+      attrs[type.name] = val;
+      refreshAttrList();
+      attrValueSel.value = '';
+    });
+
+    // Remove existing attribute chips
+    list?.querySelectorAll('[data-remove-attr]').forEach(btn => {
+      btn.addEventListener('click', () => { delete attrs[btn.dataset.removeAttr]; refreshAttrList(); });
+    });
+
     $('vf-save').addEventListener('click', async () => {
       const product_id = $('vf-product').value;
       const name = $('vf-name').value.trim();
       if (!product_id || !name) { toast('Product and variant name are required', 'error'); return; }
-      let attrs = {};
-      try { attrs = JSON.parse($('vf-attrs').value || '{}'); } catch (_) { toast('Invalid JSON in attributes', 'error'); return; }
+      let finalAttrs = attrs;
+      // Also try parsing raw JSON if attributes section wasn't used
+      if (Object.keys(attrs).length === 0) {
+        try { finalAttrs = JSON.parse($('vf-attrs').value || '{}'); } catch (_) { toast('Invalid JSON in attributes', 'error'); return; }
+      }
 
       const record = {
         product_id, business_id: STATE.business.id, name,
         sku: $('vf-sku').value.trim() || null, barcode: $('vf-barcode').value.trim() || null,
         cost_price: parseFloat($('vf-cost').value) || null,
         selling_price: parseFloat($('vf-price').value) || null,
-        attributes: attrs,
+        attributes: finalAttrs,
       };
 
       if (editing) {
@@ -712,6 +800,130 @@ async function openVariantModal(variantId) {
         if (error) { toast('Failed: ' + error.message, 'error'); return; }
       }
       toast(editing ? 'Variant updated' : 'Variant added', 'success');
+      closeModal(); renderTab();
+    });
+  }});
+}
+
+// ── VARIANT TYPES TAB ────────────────────────────────────────────────
+const PRESET_VARIANT_TYPES = [
+  { name: 'Size', options: ['XS', 'S', 'M', 'L', 'XL', 'XXL'] },
+  { name: 'Color', options: ['Black', 'White', 'Red', 'Blue', 'Green', 'Yellow', 'Grey', 'Navy'] },
+  { name: 'Weight', options: ['100g', '250g', '500g', '1kg', '2kg', '5kg'] },
+  { name: 'Volume', options: ['50ml', '100ml', '250ml', '500ml', '1L', '2L'] },
+  { name: 'Storage', options: ['32GB', '64GB', '128GB', '256GB', '512GB', '1TB'] },
+  { name: 'RAM', options: ['2GB', '4GB', '8GB', '16GB', '32GB'] },
+  { name: 'Dosage', options: ['100mg', '200mg', '250mg', '500mg', '1g'] },
+  { name: 'Flavor', options: ['Original', 'Vanilla', 'Chocolate', 'Strawberry', 'Mango'] },
+  { name: 'Material', options: ['Cotton', 'Polyester', 'Leather', 'Nylon', 'Wool'] },
+  { name: 'Fit', options: ['Slim', 'Regular', 'Relaxed', 'Athletic'] },
+];
+
+async function renderVariantTypesTab(body) {
+  await refreshVariantTypes();
+  const vtypes = STATE.variantTypes || [];
+
+  body.innerHTML = `
+    <div class="card">
+      <div class="card-title" style="justify-content:space-between;">
+        <span>Variant Types (${vtypes.length})</span>
+        <button class="btn btn-primary btn-sm" id="vt-add-btn">+ Add Type</button>
+      </div>
+      <p class="help-text" style="margin:0 0 12px;">Define attribute types (Size, Color, Weight, etc.) that you can assign to products. Each type has a list of preset options.</p>
+      <div class="field-row" style="margin-bottom:12px;">
+        <div class="field" style="flex:1;"><label>Quick-Add Preset</label>
+          <select id="vt-preset-select">
+            <option value="">— Select Industry Preset —</option>
+            ${PRESET_VARIANT_TYPES.map((p, i) => `<option value="${i}">${escapeHtml(p.name)} (${p.options.length} options)</option>`).join('')}
+          </select>
+        </div>
+        <button class="btn btn-secondary btn-sm" id="vt-add-preset-btn" style="margin-top:22px;">Add Preset</button>
+      </div>
+      <div class="table-wrap" style="max-height:500px;overflow-y:auto;">
+        <table><thead><tr><th style="width:40px;">#</th><th>Type Name</th><th>Options</th><th style="width:120px;"></th></tr></thead>
+        <tbody>
+          ${vtypes.length ? vtypes.map((vt, i) => `<tr>
+            <td>${i + 1}</td>
+            <td><b>${escapeHtml(vt.name)}</b></td>
+            <td>${(vt.options || []).map(o => `<span class="chip chip-sm">${escapeHtml(o)}</span>`).join(' ')}</td>
+            <td class="flex gap">
+              <button class="btn btn-ghost btn-sm" data-edit-vt="${vt.id}">Edit</button>
+              <button class="btn btn-ghost btn-sm" style="color:var(--danger)" data-del-vt="${vt.id}">Del</button>
+            </td>
+          </tr>`).join('') : `<tr><td colspan="4" class="empty-state">No variant types yet. Add one above or use a preset.</td></tr>`}
+        </tbody>
+      </table>
+    </div>`;
+
+  $('vt-add-btn').addEventListener('click', () => openVariantTypeModal());
+  $('vt-add-preset-btn').addEventListener('click', async () => {
+    const idx = $('vt-preset-select').value;
+    if (idx === '') { toast('Select a preset first', 'error'); return; }
+    const preset = PRESET_VARIANT_TYPES[parseInt(idx)];
+    const existing = vtypes.find(vt => vt.name.toLowerCase() === preset.name.toLowerCase());
+    if (existing) {
+      toast(`"${preset.name}" already exists`, 'error'); return;
+    }
+    const { error } = await supabase.from('variant_types').insert({
+      business_id: STATE.business.id,
+      name: preset.name,
+      options: preset.options,
+      sort_order: vtypes.length,
+    });
+    if (error) { toast('Failed: ' + error.message, 'error'); return; }
+    toast(`Added "${preset.name}" with ${preset.options.length} options`, 'success');
+    renderTab();
+  });
+
+  qsa('[data-edit-vt]', body).forEach(btn => btn.addEventListener('click', () => openVariantTypeModal(btn.dataset.editVt)));
+  qsa('[data-del-vt]', body).forEach(btn => btn.addEventListener('click', async () => {
+    if (!confirm('Delete this variant type?')) return;
+    const { error } = await supabase.from('variant_types').delete().eq('id', btn.dataset.delVt);
+    if (error) { toast('Failed: ' + error.message, 'error'); return; }
+    toast('Variant type deleted', 'success');
+    renderTab();
+  }));
+}
+
+async function openVariantTypeModal(vtId) {
+  const editing = !!vtId;
+  let vt = { name: '', options: [] };
+  if (editing) {
+    const { data } = await supabase.from('variant_types').select('*').eq('id', vtId).single();
+    vt = data || vt;
+  }
+
+  openModal(`
+    <div class="modal-title-row"><h3>${editing ? 'Edit' : 'Add'} Variant Type</h3></div>
+    <div class="field"><label>Type Name *</label><input id="vtm-name" value="${escapeHtml(vt.name)}" placeholder="e.g. Size, Color, Weight" /></div>
+    <div class="field"><label>Options (one per line)</label><textarea id="vtm-options" rows="8" placeholder="e.g. Small&#10;Medium&#10;Large&#10;XL">${(vt.options || []).join('\n')}</textarea></div>
+    <p class="help-text">Enter each option on a separate line. These options will appear when creating variants for products.</p>
+    <div class="flex gap" style="margin-top:14px;">
+      <button class="btn btn-secondary btn-block" data-close-modal>Cancel</button>
+      <button class="btn btn-primary btn-block" id="vtm-save">${editing ? 'Save' : 'Add Type'}</button>
+    </div>
+  `, { onMount: () => {
+    $('vtm-save').addEventListener('click', async () => {
+      const name = $('vtm-name').value.trim();
+      if (!name) { toast('Type name is required', 'error'); return; }
+      const options = $('vtm-options').value.split('\n').map(s => s.trim()).filter(Boolean);
+      if (options.length === 0) { toast('Add at least one option', 'error'); return; }
+
+      const payload = {
+        business_id: STATE.business.id,
+        name,
+        options,
+        sort_order: vt.sort_order || 0,
+      };
+
+      if (editing) {
+        const { error } = await supabase.from('variant_types').update(payload).eq('id', vtId);
+        if (error) { toast('Failed: ' + error.message, 'error'); return; }
+      } else {
+        const { error } = await supabase.from('variant_types').insert(payload);
+        if (error) { toast('Failed: ' + error.message, 'error'); return; }
+      }
+      toast(editing ? 'Variant type updated' : 'Variant type added', 'success');
       closeModal(); renderTab();
     });
   }});
