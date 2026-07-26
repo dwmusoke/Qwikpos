@@ -1285,7 +1285,7 @@ async function renderTransfersTab(body) {
             </tbody>
           </table></div>
         `
-            : '<div class="empty-state">No accounts configured. Run schema v7 to seed default accounts.</div>'
+            : '<div class="empty-state">No accounts configured yet. Accounts are auto-created for new businesses.</div>'
         }
       </div>
 
