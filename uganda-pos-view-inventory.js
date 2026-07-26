@@ -900,11 +900,11 @@ function openImportModal() {
                   p_category_id: catId,
                   p_supplier_id: existingProduct.supplier_id,
                   p_unit: row.unit || existingProduct.unit || "pc",
-                  p_cost_price: parseFloat(row.cost_price) || existingProduct.cost_price,
-                  p_selling_price: parseFloat(row.selling_price) || existingProduct.selling_price,
-                  p_wholesale_price: row.wholesale_price ? parseFloat(row.wholesale_price) : existingProduct.wholesale_price,
+                  p_cost_price: parseFloat(cleanNumber(row.cost_price)) || existingProduct.cost_price,
+                  p_selling_price: parseFloat(cleanNumber(row.selling_price)) || existingProduct.selling_price,
+                  p_wholesale_price: row.wholesale_price ? parseFloat(cleanNumber(row.wholesale_price)) : existingProduct.wholesale_price,
                   p_tax_category_code: row.tax_category || existingProduct.tax_category_code || "VAT",
-                  p_reorder_level: parseFloat(row.reorder_level) || existingProduct.reorder_level,
+                  p_reorder_level: parseFloat(cleanNumber(row.reorder_level)) || existingProduct.reorder_level,
                   p_is_active: true,
                   p_brand_id: brandId,
                   p_id: existingProduct.id,
@@ -913,7 +913,7 @@ function openImportModal() {
                 });
                 if (updErr) return { ok: false };
 
-                const stockQty = parseFloat(row.stock) || 0;
+                const stockQty = parseFloat(cleanNumber(row.stock)) || 0;
                 if (stockQty > 0 && STATE.branch) {
                   await supabase.rpc("upsert_product_stock", { p_product_id: existingProduct.id, p_branch_id: STATE.branch.id, p_quantity: stockQty });
                   await supabase.rpc("insert_stock_movement", { p_business_id: STATE.business.id, p_branch_id: STATE.branch.id, p_product_id: existingProduct.id, p_type: "in", p_quantity: stockQty, p_notes: "CSV import (update)", p_created_by: STATE.appUser.id });
@@ -937,11 +937,11 @@ function openImportModal() {
                 p_category_id: catId,
                 p_supplier_id: null,
                 p_unit: row.unit || "pc",
-                p_cost_price: parseFloat(row.cost_price) || 0,
-                p_selling_price: parseFloat(row.selling_price) || 0,
-                p_wholesale_price: row.wholesale_price ? parseFloat(row.wholesale_price) : null,
+                p_cost_price: parseFloat(cleanNumber(row.cost_price)) || 0,
+                p_selling_price: parseFloat(cleanNumber(row.selling_price)) || 0,
+                p_wholesale_price: row.wholesale_price ? parseFloat(cleanNumber(row.wholesale_price)) : null,
                 p_tax_category_code: row.tax_category || "VAT",
-                p_reorder_level: parseFloat(row.reorder_level) || 5,
+                p_reorder_level: parseFloat(cleanNumber(row.reorder_level)) || 5,
                 p_is_active: true,
                 p_brand_id: brandId,
                 p_id: null,
@@ -950,7 +950,7 @@ function openImportModal() {
               });
               if (error) return { ok: false };
 
-              const stockQty = parseFloat(row.stock) || 0;
+              const stockQty = parseFloat(cleanNumber(row.stock)) || 0;
               if (stockQty > 0 && STATE.branch) {
                 await supabase.rpc("upsert_product_stock", { p_product_id: product.id, p_branch_id: STATE.branch.id, p_quantity: stockQty });
                 await supabase.rpc("insert_stock_movement", { p_business_id: STATE.business.id, p_branch_id: STATE.branch.id, p_product_id: product.id, p_type: "in", p_quantity: stockQty, p_notes: "CSV import", p_created_by: STATE.appUser.id });
@@ -981,17 +981,23 @@ function openImportModal() {
 function parseCSV(text) {
   const lines = text.split(/\r?\n/).filter((l) => l.trim());
   if (lines.length < 2) return [];
+  const delim = lines[0].includes("\t") ? "\t" : ",";
   const headers = lines[0]
-    .split(",")
+    .split(delim)
     .map((h) => h.trim().toLowerCase().replace(/\s+/g, "_"));
   return lines.slice(1).map((line) => {
-    const values = parseCSVLine(line);
+    const values = delim === "\t" ? line.split("\t").map((v) => v.trim()) : parseCSVLine(line);
     const row = {};
     headers.forEach((h, i) => {
       row[h] = values[i] || "";
     });
     return row;
   });
+}
+
+function cleanNumber(v) {
+  if (typeof v !== "string") return v;
+  return v.replace(/,/g, "");
 }
 
 function parseCSVLine(line) {
