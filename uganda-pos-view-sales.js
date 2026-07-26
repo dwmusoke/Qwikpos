@@ -74,12 +74,26 @@ async function renderSalesListTab(body) {
 
     let query = supabase.from('sales').select('*, sale_items(*), payments(*), cashier:app_users!cashier_id(full_name), customer:customers(name)')
       .eq('business_id', STATE.business.id)
-      .neq('status', 'voided').neq('sale_type', 'quotation')
+      .neq('status', 'voided')
       .gte('created_at', `${from}T00:00:00`).lte('created_at', `${to}T23:59:59`)
       .order('created_at', { ascending: false });
     if (status) query = query.eq('payment_status', status);
 
-    const { data: sales } = await query;
+    let { data: sales, error: salesErr } = await query;
+
+    // Fallback: if joins fail, try simple select
+    if (salesErr) {
+      console.warn('Sales join query failed, trying simple query:', salesErr);
+      let simpleQuery = supabase.from('sales').select('*')
+        .eq('business_id', STATE.business.id)
+        .neq('status', 'voided')
+        .gte('created_at', `${from}T00:00:00`).lte('created_at', `${to}T23:59:59`)
+        .order('created_at', { ascending: false });
+      if (status) simpleQuery = simpleQuery.eq('payment_status', status);
+      const simpleResult = await simpleQuery;
+      sales = simpleResult.data;
+      if (simpleResult.error) console.warn('Simple sales query also failed:', simpleResult.error);
+    }
     lastSales = sales || [];
 
     sState.total = lastSales.length;
