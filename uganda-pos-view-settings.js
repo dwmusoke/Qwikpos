@@ -70,6 +70,13 @@ export async function renderSettings(root) {
         time they appear on a submitted invoice.</p>
     </div>
 
+    <div class="card" id="efris-s2s-card">
+      <div class="card-title">Direct URA S2S Integration</div>
+      <p class="help-text" style="margin-bottom:14px;">Connect directly to URA's EFRIS System-to-System API — no third-party middleware needed.
+        Your RSA keys are generated server-side and never exposed. After setup, register your device number with URA and you're live.</p>
+      <div id="efris-s2s-content"><div class="empty-state">Loading credentials…</div></div>
+    </div>
+
     <div class="card">
       <div class="card-title">Notifications</div>
       <p class="help-text">Get yesterday's sales, top seller and low-stock count as an SMS every morning, sent via
@@ -432,6 +439,9 @@ export async function renderSettings(root) {
     Object.assign(STATE.business, { daily_summary_enabled: enabled, daily_summary_phone: phone, daily_summary_channel: channel });
     toast('Notification settings saved', 'success');
   });
+
+  // ── EFRIS Direct S2S Credentials ──
+  loadEfrisS2sCredentials($('efris-s2s-content'));
 
   qsa('[data-save-rate]').forEach((btn) => btn.addEventListener('click', async () => {
     const code = btn.dataset.saveRate;
@@ -857,6 +867,86 @@ export async function renderSettings(root) {
     STATE.branches = branches || [];
     renderSettings(root);
   }));
+
+  // ── EFRIS Direct S2S credential loader ──
+  async function loadEfrisS2sCredentials(el) {
+    if (!el) return;
+    try {
+      const { data, error } = await supabase.functions.invoke('efris-setup', {
+        body: { action: 'list' },
+      });
+      if (error) { el.innerHTML = `<div class="empty-state" style="padding:20px;">Error loading credentials: ${escapeHtml(error.message)}</div>`; return; }
+      const creds = data?.credentials || [];
+
+      el.innerHTML = `
+        <div style="margin-bottom:14px;">
+          <button class="btn btn-primary btn-sm" id="s2s-create-btn">+ Generate RSA Keys & Create Credential</button>
+        </div>
+        ${creds.length ? `
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>TIN</th><th>Device No.</th><th>Mode</th><th>Status</th><th>Last Used</th><th></th></tr></thead>
+            <tbody>
+              ${creds.map(c => `
+              <tr>
+                <td><code>${escapeHtml(c.tin)}</code></td>
+                <td>${escapeHtml(c.device_number || '—')}</td>
+                <td><span class="badge ${c.efris_mode === 'live' ? 'badge-green' : 'badge-yellow'}">${c.efris_mode}</span></td>
+                <td><span class="badge ${c.status === 'active' ? 'badge-green' : c.status === 'pending' ? 'badge-yellow' : 'badge-red'}">${c.status}</span></td>
+                <td style="font-size:12px;">${c.last_used_at ? new Date(c.last_used_at).toLocaleDateString() : 'Never'}</td>
+                <td>
+                  <button class="btn btn-secondary btn-sm" data-s2s-edit="${c.id}" data-device="${c.device_number || ''}">Edit</button>
+                  <button class="btn btn-ghost btn-sm" data-s2s-delete="${c.id}">Delete</button>
+                </td>
+              </tr>`).join('')}
+            </tbody>
+          </table>
+        </div>
+        <p class="help-text" style="margin-top:8px;">RSA 2048-bit keys are generated server-side. The private key never leaves the edge function.</p>
+        ` : '<div class="empty-state" style="padding:16px;">No direct URA credentials yet. Click the button above to get started.</div>'}
+      `;
+
+      // Create credential
+      el.querySelector('#s2s-create-btn')?.addEventListener('click', async () => {
+        const tin = STATE.business.tin || prompt('Enter your URA TIN (10 digits):');
+        if (!tin?.trim()) { toast('TIN is required', 'error'); return; }
+        toast('Generating RSA key pair…', 'default');
+        const { data: result, error } = await supabase.functions.invoke('efris-setup', {
+          body: { action: 'create', tin: tin.trim(), efris_mode: 'sandbox' },
+        });
+        if (error) { toast('Error: ' + error.message, 'error'); return; }
+        toast('Credential created! Register your device with URA next.', 'success', 5000);
+        loadEfrisS2sCredentials(el);
+      });
+
+      // Edit (set device number)
+      el.querySelectorAll('[data-s2s-edit]').forEach(btn => btn.addEventListener('click', async () => {
+        const id = btn.dataset.s2sEdit;
+        const currentDevice = btn.dataset.device || '';
+        const deviceNo = prompt('Device Number (assigned by URA after device registration):', currentDevice);
+        if (deviceNo === null) return;
+        const { error } = await supabase.functions.invoke('efris-setup', {
+          body: { action: 'update', credential_id: id, device_number: deviceNo.trim() || null },
+        });
+        if (error) { toast('Error: ' + error.message, 'error'); return; }
+        toast('Device number saved', 'success');
+        loadEfrisS2sCredentials(el);
+      }));
+
+      // Delete
+      el.querySelectorAll('[data-s2s-delete]').forEach(btn => btn.addEventListener('click', async () => {
+        if (!confirm('Delete this credential and all cached keys?')) return;
+        const { error } = await supabase.functions.invoke('efris-setup', {
+          body: { action: 'delete', credential_id: btn.dataset.s2sDelete },
+        });
+        if (error) { toast('Error: ' + error.message, 'error'); return; }
+        toast('Credential deleted', 'success');
+        loadEfrisS2sCredentials(el);
+      }));
+    } catch (e) {
+      el.innerHTML = `<div class="empty-state" style="padding:20px;">S2S integration requires the edge functions to be deployed. See README.</div>`;
+    }
+  }
 
   function applyPreview(color) {
     const root = document.documentElement;
