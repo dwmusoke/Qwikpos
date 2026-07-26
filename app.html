@@ -326,28 +326,38 @@
       <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
 
       <aside class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+          <img src="./uganda-pos-icon.svg" alt="logo" class="sidebar-logo" id="sidebar-logo" />
+          <div class="sidebar-workspace">
+            <div class="sidebar-business" id="sidebar-business-name">Qwickpos</div>
+            <div class="sidebar-branch" id="sidebar-branch-name">Main Branch</div>
+          </div>
+        </div>
         <div class="sidebar-inner">
         <button class="nav-link" data-route="dashboard" data-tooltip="Dashboard">
           <span class="icon">🏠</span>
           <span class="nav-label">Dashboard</span>
         </button>
 
-        <!-- Sales -->
+        <div class="nav-section">Sales</div>
+
+        <!-- Sales Module -->
         <div class="nav-module">
           <button class="nav-link nav-parent" data-module="sales" data-tooltip="Sales">
-            <span class="icon">💰</span>
+            <span class="icon">💵</span>
             <span class="nav-label">Sales</span>
             <span class="nav-chevron">▶</span>
           </button>
           <div class="nav-children">
+            <div class="flyout-header">💰 Sales</div>
+            <button class="nav-link" data-route="sales"><span class="icon">📊</span> Sales</button>
             <button class="nav-link" data-route="pos"><span class="icon">🛒</span> POS</button>
             <button class="nav-link" data-route="orders"><span class="icon">📋</span> Orders</button>
             <button class="nav-link" data-route="quotations"><span class="icon">📄</span> Quotations</button>
-            <button class="nav-link" data-route="sales"><span class="icon">📊</span> Sales History</button>
           </div>
         </div>
 
-        <!-- Inventory -->
+        <!-- Inventory Module -->
         <div class="nav-module">
           <button class="nav-link nav-parent" data-module="inventory" data-tooltip="Inventory">
             <span class="icon">📦</span>
@@ -355,6 +365,7 @@
             <span class="nav-chevron">▶</span>
           </button>
           <div class="nav-children">
+            <div class="flyout-header">📦 Inventory</div>
             <button class="nav-link" data-route="products"><span class="icon">🏷️</span> Products</button>
             <button class="nav-link" data-route="inventory"><span class="icon">📊</span> Stock <span class="nav-badge hidden" id="low-stock-badge">0</span></button>
             <button class="nav-link" data-route="purchases"><span class="icon">🛒</span> Purchases</button>
@@ -362,7 +373,9 @@
           </div>
         </div>
 
-        <!-- CRM -->
+        <div class="nav-section">CRM</div>
+
+        <!-- CRM Module -->
         <div class="nav-module">
           <button class="nav-link nav-parent" data-module="crm" data-tooltip="CRM">
             <span class="icon">🤝</span>
@@ -370,13 +383,16 @@
             <span class="nav-chevron">▶</span>
           </button>
           <div class="nav-children">
+            <div class="flyout-header">🤝 CRM</div>
             <button class="nav-link" data-route="customers"><span class="icon">👤</span> Customers</button>
             <button class="nav-link" data-route="leads"><span class="icon">💼</span> Leads</button>
             <button class="nav-link" data-route="deliveries"><span class="icon">🚚</span> Deliveries</button>
           </div>
         </div>
 
-        <!-- Accounting -->
+        <div class="nav-section">Finance</div>
+
+        <!-- Accounting Module -->
         <div class="nav-module">
           <button class="nav-link nav-parent" data-module="accounting" data-tooltip="Accounting">
             <span class="icon">📒</span>
@@ -384,13 +400,16 @@
             <span class="nav-chevron">▶</span>
           </button>
           <div class="nav-children">
+            <div class="flyout-header">📒 Accounting</div>
             <button class="nav-link" data-route="accounting"><span class="icon">📊</span> Ledgers</button>
             <button class="nav-link" data-route="reports"><span class="icon">📈</span> Reports</button>
             <button class="nav-link" data-route="bi"><span class="icon">📊</span> BI &amp; Analytics</button>
           </div>
         </div>
 
-        <!-- HR -->
+        <div class="nav-section">Team</div>
+
+        <!-- HR Module -->
         <div class="nav-module">
           <button class="nav-link nav-parent" data-module="hr" data-tooltip="HR">
             <span class="icon">👔</span>
@@ -398,24 +417,28 @@
             <span class="nav-chevron">▶</span>
           </button>
           <div class="nav-children">
+            <div class="flyout-header">👔 HR</div>
             <button class="nav-link" data-route="hrm"><span class="icon">👥</span> Employees</button>
           </div>
         </div>
 
-        <!-- Communication -->
+        <!-- Communication Module -->
         <div class="nav-module">
           <button class="nav-link nav-parent" data-module="communication" data-tooltip="Communication">
-            <span class="icon">💬</span>
+            <span class="icon">📡</span>
             <span class="nav-label">Communication</span>
             <span class="nav-chevron">▶</span>
           </button>
           <div class="nav-children">
+            <div class="flyout-header">📡 Communication</div>
             <button class="nav-link" data-route="chat"><span class="icon">💬</span> Chat</button>
             <button class="nav-link" data-route="notifications"><span class="icon">🔔</span> Notifications <span class="nav-badge hidden" id="notif-sidebar-badge">0</span></button>
           </div>
         </div>
 
-        <!-- Compliance -->
+        <div class="nav-section">Compliance</div>
+
+        <!-- Compliance Module -->
         <div class="nav-module">
           <button class="nav-link nav-parent" data-module="compliance" data-tooltip="Compliance">
             <span class="icon">✅</span>
@@ -423,12 +446,15 @@
             <span class="nav-chevron">▶</span>
           </button>
           <div class="nav-children">
+            <div class="flyout-header">✅ Compliance</div>
             <button class="nav-link" data-route="efris"><span class="icon">🏛️</span> EFRIS <span class="nav-badge hidden" id="efris-badge">0</span></button>
             <button class="nav-link" data-route="audit"><span class="icon">📋</span> Audit</button>
           </div>
         </div>
 
-        <!-- Administration -->
+        <div class="nav-section">Administration</div>
+
+        <!-- Administration Module -->
         <div class="nav-module">
           <button class="nav-link nav-parent" data-module="admin" data-tooltip="Administration">
             <span class="icon">⚙️</span>
@@ -436,6 +462,7 @@
             <span class="nav-chevron">▶</span>
           </button>
           <div class="nav-children">
+            <div class="flyout-header">⚙️ Administration</div>
             <button class="nav-link" data-route="settings"><span class="icon">🔧</span> Settings</button>
             <button class="nav-link" data-route="templates"><span class="icon">📄</span> Templates</button>
             <button class="nav-link" data-route="coupons"><span class="icon">🎫</span> Coupons</button>
@@ -452,27 +479,62 @@
           <div class="offline-pill" id="offline-pill">
             <span class="dot"></span> Offline — sales will sync
           </div>
+          <button class="btn btn-secondary btn-block btn-sm" id="logout-btn">
+            Log out
+          </button>
         </div>
       </aside>
 
       <div class="main">
         <header class="topbar">
           <div class="topbar-left">
-            <button class="menu-btn" id="menu-btn">☰</button>
-            <button class="sidebar-collapse-btn" id="sidebar-collapse-btn" title="Toggle sidebar">◀</button>
             <div class="logo-wrap"><img src="./uganda-pos-icon.svg" alt="logo" id="topbar-logo" /></div>
             <div class="brand-text">
               <div class="business-name" id="topbar-business-name">Qwickpos</div>
               <div class="branch-sub" id="topbar-branch-name">Main Branch</div>
             </div>
+            <div class="topbar-divider"></div>
+            <button class="menu-btn" id="menu-btn">☰</button>
+            <button class="sidebar-collapse-btn" id="sidebar-collapse-btn" title="Toggle sidebar">◀</button>
           </div>
           <div class="topbar-center" id="page-title">Dashboard</div>
           <div class="topbar-right">
+            <div class="topbar-cta-group" id="topbar-cta-group">
+              <button class="topbar-cta" onclick="navigateTo('pos')" title="Open POS">
+                <span class="cta-icon">🛒</span> New Sale
+              </button>
+              <button class="topbar-cta" onclick="navigateTo('products')" title="Add product">
+                <span class="cta-icon">➕</span> Product
+              </button>
+              <button class="topbar-cta" onclick="navigateTo('customers')" title="Add customer">
+                <span class="cta-icon">👤</span> Customer
+              </button>
+            </div>
             <select
               id="currency-picker"
               class="hidden"
               title="Display currency"
+              style="
+                border-radius: 999px;
+                border: 1px solid var(--border);
+                padding: 6px 10px;
+                background: var(--surface);
+              "
             ></select>
+            <select
+              id="lang-picker"
+              title="Language"
+              style="
+                border-radius: 999px;
+                border: 1px solid var(--border);
+                padding: 6px 10px;
+                background: var(--surface);
+                font-size: 13px;
+              "
+            >
+              <option value="en">EN</option>
+              <option value="lg">LG</option>
+            </select>
             <div class="notif-wrapper" id="notif-wrapper">
               <button class="topbar-btn" id="notif-bell" title="Notifications">
                 🔔
@@ -493,7 +555,6 @@
               </div>
             </div>
             <button class="topbar-btn" id="theme-toggle" title="Toggle theme">🌙</button>
-            <button class="topbar-btn" id="logout-btn" title="Log out">🚪</button>
             <button class="user-chip" id="user-chip">
               <span class="avatar" id="user-avatar">U</span>
               <span>
