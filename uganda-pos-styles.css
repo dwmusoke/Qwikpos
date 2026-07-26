@@ -427,7 +427,7 @@ body.sidebar-expanded .nav-link.active::before {
   border-radius: 0 3px 3px 0;
 }
 
-/* Nav icons — small, transparent background */
+/* Nav icons — brand background */
 .nav-link .icon {
   width: 36px;
   height: 36px;
@@ -435,17 +435,18 @@ body.sidebar-expanded .nav-link.active::before {
   align-items: center;
   justify-content: center;
   text-align: center;
-  font-size: 18px;
+  font-size: 16px;
   flex-shrink: 0;
-  background: transparent;
+  background: var(--brand);
+  color: #fff;
   border-radius: 8px;
-  transition: color var(--dur-fast) var(--ease);
+  transition: background var(--dur-fast) var(--ease);
 }
 .nav-link:hover .icon {
-  color: var(--text);
+  background: var(--brand-dark);
 }
 .nav-link.active .icon {
-  color: var(--brand);
+  background: var(--brand-dark);
 }
 .nav-link.nav-link-locked {
   opacity: 0.40;
@@ -470,9 +471,20 @@ body.sidebar-expanded .sidebar-inner .nav-link.active {
 
 /* Expanded child nav items */
 body.sidebar-expanded .sidebar-inner .nav-children .nav-link .icon {
-  width: 36px;
-  height: 36px;
-  font-size: 16px;
+  width: 30px;
+  height: 30px;
+  font-size: 14px;
+  background: var(--brand-light);
+  color: var(--brand);
+  border-radius: 6px;
+}
+body.sidebar-expanded .sidebar-inner .nav-children .nav-link:hover .icon {
+  background: var(--brand);
+  color: #fff;
+}
+body.sidebar-expanded .sidebar-inner .nav-children .nav-link.active .icon {
+  background: var(--brand);
+  color: #fff;
 }
 
 .nav-label {
@@ -626,11 +638,14 @@ body:not(.sidebar-expanded) .nav-children .nav-link {
   transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
 }
 body:not(.sidebar-expanded) .nav-children .nav-link .icon {
-  width: 36px;
-  height: 36px;
+  width: 30px;
+  height: 30px;
   text-align: center;
-  font-size: 16px;
+  font-size: 14px;
   flex-shrink: 0;
+  background: var(--brand-light);
+  color: var(--brand);
+  border-radius: 6px;
 }
 body:not(.sidebar-expanded) .nav-children .nav-link:hover {
   background: var(--surface-2);
