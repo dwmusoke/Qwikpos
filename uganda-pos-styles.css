@@ -369,74 +369,11 @@ body.sidebar-expanded .sidebar {
   box-shadow: var(--shadow-md);
 }
 
-/* ── Sidebar header — workspace info ── */
-.sidebar-header {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 12px 14px;
-  border-bottom: 1px solid var(--border);
-  cursor: default;
-  flex-shrink: 0;
-}
-.sidebar-logo {
-  width: 32px;
-  height: 32px;
-  border-radius: 8px;
-  flex-shrink: 0;
-}
-.sidebar-workspace {
-  min-width: 0;
-  overflow: hidden;
-}
-.sidebar-business {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  line-height: 1.3;
-}
-.sidebar-branch {
-  font-size: 11px;
-  color: var(--text-muted);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  line-height: 1.3;
-}
-
-/* Collapsed sidebar: hide workspace text, keep logo */
-body:not(.sidebar-expanded) .sidebar-workspace {
-  display: none;
-}
-body:not(.sidebar-expanded) .sidebar-header {
-  justify-content: center;
-  padding: 12px 0;
-}
-
 /* ── Sidebar scrollbar ── */
 .sidebar::-webkit-scrollbar { width: 4px; }
 .sidebar::-webkit-scrollbar-track { background: transparent; }
 .sidebar::-webkit-scrollbar-thumb { background: var(--brand); border-radius: 4px; }
 .sidebar { scrollbar-width: thin; scrollbar-color: var(--brand) transparent; }
-
-/* ── Sidebar inner — sits directly on brand bg ── */
-/* ── Nav section header ── */
-.nav-section {
-  font-size: 10.5px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--text-muted);
-  padding: 14px 12px 4px;
-  user-select: none;
-  pointer-events: none;
-}
-body.sidebar-expanded .nav-section:first-of-type {
-  padding-top: 2px;
-}
 
 .sidebar-inner {
   padding: 6px 8px;
@@ -518,11 +455,6 @@ body.sidebar-expanded .nav-link.active::before {
   margin-left: auto;
   font-size: 10px;
   opacity: 0.5;
-}
-
-/* Hide section headers in collapsed sidebar */
-body:not(.sidebar-expanded) .nav-section {
-  display: none;
 }
 
 /* ── Expanded state ── */
@@ -675,29 +607,6 @@ body:not(.sidebar-expanded) .nav-module:hover .nav-children {
   opacity: 1;
   visibility: visible;
   pointer-events: auto;
-}
-
-/* Hide flyout headers in expanded sidebar (they're for collapsed flyout only) */
-body.sidebar-expanded .nav-children .flyout-header { display: none; }
-
-/* Flyout section header */
-body:not(.sidebar-expanded) .nav-children .flyout-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 10px 4px;
-  margin-bottom: 2px;
-  font-size: 10.5px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--text-muted);
-  border-bottom: 1px solid var(--border);
-  position: sticky;
-  top: 0;
-  background: var(--surface);
-  border-radius: var(--radius-xs) var(--radius-xs) 0 0;
-  z-index: 1;
 }
 
 body:not(.sidebar-expanded) .nav-children .nav-link {
