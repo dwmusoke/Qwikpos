@@ -907,93 +907,96 @@ function openImportModal() {
         const total = lines.length - 1;
         let count = 0;
         let failed = 0;
-        for (let i = 1; i < lines.length; i++) {
-          const cols = lines[i].split(',');
-          const name = cols[nameIdx]?.trim();
-          const price = parseFloat(cols[priceIdx]);
-          if (!name || isNaN(price)) { failed++; btn.textContent = `Importing… ${count}/${total} (${failed} skipped)`; continue; }
 
-          const rawSku = cols[headers.indexOf('sku')]?.trim() || '';
-          const rawBarcode = cols[headers.indexOf('barcode')]?.trim() || '';
+        const BATCH = 10;
+        for (let i = 1; i < lines.length; i += BATCH) {
+          const batch = lines.slice(i, i + BATCH);
+          const results = await Promise.allSettled(batch.map(async (line) => {
+            const cols = line.split(',');
+            const name = cols[nameIdx]?.trim();
+            const price = parseFloat(cols[priceIdx]);
+            if (!name || isNaN(price)) return { ok: false };
 
-          // Dedup: check if product already exists by SKU or name
-          let existingProduct = null;
-          if (rawSku && existingBySku.has(rawSku.toLowerCase())) {
-            existingProduct = existingBySku.get(rawSku.toLowerCase());
-          } else if (existingByName.has(name.toLowerCase())) {
-            existingProduct = existingByName.get(name.toLowerCase());
-          }
+            const rawSku = cols[headers.indexOf('sku')]?.trim() || '';
+            const rawBarcode = cols[headers.indexOf('barcode')]?.trim() || '';
 
-          const rawCat = cols[headers.indexOf('category')]?.trim() || '';
-          const catId = rawCat ? STATE.categories.find((c) => c.name.toLowerCase() === rawCat.toLowerCase())?.id || null : null;
-
-          const rawBrand = cols[headers.indexOf('brand')]?.trim() || '';
-          const brandId = rawBrand ? brands.find((b) => b.name.toLowerCase() === rawBrand.toLowerCase())?.id || null : null;
-
-          if (existingProduct) {
-            // Update existing product instead of creating a duplicate
-            const { error: updErr } = await supabase.rpc('upsert_product', {
-              p_business_id: STATE.business.id,
-              p_name: name,
-              p_sku: rawSku || existingProduct.sku,
-              p_barcode: rawBarcode || existingProduct.barcode,
-              p_description: existingProduct.description,
-              p_category_id: catId || existingProduct.category_id,
-              p_supplier_id: existingProduct.supplier_id,
-              p_unit: cols[headers.indexOf('unit')]?.trim() || existingProduct.unit || 'pc',
-              p_cost_price: parseFloat(cols[headers.indexOf('cost_price')]) || existingProduct.cost_price,
-              p_selling_price: price,
-              p_wholesale_price: parseFloat(cols[headers.indexOf('wholesale_price')]) || existingProduct.wholesale_price,
-              p_tax_category_code: cols[headers.indexOf('tax_category')]?.trim() || existingProduct.tax_category_code || 'STD',
-              p_reorder_level: parseFloat(cols[headers.indexOf('reorder_level')]) || existingProduct.reorder_level,
-              p_is_active: true,
-              p_brand_id: brandId || existingProduct.brand_id,
-              p_id: existingProduct.id,
-              p_expiry_date: cols[headers.indexOf('expiry_date')]?.trim() || existingProduct.expiry_date,
-              p_has_batches: existingProduct.has_batches || false,
-            });
-            if (updErr) { console.warn('CSV import update failed', name, updErr); failed++; btn.textContent = `Importing… ${count}/${total} (${failed} skipped)`; continue; }
-
-            const stockQty = parseFloat(cols[headers.indexOf('stock')]) || 0;
-            if (stockQty > 0 && STATE.branch?.id) {
-              await supabase.rpc('upsert_product_stock', { p_product_id: existingProduct.id, p_branch_id: STATE.branch.id, p_quantity: stockQty });
-              await supabase.rpc('insert_stock_movement', { p_business_id: STATE.business.id, p_branch_id: STATE.branch.id, p_product_id: existingProduct.id, p_type: 'in', p_quantity: stockQty, p_notes: 'CSV import (update)', p_created_by: STATE.appUser?.id });
+            let existingProduct = null;
+            if (rawSku && existingBySku.has(rawSku.toLowerCase())) {
+              existingProduct = existingBySku.get(rawSku.toLowerCase());
+            } else if (existingByName.has(name.toLowerCase())) {
+              existingProduct = existingByName.get(name.toLowerCase());
             }
 
-            count++;
-            btn.textContent = `Importing… ${count}/${total} (${failed} skipped)`;
-            continue;
+            const rawCat = cols[headers.indexOf('category')]?.trim() || '';
+            const catId = rawCat ? STATE.categories.find((c) => c.name.toLowerCase() === rawCat.toLowerCase())?.id || null : null;
+            const rawBrand = cols[headers.indexOf('brand')]?.trim() || '';
+            const brandId = rawBrand ? brands.find((b) => b.name.toLowerCase() === rawBrand.toLowerCase())?.id || null : null;
+
+            if (existingProduct) {
+              const { error: updErr } = await supabase.rpc('upsert_product', {
+                p_business_id: STATE.business.id,
+                p_name: name,
+                p_sku: rawSku || existingProduct.sku,
+                p_barcode: rawBarcode || existingProduct.barcode,
+                p_description: existingProduct.description,
+                p_category_id: catId || existingProduct.category_id,
+                p_supplier_id: existingProduct.supplier_id,
+                p_unit: cols[headers.indexOf('unit')]?.trim() || existingProduct.unit || 'pc',
+                p_cost_price: parseFloat(cols[headers.indexOf('cost_price')]) || existingProduct.cost_price,
+                p_selling_price: price,
+                p_wholesale_price: parseFloat(cols[headers.indexOf('wholesale_price')]) || existingProduct.wholesale_price,
+                p_tax_category_code: cols[headers.indexOf('tax_category')]?.trim() || existingProduct.tax_category_code || 'STD',
+                p_reorder_level: parseFloat(cols[headers.indexOf('reorder_level')]) || existingProduct.reorder_level,
+                p_is_active: true,
+                p_brand_id: brandId || existingProduct.brand_id,
+                p_id: existingProduct.id,
+                p_expiry_date: cols[headers.indexOf('expiry_date')]?.trim() || existingProduct.expiry_date,
+                p_has_batches: existingProduct.has_batches || false,
+              });
+              if (updErr) return { ok: false };
+
+              const stockQty = parseFloat(cols[headers.indexOf('stock')]) || 0;
+              if (stockQty > 0 && STATE.branch?.id) {
+                await supabase.rpc('upsert_product_stock', { p_product_id: existingProduct.id, p_branch_id: STATE.branch.id, p_quantity: stockQty });
+                await supabase.rpc('insert_stock_movement', { p_business_id: STATE.business.id, p_branch_id: STATE.branch.id, p_product_id: existingProduct.id, p_type: 'in', p_quantity: stockQty, p_notes: 'CSV import (update)', p_created_by: STATE.appUser?.id });
+              }
+              return { ok: true };
+            }
+
+            const { data: product, error } = await supabase.rpc('upsert_product', {
+              p_business_id: STATE.business.id,
+              p_name: name,
+              p_sku: rawSku || null,
+              p_barcode: rawBarcode || null,
+              p_description: null,
+              p_category_id: catId,
+              p_supplier_id: null,
+              p_unit: cols[headers.indexOf('unit')]?.trim() || 'pc',
+              p_cost_price: parseFloat(cols[headers.indexOf('cost_price')]) || 0,
+              p_selling_price: price,
+              p_wholesale_price: parseFloat(cols[headers.indexOf('wholesale_price')]) || null,
+              p_tax_category_code: cols[headers.indexOf('tax_category')]?.trim() || 'STD',
+              p_reorder_level: parseFloat(cols[headers.indexOf('reorder_level')]) || 5,
+              p_is_active: true,
+              p_brand_id: brandId,
+              p_id: null,
+              p_expiry_date: cols[headers.indexOf('expiry_date')]?.trim() || null,
+              p_has_batches: false,
+            });
+            if (error) return { ok: false };
+
+            const stockQty = parseFloat(cols[headers.indexOf('stock')]) || 0;
+            if (stockQty > 0 && STATE.branch?.id && product?.id) {
+              await supabase.rpc('upsert_product_stock', { p_product_id: product.id, p_branch_id: STATE.branch.id, p_quantity: stockQty });
+              await supabase.rpc('insert_stock_movement', { p_business_id: STATE.business.id, p_branch_id: STATE.branch.id, p_product_id: product.id, p_type: 'in', p_quantity: stockQty, p_notes: 'CSV import', p_created_by: STATE.appUser?.id });
+            }
+            return { ok: true };
+          }));
+
+          for (const r of results) {
+            if (r.status === "fulfilled" && r.value?.ok) count++;
+            else failed++;
           }
-
-          const { data: product, error } = await supabase.rpc('upsert_product', {
-            p_business_id: STATE.business.id,
-            p_name: name,
-            p_sku: rawSku || null,
-            p_barcode: rawBarcode || null,
-            p_description: null,
-            p_category_id: catId,
-            p_supplier_id: null,
-            p_unit: cols[headers.indexOf('unit')]?.trim() || 'pc',
-            p_cost_price: parseFloat(cols[headers.indexOf('cost_price')]) || 0,
-            p_selling_price: price,
-            p_wholesale_price: parseFloat(cols[headers.indexOf('wholesale_price')]) || null,
-            p_tax_category_code: cols[headers.indexOf('tax_category')]?.trim() || 'STD',
-            p_reorder_level: parseFloat(cols[headers.indexOf('reorder_level')]) || 5,
-            p_is_active: true,
-            p_brand_id: brandId,
-            p_id: null,
-            p_expiry_date: cols[headers.indexOf('expiry_date')]?.trim() || null,
-            p_has_batches: false,
-          });
-          if (error) { console.warn('CSV import row failed', name, error); failed++; btn.textContent = `Importing… ${count}/${total} (${failed} skipped)`; continue; }
-
-          const stockQty = parseFloat(cols[headers.indexOf('stock')]) || 0;
-          if (stockQty > 0 && STATE.branch?.id && product?.id) {
-            await supabase.rpc('upsert_product_stock', { p_product_id: product.id, p_branch_id: STATE.branch.id, p_quantity: stockQty });
-            await supabase.rpc('insert_stock_movement', { p_business_id: STATE.business.id, p_branch_id: STATE.branch.id, p_product_id: product.id, p_type: 'in', p_quantity: stockQty, p_notes: 'CSV import', p_created_by: STATE.appUser?.id });
-          }
-
-          count++;
           btn.textContent = `Importing… ${count}/${total} (${failed} skipped)`;
         }
         toast(`Imported ${count} product(s) (${failed} skipped/failed)`, count > 0 ? 'success' : 'error');

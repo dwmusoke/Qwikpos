@@ -868,116 +868,100 @@ function openImportModal() {
           let skipped = 0;
           let failed = 0;
 
-          for (const row of parsedRows) {
-            if (!row.name || !row.selling_price) {
-              failed++;
-              continue;
-            }
+          const BATCH = 10;
+          for (let i = 0; i < parsedRows.length; i += BATCH) {
+            const batch = parsedRows.slice(i, i + BATCH);
+            const results = await Promise.allSettled(batch.map(async (row) => {
+              if (!row.name || !row.selling_price) return { ok: false };
 
-            // Dedup: check if product already exists by SKU or name
-            const trimmedName = row.name.trim();
-            const trimmedSku = (row.sku || "").trim();
-            let existingProduct = null;
-            if (trimmedSku && existingBySku.has(trimmedSku.toLowerCase())) {
-              existingProduct = existingBySku.get(trimmedSku.toLowerCase());
-            } else if (existingByName.has(trimmedName.toLowerCase())) {
-              existingProduct = existingByName.get(trimmedName.toLowerCase());
-            }
+              const trimmedName = row.name.trim();
+              const trimmedSku = (row.sku || "").trim();
+              let existingProduct = null;
+              if (trimmedSku && existingBySku.has(trimmedSku.toLowerCase())) {
+                existingProduct = existingBySku.get(trimmedSku.toLowerCase());
+              } else if (existingByName.has(trimmedName.toLowerCase())) {
+                existingProduct = existingByName.get(trimmedName.toLowerCase());
+              }
 
-            if (existingProduct) {
-              // Update existing product instead of creating a duplicate
+              if (existingProduct) {
+                const catId = row.category
+                  ? STATE.categories.find((c) => c.name.toLowerCase() === row.category.toLowerCase())?.id || existingProduct.category_id
+                  : existingProduct.category_id;
+                const brandId = row.brand
+                  ? brandList.find((b) => b.name.toLowerCase() === row.brand.toLowerCase())?.id || existingProduct.brand_id
+                  : existingProduct.brand_id;
+
+                const { error: updErr } = await supabase.rpc("upsert_product", {
+                  p_business_id: STATE.business.id,
+                  p_name: trimmedName,
+                  p_sku: trimmedSku || existingProduct.sku,
+                  p_barcode: row.barcode || existingProduct.barcode,
+                  p_description: existingProduct.description,
+                  p_category_id: catId,
+                  p_supplier_id: existingProduct.supplier_id,
+                  p_unit: row.unit || existingProduct.unit || "pc",
+                  p_cost_price: parseFloat(row.cost_price) || existingProduct.cost_price,
+                  p_selling_price: parseFloat(row.selling_price) || existingProduct.selling_price,
+                  p_wholesale_price: row.wholesale_price ? parseFloat(row.wholesale_price) : existingProduct.wholesale_price,
+                  p_tax_category_code: row.tax_category || existingProduct.tax_category_code || "VAT",
+                  p_reorder_level: parseFloat(row.reorder_level) || existingProduct.reorder_level,
+                  p_is_active: true,
+                  p_brand_id: brandId,
+                  p_id: existingProduct.id,
+                  p_expiry_date: row.expiry_date || existingProduct.expiry_date,
+                  p_has_batches: existingProduct.has_batches || false,
+                });
+                if (updErr) return { ok: false };
+
+                const stockQty = parseFloat(row.stock) || 0;
+                if (stockQty > 0 && STATE.branch) {
+                  await supabase.rpc("upsert_product_stock", { p_product_id: existingProduct.id, p_branch_id: STATE.branch.id, p_quantity: stockQty });
+                  await supabase.rpc("insert_stock_movement", { p_business_id: STATE.business.id, p_branch_id: STATE.branch.id, p_product_id: existingProduct.id, p_type: "in", p_quantity: stockQty, p_notes: "CSV import (update)", p_created_by: STATE.appUser.id });
+                }
+                return { ok: true };
+              }
+
               const catId = row.category
-                ? STATE.categories.find(
-                    (c) => c.name.toLowerCase() === row.category.toLowerCase(),
-                  )?.id || existingProduct.category_id
-                : existingProduct.category_id;
-
+                ? STATE.categories.find((c) => c.name.toLowerCase() === row.category.toLowerCase())?.id || null
+                : null;
               const brandId = row.brand
-                ? brandList.find((b) => b.name.toLowerCase() === row.brand.toLowerCase())?.id || existingProduct.brand_id
-                : existingProduct.brand_id;
+                ? brandList.find((b) => b.name.toLowerCase() === row.brand.toLowerCase())?.id || null
+                : null;
 
-              const { error: updErr } = await supabase.rpc("upsert_product", {
+              const { data: product, error } = await supabase.rpc("upsert_product", {
                 p_business_id: STATE.business.id,
                 p_name: trimmedName,
-                p_sku: trimmedSku || existingProduct.sku,
-                p_barcode: row.barcode || existingProduct.barcode,
-                p_description: existingProduct.description,
+                p_sku: trimmedSku || null,
+                p_barcode: row.barcode || null,
+                p_description: null,
                 p_category_id: catId,
-                p_supplier_id: existingProduct.supplier_id,
-                p_unit: row.unit || existingProduct.unit || "pc",
-                p_cost_price: parseFloat(row.cost_price) || existingProduct.cost_price,
-                p_selling_price: parseFloat(row.selling_price) || existingProduct.selling_price,
-                p_wholesale_price: row.wholesale_price ? parseFloat(row.wholesale_price) : existingProduct.wholesale_price,
-                p_tax_category_code: row.tax_category || existingProduct.tax_category_code || "VAT",
-                p_reorder_level: parseFloat(row.reorder_level) || existingProduct.reorder_level,
+                p_supplier_id: null,
+                p_unit: row.unit || "pc",
+                p_cost_price: parseFloat(row.cost_price) || 0,
+                p_selling_price: parseFloat(row.selling_price) || 0,
+                p_wholesale_price: row.wholesale_price ? parseFloat(row.wholesale_price) : null,
+                p_tax_category_code: row.tax_category || "VAT",
+                p_reorder_level: parseFloat(row.reorder_level) || 5,
                 p_is_active: true,
                 p_brand_id: brandId,
-                p_id: existingProduct.id,
-                p_expiry_date: row.expiry_date || existingProduct.expiry_date,
-                p_has_batches: existingProduct.has_batches || false,
+                p_id: null,
+                p_expiry_date: row.expiry_date || null,
+                p_has_batches: false,
               });
+              if (error) return { ok: false };
 
-              if (updErr) {
-                failed++;
-                continue;
-              }
-
-              // Update stock if provided
               const stockQty = parseFloat(row.stock) || 0;
               if (stockQty > 0 && STATE.branch) {
-                await supabase.rpc("upsert_product_stock", { p_product_id: existingProduct.id, p_branch_id: STATE.branch.id, p_quantity: stockQty });
-                await supabase.rpc("insert_stock_movement", { p_business_id: STATE.business.id, p_branch_id: STATE.branch.id, p_product_id: existingProduct.id, p_type: "in", p_quantity: stockQty, p_notes: "CSV import (update)", p_created_by: STATE.appUser.id });
+                await supabase.rpc("upsert_product_stock", { p_product_id: product.id, p_branch_id: STATE.branch.id, p_quantity: stockQty });
+                await supabase.rpc("insert_stock_movement", { p_business_id: STATE.business.id, p_branch_id: STATE.branch.id, p_product_id: product.id, p_type: "in", p_quantity: stockQty, p_notes: "CSV import", p_created_by: STATE.appUser.id });
               }
+              return { ok: true };
+            }));
 
-              imported++;
-              btn.textContent = `Importing… ${imported}/${parsedRows.length} (updated existing)`;
-              continue;
+            for (const r of results) {
+              if (r.status === "fulfilled" && r.value?.ok) imported++;
+              else failed++;
             }
-
-            const catId = row.category
-              ? STATE.categories.find(
-                  (c) => c.name.toLowerCase() === row.category.toLowerCase(),
-                )?.id || null
-              : null;
-
-            const brandId = row.brand
-              ? brandList.find((b) => b.name.toLowerCase() === row.brand.toLowerCase())?.id || null
-              : null;
-
-            const { data: product, error } = await supabase.rpc("upsert_product", {
-              p_business_id: STATE.business.id,
-              p_name: trimmedName,
-              p_sku: trimmedSku || null,
-              p_barcode: row.barcode || null,
-              p_description: null,
-              p_category_id: catId,
-              p_supplier_id: null,
-              p_unit: row.unit || "pc",
-              p_cost_price: parseFloat(row.cost_price) || 0,
-              p_selling_price: parseFloat(row.selling_price) || 0,
-              p_wholesale_price: row.wholesale_price ? parseFloat(row.wholesale_price) : null,
-              p_tax_category_code: row.tax_category || "VAT",
-              p_reorder_level: parseFloat(row.reorder_level) || 5,
-              p_is_active: true,
-              p_brand_id: brandId,
-              p_id: null,
-              p_expiry_date: row.expiry_date || null,
-              p_has_batches: false,
-            });
-
-            if (error) {
-              failed++;
-              continue;
-            }
-
-            // Set initial stock
-            const stockQty = parseFloat(row.stock) || 0;
-            if (stockQty > 0 && STATE.branch) {
-              await supabase.rpc("upsert_product_stock", { p_product_id: product.id, p_branch_id: STATE.branch.id, p_quantity: stockQty });
-              await supabase.rpc("insert_stock_movement", { p_business_id: STATE.business.id, p_branch_id: STATE.branch.id, p_product_id: product.id, p_type: "in", p_quantity: stockQty, p_notes: "CSV import", p_created_by: STATE.appUser.id });
-            }
-
-            imported++;
             btn.textContent = `Importing… ${imported}/${parsedRows.length}`;
           }
 
