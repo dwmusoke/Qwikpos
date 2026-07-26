@@ -45,6 +45,7 @@ export async function renderSandboxAdmin(root) {
         <h1>Sandbox API — Admin</h1>
         <p>Manage EFRIS Sandbox API keys and monitor usage</p>
       </div>
+      <button class="btn btn-primary" id="sbx-quick-create">+ Quick Create Vendor</button>
     </div>
 
     <div class="kpi-grid">
@@ -79,6 +80,93 @@ export async function renderSandboxAdmin(root) {
       renderTab();
     }),
   );
+
+  $("sbx-quick-create")?.addEventListener("click", () => {
+    openModal(`
+      <div class="modal-title-row"><h3>Quick Create Sandbox Vendor</h3></div>
+      <p style="font-size:13px;color:var(--text-muted);margin-bottom:14px;">Creates a minimal vendor business + API key in one step.</p>
+      <div class="field"><label>Vendor / Business Name</label><input id="qc-name" required placeholder="Acme POS Solutions" /></div>
+      <div class="field-row">
+        <div class="field"><label>Email (optional)</label><input id="qc-email" type="email" placeholder="vendor@example.com" /></div>
+        <div class="field"><label>TIN (optional)</label><input id="qc-tin" placeholder="1000000000" /></div>
+      </div>
+      <div class="field-row">
+        <div class="field"><label>API Tier</label>
+          <select id="qc-tier">
+            <option value="free">Free (100 req/hr)</option>
+            <option value="starter">Starter (500 req/hr)</option>
+            <option value="pro">Pro (2K req/hr)</option>
+          </select>
+        </div>
+        <div class="field"><label>Key Label</label><input id="qc-label" placeholder="Sandbox Key" /></div>
+      </div>
+      <div class="flex gap" style="margin-top:14px">
+        <button class="btn btn-secondary btn-block" data-close-modal>Cancel</button>
+        <button class="btn btn-primary btn-block" id="qc-save">Create Vendor & Key</button>
+      </div>
+    `, {
+      onMount: () => {
+        $("qc-save")?.addEventListener("click", async () => {
+          const name = $("qc-name").value.trim();
+          if (!name) { toast("Vendor name is required", "error"); return; }
+          const email = $("qc-email").value.trim() || null;
+          const tin = $("qc-tin").value.trim() || null;
+          const tier = $("qc-tier").value;
+          const label = $("qc-label").value.trim() || `${name} Sandbox`;
+
+          const limits = { free: { rate_limit: 100, daily_limit: 100 }, starter: { rate_limit: 500, daily_limit: 5000 }, pro: { rate_limit: 2000, daily_limit: 50000 } };
+
+          toast("Creating business…", "default");
+
+          // 1. Create business
+          const { data: biz, error: bizErr } = await supabase
+            .from("businesses")
+            .insert({ name, email, tin, efris_mode: "sandbox", base_currency: "UGX" })
+            .select()
+            .single();
+          if (bizErr) { toast("Business error: " + bizErr.message, "error"); return; }
+
+          // 2. Create main branch
+          await supabase.from("branches").insert({ business_id: biz.id, name: "Main Branch", is_main: true });
+
+          // 3. Create trial subscription (14 days)
+          await supabase.from("subscriptions").insert({
+            business_id: biz.id,
+            status: "trialing",
+            trial_ends_at: new Date(Date.now() + 14 * 86400000).toISOString(),
+          });
+
+          // 4. Generate API key
+          const { data: plainKey, error: keyErr } = await supabase.rpc("create_sandbox_api_key", {
+            p_business_id: biz.id,
+            p_label: label,
+          });
+          if (keyErr) { toast("Key error: " + keyErr.message, "error"); return; }
+
+          // 5. Upgrade tier if not free
+          if (tier !== "free" && plainKey) {
+            const { data: rows } = await supabase.from("sandbox_api_keys").select("id").eq("business_id", biz.id).order("created_at", { ascending: false }).limit(1);
+            if (rows?.length) {
+              await supabase.from("sandbox_api_keys").update({ tier, ...limits[tier] }).eq("id", rows[0].id);
+            }
+          }
+
+          // 6. Show key
+          openModal(`
+            <div class="modal-title-row"><h3>Vendor Created</h3></div>
+            <p style="font-size:13px;margin-bottom:8px;"><b>${escapeHtml(name)}</b> has been created with a 14-day trial.</p>
+            <p style="font-size:13px;color:var(--text-muted);margin-bottom:10px;">Copy this API key now — it <b>will not be shown again</b>.</p>
+            <div style="background:var(--surface-2);padding:12px;border-radius:8px;font-family:monospace;font-size:13px;word-break:break-all;user-select:all;">${escapeHtml(plainKey || "")}</div>
+            <div class="flex gap" style="margin-top:14px">
+              <button class="btn btn-primary btn-block" data-close-modal>Done</button>
+            </div>
+          `);
+
+          renderSandboxAdmin(el.closest("[data-route]") || $("view-root"));
+        });
+      },
+    });
+  });
 }
 
 function renderKeysTab(el, { keys, businesses, bizMap }) {
