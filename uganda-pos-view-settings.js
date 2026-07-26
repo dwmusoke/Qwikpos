@@ -381,9 +381,7 @@ export async function renderSettings(root) {
       base_currency: newCurrency,
     });
     STATE.displayCurrency = newCurrency;
-    document.querySelectorAll('#sidebar-business-name, #topbar-business-name').forEach(el => {
-      el.textContent = STATE.business.name;
-    });
+    $('topbar-business-name').textContent = STATE.business.name;
     toast('Profile saved', 'success');
   });
 
