@@ -303,17 +303,16 @@ function renderVendors(el, d) {
           const planId = $("ab-plan").value;
           const password = $("ab-pw").value;
           if (!bizName || !adminName || !email || password.length < 8) { toast("All fields required (password 8+ chars)", "error"); return; }
-          const { data: authData, error: authErr } = await supabase.auth.admin.createUser({ email, password, email_confirm: true });
-          if (authErr) { toast("Auth error: " + authErr.message, "error"); return; }
-          const { data: business, error: bizErr } = await supabase.from("businesses").insert({ name: bizName, base_currency: currency, primary_phone: phone || null }).select().single();
-          if (bizErr) { toast("Business error: " + bizErr.message, "error"); return; }
-          const { error: branchErr } = await supabase.from("branches").insert({ business_id: business.id, name: "Main Branch", is_main: true });
-          if (branchErr) { toast("Branch error: " + branchErr.message, "error"); return; }
-          const { error: userErr } = await supabase.from("app_users").insert({ id: authData.user.id, business_id: business.id, full_name: adminName, phone: phone || null, role: "admin", is_active: true });
-          if (userErr) { toast("User error: " + userErr.message, "error"); return; }
-          const trialEnd = new Date(); trialEnd.setDate(trialEnd.getDate() + 14);
-          const { error: subErr } = await supabase.from("subscriptions").insert({ business_id: business.id, plan_id: planId, status: "trialing", trial_ends_at: trialEnd.toISOString(), current_period_end: trialEnd.toISOString() });
-          if (subErr) { toast("Sub error: " + subErr.message, "error"); return; }
+          const { data: result, error: rpcErr } = await supabase.rpc("admin_create_business", {
+            p_business_name: bizName,
+            p_admin_name: adminName,
+            p_admin_email: email,
+            p_admin_phone: phone || null,
+            p_base_currency: currency,
+            p_plan_id: planId || null,
+            p_admin_password: password,
+          });
+          if (rpcErr) { toast("Error: " + rpcErr.message, "error"); return; }
           toast("Business created with admin account", "success");
           closeModal();
           document.querySelector('[data-route="admin"]')?.click();
