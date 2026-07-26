@@ -82,14 +82,13 @@ export async function renderSandboxAdmin(root) {
 }
 
 function renderKeysTab(el, { keys, businesses, bizMap }) {
-  if (!keys.length) {
-    el.innerHTML = '<div class="card"><div class="empty-state">No API keys issued yet.</div></div>';
-    return;
-  }
-
   el.innerHTML = `
     <div class="card">
-      <div class="card-title">All API Keys</div>
+      <div class="card-title">
+        <span>All API Keys</span>
+        <button class="btn btn-primary btn-sm" id="sbx-gen-key">+ Generate API Key</button>
+      </div>
+      ${keys.length ? `
       <div class="table-wrap">
         <table>
           <thead><tr><th>Vendor</th><th>Label</th><th>API Key</th><th>Tier</th><th>Rate Limit</th><th>Last Used</th><th>Status</th><th></th></tr></thead>
@@ -111,8 +110,70 @@ function renderKeysTab(el, { keys, businesses, bizMap }) {
             `).join("")}
           </tbody>
         </table>
+      </div>` : '<div class="empty-state">No API keys issued yet. Click "Generate API Key" to create one.</div>'}
+      </div>`;
+
+  $("sbx-gen-key")?.addEventListener("click", () => {
+    openModal(`
+      <div class="modal-title-row"><h3>Generate Sandbox API Key</h3></div>
+      <div class="field">
+        <label>Vendor / Business</label>
+        <select id="sbx-key-biz">${(businesses || []).map((b) => `<option value="${b.id}">${escapeHtml(b.name)}</option>`).join("")}</select>
       </div>
-    </div>`;
+      <div class="field">
+        <label>Label (optional)</label>
+        <input id="sbx-key-label" placeholder="e.g. Prod Test, Dev Staging" />
+      </div>
+      <div class="field">
+        <label>Tier</label>
+        <select id="sbx-key-tier">
+          <option value="free">Free (100 req/hr, 100 invoices/day)</option>
+          <option value="starter">Starter (500 req/hr, 5K invoices/day)</option>
+          <option value="pro">Pro (2K req/hr, 50K invoices/day)</option>
+        </select>
+      </div>
+      <div class="flex gap" style="margin-top:14px">
+        <button class="btn btn-secondary btn-block" data-close-modal>Cancel</button>
+        <button class="btn btn-primary btn-block" id="sbx-key-save">Generate</button>
+      </div>
+    `, {
+      onMount: async () => {
+        $("sbx-key-save")?.addEventListener("click", async () => {
+          const bizId = $("sbx-key-biz").value;
+          const label = $("sbx-key-label").value.trim() || "Sandbox Key";
+          const tier = $("sbx-key-tier").value;
+          if (!bizId) { toast("Select a vendor", "error"); return; }
+
+          const limits = { free: { rate_limit: 100, daily_limit: 100 }, starter: { rate_limit: 500, daily_limit: 5000 }, pro: { rate_limit: 2000, daily_limit: 50000 } };
+
+          const { data: plainKey, error } = await supabase.rpc("create_sandbox_api_key", {
+            p_business_id: bizId,
+            p_label: label,
+          });
+          if (error) { toast("Error: " + error.message, "error"); return; }
+
+          // Upgrade tier if not free
+          if (tier !== "free" && plainKey) {
+            const { data: rows } = await supabase.from("sandbox_api_keys").select("id").eq("business_id", bizId).order("created_at", { ascending: false }).limit(1);
+            if (rows?.length) {
+              await supabase.from("sandbox_api_keys").update({ tier, ...limits[tier] }).eq("id", rows[0].id);
+            }
+          }
+
+          openModal(`
+            <div class="modal-title-row"><h3>API Key Generated</h3></div>
+            <p style="margin-bottom:10px;font-size:13px;">Copy this key now — it <b>will not be shown again</b>.</p>
+            <div style="background:var(--surface-2);padding:12px;border-radius:8px;font-family:monospace;font-size:13px;word-break:break-all;user-select:all;">${escapeHtml(plainKey || "")}</div>
+            <div class="flex gap" style="margin-top:14px">
+              <button class="btn btn-primary btn-block" data-close-modal>Done</button>
+            </div>
+          `);
+
+          renderSandboxAdmin(el.closest("[data-route]") || $("view-root"));
+        });
+      },
+    });
+  });
 
   qsa("[data-toggle-key]", el).forEach((btn) =>
     btn.addEventListener("click", async () => {
