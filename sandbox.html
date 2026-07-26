@@ -3,8 +3,8 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <title>Qwickpos EFRIS Sandbox API — Free Testing for POS & ERP Vendors</title>
-    <meta name="description" content="Free EFRIS sandbox API for Ugandan POS, ERP, and accounting vendors. Test URA e-invoicing integration without a live account. Realistic mock responses." />
+    <title>Qwickpos EFRIS Sandbox API — Free URA E-Invoicing Test Environment</title>
+    <meta name="description" content="Free EFRIS sandbox API for Ugandan POS, ERP, accounting, and inventory systems. Test URA e-invoicing integration without a live account. Works with any business software." />
     <meta name="theme-color" content="#0f6b4a" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -149,9 +149,9 @@
           <span class="method">POST</span> <span class="url">/{TIN}/generate-fiscal-invoice</span><br>
           <span class="header">Authorization: Bearer</span> <span class="dim">sk_sbx_...</span>
         </div>
-        <h1>EFRIS Sandbox API<br>for <span class="accent">Ugandan Vendors</span></h1>
-        <p>Test your POS, ERP, or accounting system's URA EFRIS integration without a live account.
-          Realistic mock responses — FDN numbers, anti-fake codes, QR data.</p>
+        <h1>EFRIS Sandbox API<br>for <span class="accent">Any Business Software</span></h1>
+        <p>Whether you build POS, ERP, accounting, inventory, or invoicing systems — test your URA EFRIS integration
+          without a live account. Works with any software that sends fiscal invoices to URA.</p>
         <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;">
           <a href="#signup" class="sandbox-cta sandbox-cta-primary" id="hero-signup-btn">Get Free API Key →</a>
           <a href="#endpoints" class="sandbox-cta sandbox-cta-secondary">View API Docs</a>
@@ -164,17 +164,22 @@
           <div class="sandbox-feature-card">
             <div class="sandbox-feature-icon">⚡</div>
             <h3>Instant Setup</h3>
-            <p>Sign up, get an API key, and start testing in under 5 minutes. No URA registration required.</p>
+            <p>Sign up, get an API key, and start testing in under 5 minutes. No URA registration or device number required.</p>
           </div>
           <div class="sandbox-feature-card">
             <div class="sandbox-feature-icon">🎯</div>
             <h3>Realistic Responses</h3>
-            <p>Mock FDN numbers, anti-fake codes, QR data, and occasional rejections — just like URA.</p>
+            <p>Mock FDN numbers, anti-fake codes, QR data, and occasional rejections — matches real URA behavior for reliable testing.</p>
+          </div>
+          <div class="sandbox-feature-card">
+            <div class="sandbox-feature-icon">🏢</div>
+            <h3>Multi-Tenant by Design</h3>
+            <p>Each vendor gets their own TIN, API keys, and usage tracking. Test across multiple business scenarios from one account.</p>
           </div>
           <div class="sandbox-feature-card">
             <div class="sandbox-feature-icon">🔌</div>
-            <h3>Same Payload Format</h3>
-            <p>Use the exact same JSON payloads you'd send to EFRIS Simplified or URA direct. No changes needed.</p>
+            <h3>Works With Any System</h3>
+            <p>POS, ERP, accounting, inventory, invoicing — if your software sends fiscal invoices to URA, our sandbox simulates the response.</p>
           </div>
           <div class="sandbox-feature-card">
             <div class="sandbox-feature-icon">📊</div>
@@ -188,8 +193,8 @@
           </div>
           <div class="sandbox-feature-card">
             <div class="sandbox-feature-icon">🚀</div>
-            <h3>Ready for Production</h3>
-            <p>When you're ready to go live, switch to Direct URA S2S or EFRIS Simplified — your payloads already work.</p>
+            <h3>Seamless Production Path</h3>
+            <p>Your sandbox payloads work in production — switch to Direct URA S2S or any EFRIS middleware with zero code changes.</p>
           </div>
         </div>
       </section>
