@@ -944,12 +944,14 @@ export async function flushOfflineEfrisQueue() {
   if (!list.length) return;
   const remaining = [];
   let synced = 0;
+  const isS2S = STATE.business?.efris_provider === 'direct_s2s';
   for (const entry of list) {
     try {
-      const { data, error } = await supabase.functions.invoke(
-        "efris-submit-invoice",
-        { body: { efrisInvoiceId: entry.efrisInvoiceId } },
-      );
+      const fnName = isS2S ? "efris-s2s" : "efris-submit-invoice";
+      const body = isS2S
+        ? { action: "fiscalise_invoice", payload: { efris_invoice_id: entry.efrisInvoiceId } }
+        : { efrisInvoiceId: entry.efrisInvoiceId };
+      const { data, error } = await supabase.functions.invoke(fnName, { body });
       if (error || !data?.success) {
         remaining.push(entry);
       } else {

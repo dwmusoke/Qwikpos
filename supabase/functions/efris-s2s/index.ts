@@ -361,6 +361,85 @@ async function sendToUra(cred: any, interfaceCode: string, content: any, encrypt
 }
 
 // ====================================================================
+// PAYLOAD TRANSFORMATION: EFRIS Simplified → URA Direct T109
+// ====================================================================
+
+/** Convert a middleware-format invoice payload to the direct URA T109 shape */
+function transformToUraFormat(src: any, biz: any, cred: any): any {
+  if (!src) throw new Error("Empty invoice payload");
+
+  const goodsDetails = (src.goodsDetails || []).map((g: any, idx: number) => ({
+    goodsName: g.item || g.goodsName || "",
+    goodsCode: g.itemCode || g.goodsCode || "",
+    qty: String(g.qty || "1"),
+    unitPrice: String(g.unitPrice || "0"),
+    goodsCategoryId: g.goodsCategoryId || g.commodityCategoryId || "",
+    taxRate: g.taxRate || "0.18",
+    taxAmount: g.tax || g.taxAmount || "0",
+    discountFlag: g.discountFlag || "2",
+    measurementUnit: g.unitOfMeasure || g.measurementUnit || "101",
+    orderNumber: g.orderNumber || String(idx),
+    exciseFlag: g.exciseFlag || "2",
+    deemedFlag: g.deemedFlag || "2",
+    barCode: "",
+  }));
+
+  const taxDetails = (src.taxDetails || []).map((t: any) => ({
+    taxCategoryCode: t.taxCategoryCode || "01",
+    taxRate: t.taxRate || "0.18",
+    grossAmount: String(t.grossAmount || "0"),
+    netAmount: String(t.netAmount || "0"),
+    taxAmount: String(t.taxAmount || "0"),
+  }));
+
+  const summary = src.summary || {};
+  const payWay = (src.payWay || []).map((p: any) => ({
+    paymentMode: p.paymentMode || "102",
+    paymentAmount: String(p.paymentAmount || "0"),
+    orderNumber: p.orderNumber || "a",
+  }));
+
+  const deviceNo = cred.device_number || biz.efris_device_no || (biz.tin ? `${biz.tin}_01` : "");
+
+  return {
+    invoice: {
+      sellerDetails: {
+        tin: biz.tin || "",
+        legalName: biz.name || "",
+        businessName: biz.name || "",
+        emailAddress: biz.email || "",
+        telephoneNo: biz.phone || "",
+        referenceNo: src.sellerDetails?.referenceNo || "",
+        isCheckReferenceNo: src.sellerDetails?.isCheckReferenceNo || "0",
+      },
+      basicInformation: {
+        invoiceNo: "",
+        antifakeCode: "",
+        deviceNo,
+        issuedDate: src.basicInformation?.issuedDate || new Date().toISOString().slice(0, 19).replace("T", " "),
+        operator: src.basicInformation?.operator || "admin",
+        currency: src.basicInformation?.currency || "UGX",
+        invoiceType: src.basicInformation?.invoiceType || "1",
+        invoiceKind: src.basicInformation?.invoiceKind || "1",
+        dataSource: src.basicInformation?.dataSource || "103",
+      },
+      buyerDetails: src.buyerDetails || { buyerType: "1", buyerLegalName: "Walk-in Customer" },
+      goodsDetails,
+      taxDetails,
+      summary: {
+        netAmount: String(summary.netAmount || "0"),
+        taxAmount: String(summary.taxAmount || "0"),
+        grossAmount: String(summary.grossAmount || "0"),
+        itemCount: String(summary.itemCount || goodsDetails.length),
+        modeCode: summary.modeCode || "1",
+        remarks: summary.remarks || "Thank you for your business",
+      },
+      payWay: payWay.length ? payWay : [{ paymentMode: "102", paymentAmount: summary.grossAmount || "0", orderNumber: "a" }],
+    },
+  };
+}
+
+// ====================================================================
 // INTERFACE CODES
 // ====================================================================
 
@@ -429,7 +508,7 @@ Deno.serve(async (req) => {
         break;
       }
 
-      // ---- T109: Submit invoice ----
+      // ---- T109: Submit invoice (raw payload) ----
       case "submit_invoice": {
         if (!payload) return json({ success: false, error: "payload required" }, 400, cors);
         const resp = await sendToUra(cred, "T109", payload, true);
@@ -441,6 +520,124 @@ Deno.serve(async (req) => {
           result = { success: true, data: content, returnCode, returnMessage: returnMsg };
         } else {
           result = { success: false, error: returnMsg, returnCode, raw: resp };
+        }
+        await admin.from("efris_credentials").update({ last_used_at: new Date().toISOString() }).eq("id", cred.id);
+        break;
+      }
+
+      // ---- High-level: fiscalise an efris_invoices row via direct S2S ----
+      // Loads the invoice, auto-registers products via T130, transforms
+      // the EFRIS Simplified payload to URA format, submits via T109,
+      // and updates efris_invoices + efris_queue.
+      case "fiscalise_invoice": {
+        const efrisInvoiceId = payload?.efris_invoice_id;
+        if (!efrisInvoiceId) return json({ success: false, error: "efris_invoice_id required" }, 400, cors);
+
+        // Load the staged invoice
+        const { data: invoice, error: invErr } = await admin
+          .from("efris_invoices").select("*").eq("id", efrisInvoiceId).single();
+        if (invErr || !invoice) return json({ success: false, error: "Invoice not found" }, 400, cors);
+        if (invoice.business_id !== appUser.business_id) return json({ success: false, error: "Invoice belongs to another business" }, 403, cors);
+        if (invoice.status === "accepted") return json({ success: true, alreadyProcessed: true }, 200, cors);
+
+        // Load the business
+        const { data: biz } = await admin.from("businesses").select("*").eq("id", appUser.business_id).single();
+        if (!biz?.tin) return json({ success: false, error: "Business TIN not set" }, 400, cors);
+
+        // Auto-register any unregistered products via T130
+        const { data: saleItems } = await admin.from("sale_items").select("product_id").eq("sale_id", invoice.sale_id);
+        const productIds = [...new Set((saleItems || []).map((i: any) => i.product_id).filter(Boolean))];
+        if (productIds.length) {
+          const { data: products } = await admin.from("products").select("*").in("id", productIds);
+          for (const product of products || []) {
+            if (product.efris_registered_at) continue;
+            if (!product.efris_commodity_category_id) {
+              return json({ success: false, error: `"${product.name}" is missing an EFRIS Commodity Category ID — set it in Inventory.` }, 400, cors);
+            }
+            const goodsPayload = [{
+              operationType: "101",
+              goodsName: product.name,
+              goodsCode: product.sku || product.barcode || `PROD-${product.id.slice(0, 8)}`,
+              measureUnit: product.efris_measure_unit || "101",
+              unitPrice: String(product.selling_price ?? 0),
+              currency: "101",
+              commodityCategoryId: product.efris_commodity_category_id,
+              haveExciseTax: "102",
+              havePieceUnit: "102",
+              haveCustomsUnit: "102",
+              stockPrewarning: String(product.reorder_level ?? 0),
+            }];
+            const regResp = await sendToUra(cred, "T130", goodsPayload, true);
+            const regMsg = regResp.returnStateInfo?.returnMessage || "";
+            if (regMsg !== "SUCCESS") {
+              return json({ success: false, error: `Could not register "${product.name}" with EFRIS: ${regMsg}` }, 400, cors);
+            }
+            await admin.from("products").update({ efris_registered_at: new Date().toISOString() }).eq("id", product.id);
+          }
+        }
+
+        // Transform the EFRIS Simplified payload to direct URA T109 format
+        const srcPayload = invoice.payload_json?.invoice || invoice.payload_json;
+        const transformedPayload = transformToUraFormat(srcPayload, biz, cred);
+
+        // Mark as queued
+        await admin.from("efris_invoices").update({ status: "queued" }).eq("id", efrisInvoiceId);
+        await admin.from("efris_queue").update({ status: "processing" }).eq("efris_invoice_id", efrisInvoiceId);
+
+        // Submit via T109
+        const resp = await sendToUra(cred, "T109", transformedPayload, true);
+        const returnMsg = resp.returnStateInfo?.returnMessage || "";
+        const returnCode = resp.returnStateInfo?.returnCode || "";
+        const content = resp.data?.content;
+
+        if (returnMsg === "SUCCESS" && content) {
+          // Parse the decrypted content for fiscal number etc.
+          let fiscalData: any = {};
+          try {
+            const contentStr = typeof content === "string" ? atob(content) : JSON.stringify(content);
+            fiscalData = typeof contentStr === "string" ? JSON.parse(contentStr) : content;
+          } catch { fiscalData = content; }
+
+          const invoiceNo = fiscalData.invoiceNo || fiscalData.invoice_no || "";
+          const antifakeCode = fiscalData.antifakeCode || fiscalData.antifake_code || "";
+          const uraInvoiceId = fiscalData.invoiceId || fiscalData.invoice_id || "";
+
+          await admin.from("efris_invoices").update({
+            status: "accepted",
+            fiscal_invoice_number: invoiceNo || invoice.fiscal_invoice_number,
+            antifake_code: antifakeCode || null,
+            ura_invoice_id: uraInvoiceId || null,
+            response_json: resp,
+            error_message: null,
+            submitted_at: new Date().toISOString(),
+          }).eq("id", efrisInvoiceId);
+          await admin.from("efris_queue").update({ status: "done" }).eq("efris_invoice_id", efrisInvoiceId);
+
+          result = { success: true, invoiceNo, antifakeCode, returnCode };
+        } else {
+          // Handle retry logic
+          const { data: queueEntry } = await admin
+            .from("efris_queue").select("retries, max_retries").eq("efris_invoice_id", efrisInvoiceId).single();
+          const currentRetries = queueEntry?.retries || 0;
+          const maxRetries = queueEntry?.max_retries || 3;
+
+          if (currentRetries < maxRetries) {
+            const backoffMs = 30000 * Math.pow(2, currentRetries);
+            const nextRetryAt = new Date(Date.now() + backoffMs).toISOString();
+            await admin.from("efris_queue").update({
+              status: "pending", last_error: returnMsg, retries: currentRetries + 1, next_retry_at: nextRetryAt,
+            }).eq("efris_invoice_id", efrisInvoiceId);
+            await admin.from("efris_invoices").update({
+              status: "queued", error_message: `Retry ${currentRetries + 1}/${maxRetries}: ${returnMsg}`, response_json: resp,
+            }).eq("id", efrisInvoiceId);
+            result = { success: false, error: returnMsg, retryScheduled: true, nextRetryAt, retriesLeft: maxRetries - currentRetries - 1 };
+          } else {
+            await admin.from("efris_invoices").update({
+              status: "rejected", error_message: returnMsg, response_json: resp, submitted_at: new Date().toISOString(),
+            }).eq("id", efrisInvoiceId);
+            await admin.from("efris_queue").update({ status: "failed", last_error: returnMsg, retries: currentRetries + 1 }).eq("efris_invoice_id", efrisInvoiceId);
+            result = { success: false, error: returnMsg, returnCode };
+          }
         }
         await admin.from("efris_credentials").update({ last_used_at: new Date().toISOString() }).eq("id", cred.id);
         break;

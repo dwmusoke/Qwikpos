@@ -52,11 +52,12 @@ export async function renderSettings(root) {
       <div class="field-row">
         <div class="field"><label>Provider</label>
           <select id="efris-provider">
-            <option value="efris_simplified" ${STATE.business.efris_provider !== 'weaf' ? 'selected' : ''}>EFRIS Simplified</option>
+            <option value="efris_simplified" ${STATE.business.efris_provider === 'efris_simplified' || (!STATE.business.efris_provider || STATE.business.efris_provider === 'weaf') ? 'selected' : ''}>EFRIS Simplified</option>
             <option value="weaf" ${STATE.business.efris_provider === 'weaf' ? 'selected' : ''}>WEAF</option>
+            <option value="direct_s2s" ${STATE.business.efris_provider === 'direct_s2s' ? 'selected' : ''}>Direct URA S2S (no middleware)</option>
           </select>
         </div>
-        <div class="field"><label>API Key</label><input id="efris-api-key" type="password" placeholder="Paste your provider API key" /></div>
+        <div class="field" id="efris-api-key-field"><label>API Key</label><input id="efris-api-key" type="password" placeholder="Paste your provider API key" /></div>
       </div>
       <div class="flex gap" style="align-items:center; margin-bottom:14px;">
         <label style="display:flex; align-items:center; gap:8px; font-size:13.5px;">
@@ -68,6 +69,8 @@ export async function renderSettings(root) {
       <p class="help-text" style="margin-top:8px;">Each product also needs an <b>EFRIS Commodity Category ID</b> before it can be
         fiscalised — set that per product in Inventory. Unregistered products are registered with EFRIS automatically the first
         time they appear on a submitted invoice.</p>
+      <p class="help-text" style="margin-top:6px;"><b>Direct URA S2S:</b> Generate RSA keys in Settings → Direct URA S2S Integration below,
+        register your device with URA, then enable live mode here. No third-party subscription needed.</p>
     </div>
 
     <div class="card" id="efris-s2s-card">
@@ -408,9 +411,13 @@ export async function renderSettings(root) {
     const apiKey = $('efris-api-key').value.trim();
     const liveEnabled = $('efris-live-enabled').checked;
 
-    if (liveEnabled && !apiKey) { toast('Paste your EFRIS provider API key before enabling live mode', 'error'); return; }
+    if (liveEnabled && provider !== 'direct_s2s' && !apiKey) { toast('Paste your EFRIS provider API key before enabling live mode', 'error'); return; }
+    if (liveEnabled && provider === 'direct_s2s') {
+      const { data: hasCreds } = await supabase.from('efris_credentials').select('id').eq('business_id', STATE.business.id).eq('status', 'active').limit(1);
+      if (!hasCreds?.length) { toast('Generate RSA keys in the Direct URA S2S section below first', 'error'); return; }
+    }
 
-    if (apiKey) {
+    if (apiKey && provider !== 'direct_s2s') {
       const { error: credErr } = await supabase.from('efris_provider_credentials')
         .upsert({ business_id: STATE.business.id, provider, api_key: apiKey, is_active: true, updated_at: new Date().toISOString() }, { onConflict: 'business_id' });
       if (credErr) { toast('Failed to save API key: ' + credErr.message, 'error'); return; }
@@ -424,6 +431,16 @@ export async function renderSettings(root) {
     $('efris-api-key').value = '';
     toast('EFRIS provider settings saved', 'success');
   });
+
+  // Show/hide API key field based on provider selection
+  $('efris-provider')?.addEventListener('change', () => {
+    const keyField = $('efris-api-key-field');
+    if (keyField) keyField.style.display = $('efris-provider').value === 'direct_s2s' ? 'none' : '';
+  });
+  // Hide on initial load if already direct_s2s
+  if ($('efris-provider')?.value === 'direct_s2s' && $('efris-api-key-field')) {
+    $('efris-api-key-field').style.display = 'none';
+  }
 
   $('save-summary-btn').addEventListener('click', async () => {
     const enabled = $('summary-enabled').checked;

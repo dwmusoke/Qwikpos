@@ -47,6 +47,7 @@ export async function renderEfris(root) {
       <div class="page-header-info">
         <h1>EFRIS — URA E-Invoicing</h1>
         <p>Mode: <span class="badge ${STATE.business.efris_live_enabled ? "badge-green" : "badge-yellow"}">${STATE.business.efris_live_enabled ? "LIVE" : "SANDBOX"}</span>
+          &nbsp;·&nbsp; Provider: <b>${STATE.business.efris_provider === 'direct_s2s' ? 'Direct URA S2S' : STATE.business.efris_provider === 'weaf' ? 'WEAF' : 'EFRIS Simplified'}</b>
           &nbsp;·&nbsp; TIN: ${escapeHtml(STATE.business.tin || "not set")}
           &nbsp;·&nbsp; Device No: ${escapeHtml(STATE.business.efris_device_no || "not registered")}</p>
       </div>
@@ -173,8 +174,50 @@ async function submitInvoice(invoiceId) {
   return submitInvoiceSimulated(invoiceId);
 }
 
-// ---- LIVE: real submission via the efris-submit-invoice edge function ----
+// ---- LIVE: real submission via the appropriate edge function ----
 async function submitInvoiceLive(invoiceId) {
+  // Route to Direct S2S or middleware-based submission
+  if (STATE.business.efris_provider === 'direct_s2s') {
+    return submitInvoiceS2S(invoiceId);
+  }
+  return submitInvoiceMiddleware(invoiceId);
+}
+
+// ---- DIRECT S2S: submit via efris-s2s edge function (no middleware) ----
+async function submitInvoiceS2S(invoiceId) {
+  toast("Submitting directly to URA (S2S)…", "default", 2500);
+  const { data, error } = await supabase.functions.invoke(
+    "efris-s2s",
+    { body: { action: "fiscalise_invoice", payload: { efris_invoice_id: invoiceId } } },
+  );
+
+  if (error || !data?.success) {
+    if (data?.retryScheduled) {
+      toast(
+        `EFRIS rejected — retry ${data.retriesLeft ? `${data.retriesLeft} left` : "scheduled"}: ${data.error}`,
+        "default",
+        6000,
+      );
+    } else {
+      toast(
+        "EFRIS S2S submission failed: " +
+          (data?.error || error?.message || "unknown error"),
+        "error",
+        8000,
+      );
+    }
+  } else {
+    toast(
+      `EFRIS invoice accepted ✅ FDN: ${data.invoiceNo || ""}`,
+      "success",
+      6000,
+    );
+  }
+  document.querySelector('[data-route="efris"]')?.click();
+}
+
+// ---- MIDDLEWARE: submit via efris-submit-invoice edge function (EFRIS Simplified / WEAF) ----
+async function submitInvoiceMiddleware(invoiceId) {
   toast("Submitting to EFRIS…", "default", 2500);
   const { data, error } = await supabase.functions.invoke(
     "efris-submit-invoice",
