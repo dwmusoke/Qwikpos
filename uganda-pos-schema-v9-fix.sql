@@ -3,6 +3,18 @@
 -- Run this if the table was created without the full schema
 -- =====================================================================
 
+-- Drop legacy api_key column if it exists (we use api_key_hash instead)
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'sandbox_api_keys' AND column_name = 'api_key'
+  ) THEN
+    ALTER TABLE sandbox_api_keys DROP COLUMN api_key;
+    RAISE NOTICE 'Dropped legacy api_key column';
+  END IF;
+END $$;
+
 -- Add api_key_hash if missing
 DO $$
 BEGIN
