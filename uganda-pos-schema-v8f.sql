@@ -11,10 +11,10 @@ create or replace function admin_create_business(
   p_business_name text,
   p_admin_name text,
   p_admin_email text,
+  p_admin_password text,
   p_admin_phone text default null,
   p_base_currency text default 'UGX',
-  p_plan_id uuid default null,
-  p_admin_password text
+  p_plan_id uuid default null
 ) returns jsonb
 language plpgsql security definer as $$
 declare
@@ -139,7 +139,7 @@ begin
 end;
 $$;
 
-grant execute on function admin_create_business(text, text, text, text, text, uuid, text) to authenticated;
+grant execute on function admin_create_business(text, text, text, text, text, text, uuid) to authenticated;
 
 
 -- ═══════════════════════════════════════════════════════════════════════
