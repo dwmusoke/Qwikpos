@@ -122,9 +122,10 @@ async function renderProductListTab(body) {
     qsa('[data-label]', tbody).forEach((b) => b.addEventListener('click', () => openSingleLabelModal(b.dataset.label)));
     qsa('[data-import-csv]', tbody).forEach((b) => b.addEventListener('click', () => openImportModal()));
 
-    let pagBar = tableWrap.querySelector('.pagination-bar');
-    if (!pagBar) { pagBar = document.createElement('div'); tableWrap.after(pagBar); }
-    pagBar.outerHTML = paginationHtml(pState);
+    const card = tableWrap.closest('.card');
+    let existingPag = card.querySelector('.pagination-bar');
+    if (existingPag) existingPag.remove();
+    tableWrap.insertAdjacentHTML('afterend', paginationHtml(pState));
     wirePagination(pState, renderRows);
   }
 }
