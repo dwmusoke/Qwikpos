@@ -314,10 +314,10 @@ function wireShell() {
 }
 
 function updateLogo() {
-  const logoEl = $("sidebar-logo");
-  if (logoEl) {
-    logoEl.src = STATE.business?.logo_url || "./uganda-pos-icon.svg";
-  }
+  const src = STATE.business?.logo_url || "./uganda-pos-icon.svg";
+  document.querySelectorAll(".sidebar-logo, #topbar-logo").forEach(el => {
+    el.src = src;
+  });
 }
 
 function populateUserChip() {
@@ -332,12 +332,20 @@ function populateUserChip() {
   $("user-role").textContent = STATE.appUser.role.replace("_", " ");
 
   if (!STATE.business) {
-    $("sidebar-business-name").textContent = "Platform Admin";
-    $("sidebar-branch-name").textContent = "";
+    document.querySelectorAll("#sidebar-business-name, #topbar-business-name").forEach(el => {
+      el.textContent = "Platform Admin";
+    });
+    document.querySelectorAll("#sidebar-branch-name, #topbar-branch-name").forEach(el => {
+      el.textContent = "";
+    });
     return;
   }
-  $("sidebar-business-name").textContent = STATE.business.name;
-  $("sidebar-branch-name").textContent = STATE.branch?.name || "";
+  document.querySelectorAll("#sidebar-business-name, #topbar-business-name").forEach(el => {
+    el.textContent = STATE.business.name;
+  });
+  document.querySelectorAll("#sidebar-branch-name, #topbar-branch-name").forEach(el => {
+    el.textContent = STATE.branch?.name || "";
+  });
 
   const trialPill = $("trial-pill");
   trialPill.classList.remove("show", "offline-pill-danger");
