@@ -1600,7 +1600,7 @@ tbody tr:hover {
 @media (max-width: 980px) {
   .pos-layout {
     grid-template-columns: 1fr;
-    height: auto;
+    height: 100dvh;
     gap: 0;
   }
   .pos-layout .cart-panel {
@@ -1628,18 +1628,25 @@ tbody tr:hover {
     left: 50%;
     transform: translateX(-50%);
   }
-  .pos-layout .pos-catalog { padding-bottom: 60px; }
+  .pos-layout .pos-catalog {
+    height: 100dvh;
+    overflow: hidden;
+    padding-bottom: 52px;
+  }
 }
 
 .pos-catalog {
   display: flex;
   flex-direction: column;
   min-height: 0;
+  overflow: hidden;
+  position: relative;
 }
 .pos-search-row {
   display: flex;
   gap: 8px;
   margin-bottom: 12px;
+  flex-shrink: 0;
 }
 .pos-search-row input {
   flex: 1;
@@ -1667,6 +1674,9 @@ tbody tr:hover {
   padding-bottom: 10px;
   scroll-snap-type: x proximity;
   -webkit-overflow-scrolling: touch;
+  flex-shrink: 0;
+  position: relative;
+  z-index: 2;
 }
 .category-chips .chip { scroll-snap-align: start; }
 .chip {
@@ -1700,6 +1710,8 @@ tbody tr:hover {
   gap: 10px;
   overflow-y: auto;
   padding-bottom: 12px;
+  flex: 1;
+  min-height: 0;
 }
 @media (max-width: 640px) {
   .product-grid {

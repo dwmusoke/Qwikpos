@@ -30,6 +30,7 @@ let posSaleCurrency = "UGX";
 let posDiscountInput = 0;
 let posSearchTerm = "";
 let posActiveCategory = "all";
+let posActiveBrand = "all";
 let posMode = "sale"; // 'sale' | 'quotation'
 let posBranchId = null; // null = default branch
 let posDelivery = false;
@@ -122,6 +123,11 @@ export async function renderPOS(root) {
           <button class="chip active" data-cat="all">All</button>
           ${STATE.categories.map((c) => `<button class="chip" data-cat="${c.id}">${escapeHtml(c.icon || "")} ${escapeHtml(c.name)}</button>`).join("")}
         </div>
+        ${STATE.brands && STATE.brands.length ? `
+        <div class="category-chips" id="pos-brands" style="padding-top:2px;padding-bottom:8px;">
+          <button class="chip active" data-brand="all">All Brands</button>
+          ${STATE.brands.map((b) => `<button class="chip" data-brand="${b.id}">${escapeHtml(b.name)}</button>`).join("")}
+        </div>` : ""}
         <div class="product-grid" id="pos-product-grid"></div>
       </div>
 
@@ -255,6 +261,15 @@ export async function renderPOS(root) {
       renderProductGrid();
     }),
   );
+  // Brands
+  qsa("#pos-brands .chip").forEach((chip) =>
+    chip.addEventListener("click", () => {
+      posActiveBrand = chip.dataset.brand;
+      qsa("#pos-brands .chip").forEach((c) => c.classList.remove("active"));
+      chip.classList.add("active");
+      renderProductGrid();
+    }),
+  );
   // Clear cart
   $("pos-clear-cart").addEventListener("click", () => {
     STATE.cart = [];
@@ -326,6 +341,8 @@ function renderProductGrid() {
   let list = STATE.products;
   if (posActiveCategory !== "all")
     list = list.filter((p) => p.category_id === posActiveCategory);
+  if (posActiveBrand !== "all")
+    list = list.filter((p) => p.brand_id === posActiveBrand);
   if (posSearchTerm) {
     list = list.filter(
       (p) =>

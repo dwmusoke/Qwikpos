@@ -856,12 +856,81 @@ function openImportModal() {
           const { data: brandRows } = await supabase.from('brands').select('id,name').eq('business_id', STATE.business.id);
           const brandList = brandRows || [];
 
+          // Build lookup of existing products for dedup (by name and sku)
+          const existingByName = new Map();
+          const existingBySku = new Map();
+          STATE.products.forEach((p) => {
+            existingByName.set(p.name.trim().toLowerCase(), p);
+            if (p.sku) existingBySku.set(p.sku.trim().toLowerCase(), p);
+          });
+
           let imported = 0;
+          let skipped = 0;
           let failed = 0;
 
           for (const row of parsedRows) {
             if (!row.name || !row.selling_price) {
               failed++;
+              continue;
+            }
+
+            // Dedup: check if product already exists by SKU or name
+            const trimmedName = row.name.trim();
+            const trimmedSku = (row.sku || "").trim();
+            let existingProduct = null;
+            if (trimmedSku && existingBySku.has(trimmedSku.toLowerCase())) {
+              existingProduct = existingBySku.get(trimmedSku.toLowerCase());
+            } else if (existingByName.has(trimmedName.toLowerCase())) {
+              existingProduct = existingByName.get(trimmedName.toLowerCase());
+            }
+
+            if (existingProduct) {
+              // Update existing product instead of creating a duplicate
+              const catId = row.category
+                ? STATE.categories.find(
+                    (c) => c.name.toLowerCase() === row.category.toLowerCase(),
+                  )?.id || existingProduct.category_id
+                : existingProduct.category_id;
+
+              const brandId = row.brand
+                ? brandList.find((b) => b.name.toLowerCase() === row.brand.toLowerCase())?.id || existingProduct.brand_id
+                : existingProduct.brand_id;
+
+              const { error: updErr } = await supabase.rpc("upsert_product", {
+                p_business_id: STATE.business.id,
+                p_name: trimmedName,
+                p_sku: trimmedSku || existingProduct.sku,
+                p_barcode: row.barcode || existingProduct.barcode,
+                p_description: existingProduct.description,
+                p_category_id: catId,
+                p_supplier_id: existingProduct.supplier_id,
+                p_unit: row.unit || existingProduct.unit || "pc",
+                p_cost_price: parseFloat(row.cost_price) || existingProduct.cost_price,
+                p_selling_price: parseFloat(row.selling_price) || existingProduct.selling_price,
+                p_wholesale_price: row.wholesale_price ? parseFloat(row.wholesale_price) : existingProduct.wholesale_price,
+                p_tax_category_code: row.tax_category || existingProduct.tax_category_code || "VAT",
+                p_reorder_level: parseFloat(row.reorder_level) || existingProduct.reorder_level,
+                p_is_active: true,
+                p_brand_id: brandId,
+                p_id: existingProduct.id,
+                p_expiry_date: row.expiry_date || existingProduct.expiry_date,
+                p_has_batches: existingProduct.has_batches || false,
+              });
+
+              if (updErr) {
+                failed++;
+                continue;
+              }
+
+              // Update stock if provided
+              const stockQty = parseFloat(row.stock) || 0;
+              if (stockQty > 0 && STATE.branch) {
+                await supabase.rpc("upsert_product_stock", { p_product_id: existingProduct.id, p_branch_id: STATE.branch.id, p_quantity: stockQty });
+                await supabase.rpc("insert_stock_movement", { p_business_id: STATE.business.id, p_branch_id: STATE.branch.id, p_product_id: existingProduct.id, p_type: "in", p_quantity: stockQty, p_notes: "CSV import (update)", p_created_by: STATE.appUser.id });
+              }
+
+              imported++;
+              btn.textContent = `Importing… ${imported}/${parsedRows.length} (updated existing)`;
               continue;
             }
 
@@ -877,8 +946,8 @@ function openImportModal() {
 
             const { data: product, error } = await supabase.rpc("upsert_product", {
               p_business_id: STATE.business.id,
-              p_name: row.name.trim(),
-              p_sku: row.sku || null,
+              p_name: trimmedName,
+              p_sku: trimmedSku || null,
               p_barcode: row.barcode || null,
               p_description: null,
               p_category_id: catId,
@@ -913,7 +982,7 @@ function openImportModal() {
           }
 
           toast(
-            `Imported ${imported} products (${failed} failed)`,
+            `Imported ${imported} products (${skipped} updated, ${failed} failed)`,
             imported > 0 ? "success" : "error",
           );
           closeModal();
