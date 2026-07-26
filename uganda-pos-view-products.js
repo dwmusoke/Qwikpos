@@ -856,6 +856,38 @@ function openSingleLabelModal(productId) {
 }
 
 // ── IMPORT CSV MODAL ─────────────────────────────────────────────────
+function parseCSVLine(line) {
+  const result = [];
+  let current = "";
+  let inQuotes = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (inQuotes) {
+      if (ch === '"') {
+        if (i + 1 < line.length && line[i + 1] === '"') {
+          current += '"';
+          i++;
+        } else {
+          inQuotes = false;
+        }
+      } else {
+        current += ch;
+      }
+    } else {
+      if (ch === '"') {
+        inQuotes = true;
+      } else if (ch === ",") {
+        result.push(current.trim());
+        current = "";
+      } else {
+        current += ch;
+      }
+    }
+  }
+  result.push(current.trim());
+  return result;
+}
+
 function openImportModal() {
   openModal(`
     <div class="modal-title-row"><h3>Import Products from CSV</h3></div>
@@ -912,7 +944,7 @@ function openImportModal() {
         for (let i = 1; i < lines.length; i += BATCH) {
           const batch = lines.slice(i, i + BATCH);
           const results = await Promise.allSettled(batch.map(async (line) => {
-            const cols = line.split(',');
+            const cols = parseCSVLine(line);
             const name = cols[nameIdx]?.trim();
             const price = parseFloat(cols[priceIdx]);
             if (!name || isNaN(price)) return { ok: false };
