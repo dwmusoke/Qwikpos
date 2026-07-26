@@ -1232,23 +1232,39 @@ async function renderCashFlowTab(body) {
 // ---------------------------------------------------------------------
 // FUND TRANSFERS TAB
 // ---------------------------------------------------------------------
+async function fetchOrCreateAccounts() {
+  let { data: accounts } = await supabase
+    .from("account_balances")
+    .select("*")
+    .eq("business_id", STATE.business.id)
+    .order("account_name");
+
+  if (!accounts || accounts.length === 0) {
+    await supabase.rpc("seed_default_accounts", {
+      p_business_id: STATE.business.id,
+    });
+    ({ data: accounts } = await supabase
+      .from("account_balances")
+      .select("*")
+      .eq("business_id", STATE.business.id)
+      .order("account_name"));
+  }
+
+  return accounts || [];
+}
+
 async function renderTransfersTab(body) {
-  const [{ data: transfers }, { data: accounts }] = await Promise.all([
+  const [transfersResult, allAccounts] = await Promise.all([
     supabase
       .from("fund_transfers")
       .select("*")
       .eq("business_id", STATE.business.id)
       .order("created_at", { ascending: false })
       .limit(200),
-    supabase
-      .from("account_balances")
-      .select("*")
-      .eq("business_id", STATE.business.id)
-      .order("account_name"),
+    fetchOrCreateAccounts(),
   ]);
 
-  const allTransfers = transfers || [];
-  const allAccounts = accounts || [];
+  const allTransfers = transfersResult.data || [];
   const totalMoved = allTransfers
     .filter((t) => t.status === "completed")
     .reduce((a, t) => a + Number(t.amount || 0), 0);
@@ -1407,22 +1423,17 @@ async function renderTransfersTab(body) {
 // DEPOSITS TAB
 // ---------------------------------------------------------------------
 async function renderDepositsTab(body) {
-  const [{ data: deposits }, { data: accounts }] = await Promise.all([
+  const [depositsResult, allAccounts] = await Promise.all([
     supabase
       .from("deposits")
       .select("*")
       .eq("business_id", STATE.business.id)
       .order("deposit_date", { ascending: false })
       .limit(200),
-    supabase
-      .from("account_balances")
-      .select("*")
-      .eq("business_id", STATE.business.id)
-      .order("account_name"),
+    fetchOrCreateAccounts(),
   ]);
 
-  const allDeposits = deposits || [];
-  const allAccounts = accounts || [];
+  const allDeposits = depositsResult.data || [];
   const totalDeposited = allDeposits
     .filter((d) => d.status === "confirmed")
     .reduce((a, d) => a + Number(d.amount || 0), 0);
