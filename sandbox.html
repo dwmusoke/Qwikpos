@@ -1,0 +1,618 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Qwickpos EFRIS Sandbox API — Free Testing for POS & ERP Vendors</title>
+    <meta name="description" content="Free EFRIS sandbox API for Ugandan POS, ERP, and accounting vendors. Test URA e-invoicing integration without a live account. Realistic mock responses." />
+    <meta name="theme-color" content="#0f6b4a" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="icon" href="./uganda-pos-icon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="./uganda-pos-styles.css" />
+    <style>
+      body { margin: 0; font-family: 'Inter', system-ui, sans-serif; background: #0b1120; color: #e2e8f0; }
+      .sandbox-nav { display: flex; align-items: center; justify-content: space-between; padding: 16px 32px; border-bottom: 1px solid rgba(255,255,255,0.08); }
+      .sandbox-nav-brand { display: flex; align-items: center; gap: 10px; text-decoration: none; color: #fff; font-weight: 700; font-size: 18px; }
+      .sandbox-nav-brand img { width: 28px; height: 28px; }
+      .sandbox-nav-links { display: flex; align-items: center; gap: 20px; }
+      .sandbox-nav-links a { color: rgba(255,255,255,0.6); text-decoration: none; font-size: 14px; font-weight: 500; transition: color 0.2s; }
+      .sandbox-nav-links a:hover { color: #fff; }
+      .sandbox-hero { text-align: center; padding: 80px 24px 60px; background: linear-gradient(135deg, #0b1120 0%, #1a1a3e 50%, #0b1120 100%); }
+      .sandbox-hero h1 { font-size: 48px; font-weight: 800; margin: 0 0 16px; line-height: 1.15; }
+      .sandbox-hero h1 .accent { background: linear-gradient(135deg, #10b981, #3b82f6); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+      .sandbox-hero p { font-size: 18px; color: rgba(255,255,255,0.6); max-width: 600px; margin: 0 auto 32px; line-height: 1.6; }
+      .sandbox-hero-code { display: inline-block; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 16px 24px; font-family: 'JetBrains Mono', monospace; font-size: 14px; color: #10b981; margin-bottom: 32px; text-align: left; }
+      .sandbox-hero-code .dim { color: rgba(255,255,255,0.3); }
+      .sandbox-hero-code .method { color: #3b82f6; font-weight: 600; }
+      .sandbox-hero-code .url { color: #e2e8f0; }
+      .sandbox-hero-code .header { color: #f59e0b; }
+      .sandbox-cta { display: inline-flex; align-items: center; gap: 8px; padding: 14px 28px; border-radius: 10px; font-size: 16px; font-weight: 600; text-decoration: none; transition: all 0.2s; }
+      .sandbox-cta-primary { background: linear-gradient(135deg, #10b981, #059669); color: #fff; box-shadow: 0 4px 20px rgba(16,185,129,0.3); }
+      .sandbox-cta-primary:hover { transform: translateY(-1px); box-shadow: 0 6px 24px rgba(16,185,129,0.4); }
+      .sandbox-cta-secondary { background: rgba(255,255,255,0.06); color: #e2e8f0; border: 1px solid rgba(255,255,255,0.12); }
+      .sandbox-cta-secondary:hover { background: rgba(255,255,255,0.1); }
+      .sandbox-features { padding: 80px 24px; max-width: 1100px; margin: 0 auto; }
+      .sandbox-features h2 { text-align: center; font-size: 32px; font-weight: 700; margin: 0 0 48px; }
+      .sandbox-feature-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 24px; }
+      .sandbox-feature-card { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 16px; padding: 28px; transition: border-color 0.2s; }
+      .sandbox-feature-card:hover { border-color: rgba(16,185,129,0.3); }
+      .sandbox-feature-icon { font-size: 32px; margin-bottom: 12px; }
+      .sandbox-feature-card h3 { font-size: 18px; font-weight: 700; margin: 0 0 8px; }
+      .sandbox-feature-card p { font-size: 14px; color: rgba(255,255,255,0.5); line-height: 1.6; margin: 0; }
+      .sandbox-endpoints { padding: 60px 24px; max-width: 900px; margin: 0 auto; }
+      .sandbox-endpoints h2 { text-align: center; font-size: 28px; font-weight: 700; margin: 0 0 32px; }
+      .endpoint-card { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 20px; margin-bottom: 12px; display: flex; align-items: center; gap: 16px; }
+      .endpoint-method { font-family: monospace; font-size: 12px; font-weight: 700; padding: 4px 10px; border-radius: 6px; min-width: 50px; text-align: center; }
+      .endpoint-method.post { background: rgba(59,130,246,0.15); color: #60a5fa; }
+      .endpoint-method.get { background: rgba(16,185,129,0.15); color: #34d399; }
+      .endpoint-path { font-family: monospace; font-size: 14px; color: #e2e8f0; flex: 1; }
+      .endpoint-desc { font-size: 13px; color: rgba(255,255,255,0.4); }
+      .sandbox-pricing { padding: 60px 24px; text-align: center; }
+      .sandbox-pricing h2 { font-size: 28px; font-weight: 700; margin: 0 0 8px; }
+      .sandbox-pricing .subtitle { color: rgba(255,255,255,0.5); margin: 0 0 32px; }
+      .pricing-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 20px; max-width: 800px; margin: 0 auto; }
+      .pricing-card { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 16px; padding: 28px; text-align: left; }
+      .pricing-card.featured { border-color: #10b981; background: rgba(16,185,129,0.06); }
+      .pricing-card .tier { font-size: 14px; font-weight: 600; color: rgba(255,255,255,0.5); text-transform: uppercase; letter-spacing: 1px; }
+      .pricing-card .price { font-size: 28px; font-weight: 800; margin: 8px 0; }
+      .pricing-card .price small { font-size: 14px; font-weight: 500; color: rgba(255,255,255,0.4); }
+      .pricing-card ul { list-style: none; padding: 0; margin: 16px 0; }
+      .pricing-card li { font-size: 13px; color: rgba(255,255,255,0.5); padding: 4px 0; }
+      .sandbox-footer { border-top: 1px solid rgba(255,255,255,0.08); padding: 32px 24px; text-align: center; color: rgba(255,255,255,0.3); font-size: 13px; }
+      .sandbox-footer a { color: #10b981; text-decoration: none; }
+
+      /* Auth & Dashboard */
+      .auth-wrap { display: flex; align-items: center; justify-content: center; min-height: calc(100vh - 60px); padding: 24px; }
+      .auth-card { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 16px; padding: 32px; width: 100%; max-width: 440px; }
+      .auth-card h2 { font-size: 22px; font-weight: 700; margin: 0 0 4px; }
+      .auth-card .subtitle { font-size: 14px; color: rgba(255,255,255,0.4); margin: 0 0 24px; }
+      .auth-field { margin-bottom: 16px; }
+      .auth-field label { display: block; font-size: 13px; font-weight: 600; color: rgba(255,255,255,0.6); margin-bottom: 6px; }
+      .auth-field input { width: 100%; padding: 10px 14px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.12); background: rgba(255,255,255,0.06); color: #e2e8f0; font-size: 14px; font-family: inherit; box-sizing: border-box; }
+      .auth-field input:focus { outline: none; border-color: #10b981; }
+      .auth-field input::placeholder { color: rgba(255,255,255,0.25); }
+      .auth-error { color: #ef4444; font-size: 13px; margin-top: 8px; display: none; }
+      .auth-link { text-align: center; margin-top: 16px; font-size: 13px; color: rgba(255,255,255,0.4); }
+      .auth-link a { color: #10b981; text-decoration: none; font-weight: 600; }
+
+      /* Dashboard */
+      .dash-wrap { max-width: 1100px; margin: 0 auto; padding: 32px 24px; }
+      .dash-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; flex-wrap: wrap; gap: 12px; }
+      .dash-header h1 { font-size: 24px; font-weight: 700; margin: 0; }
+      .dash-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 16px; margin-bottom: 24px; }
+      .dash-kpi { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 20px; }
+      .dash-kpi .label { font-size: 12px; color: rgba(255,255,255,0.4); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+      .dash-kpi .value { font-size: 28px; font-weight: 800; }
+      .dash-kpi .delta { font-size: 12px; color: rgba(255,255,255,0.35); margin-top: 2px; }
+      .dash-section { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 24px; margin-bottom: 20px; }
+      .dash-section h2 { font-size: 16px; font-weight: 700; margin: 0 0 16px; }
+      .key-row { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid rgba(255,255,255,0.06); }
+      .key-row:last-child { border-bottom: none; }
+      .key-label { flex: 1; font-size: 14px; }
+      .key-tier { font-size: 12px; padding: 2px 8px; border-radius: 4px; background: rgba(59,130,246,0.15); color: #60a5fa; }
+      .key-status { font-size: 12px; padding: 2px 8px; border-radius: 4px; }
+      .key-status.active { background: rgba(16,185,129,0.15); color: #34d399; }
+      .key-status.revoked { background: rgba(239,68,68,0.15); color: #f87171; }
+      .key-date { font-size: 12px; color: rgba(255,255,255,0.3); min-width: 80px; }
+      .usage-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+      .usage-table th { text-align: left; padding: 8px 12px; color: rgba(255,255,255,0.4); font-weight: 600; border-bottom: 1px solid rgba(255,255,255,0.08); }
+      .usage-table td { padding: 8px 12px; border-bottom: 1px solid rgba(255,255,255,0.04); }
+      .usage-table .mono { font-family: monospace; }
+      .btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: 8px; font-size: 13px; font-weight: 600; font-family: inherit; cursor: pointer; border: none; transition: all 0.15s; }
+      .btn-primary { background: #10b981; color: #fff; }
+      .btn-primary:hover { background: #059669; }
+      .btn-secondary { background: rgba(255,255,255,0.08); color: #e2e8f0; border: 1px solid rgba(255,255,255,0.12); }
+      .btn-secondary:hover { background: rgba(255,255,255,0.12); }
+      .btn-danger { background: rgba(239,68,68,0.15); color: #f87171; }
+      .btn-danger:hover { background: rgba(239,68,68,0.25); }
+      .btn-sm { padding: 5px 10px; font-size: 12px; }
+      .btn-block { width: 100%; justify-content: center; }
+      .toast { position: fixed; bottom: 24px; right: 24px; padding: 12px 20px; border-radius: 10px; font-size: 14px; font-weight: 500; z-index: 9999; transform: translateY(100px); opacity: 0; transition: all 0.3s; max-width: 400px; }
+      .toast.show { transform: translateY(0); opacity: 1; }
+      .toast.success { background: #059669; color: #fff; }
+      .toast.error { background: #dc2626; color: #fff; }
+      .toast.info { background: #1e40af; color: #fff; }
+      .hidden { display: none !important; }
+      .empty-state { text-align: center; padding: 32px; color: rgba(255,255,255,0.3); font-size: 14px; }
+      .code-block { background: rgba(0,0,0,0.3); border-radius: 8px; padding: 16px; font-family: monospace; font-size: 13px; overflow-x: auto; margin: 12px 0; color: #10b981; }
+      .tab-bar { display: flex; gap: 4px; margin-bottom: 16px; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 8px; }
+      .tab-btn { padding: 6px 14px; border-radius: 6px; font-size: 13px; font-weight: 500; cursor: pointer; border: none; background: transparent; color: rgba(255,255,255,0.4); transition: all 0.15s; }
+      .tab-btn.active { background: rgba(16,185,129,0.15); color: #34d399; }
+    </style>
+  </head>
+  <body>
+    <!-- NAV -->
+    <nav class="sandbox-nav">
+      <a href="./" class="sandbox-nav-brand">
+        <img src="./uganda-pos-icon.svg" alt="Qwickpos" />
+        <span>Qwickpos Sandbox</span>
+      </a>
+      <div class="sandbox-nav-links" id="nav-links">
+        <a href="#features">Features</a>
+        <a href="#endpoints">API</a>
+        <a href="#pricing">Pricing</a>
+        <a href="#" id="nav-signup">Sign Up</a>
+        <a href="#" id="nav-login" class="btn btn-primary btn-sm" style="color:#fff;">Dashboard</a>
+      </div>
+    </nav>
+
+    <!-- TOAST -->
+    <div class="toast" id="toast"></div>
+
+    <!-- ===================== LANDING ===================== -->
+    <div id="view-landing">
+      <section class="sandbox-hero">
+        <div class="sandbox-hero-code">
+          <span class="dim">// Test EFRIS integration in 5 minutes</span><br>
+          <span class="method">POST</span> <span class="url">/{TIN}/generate-fiscal-invoice</span><br>
+          <span class="header">Authorization: Bearer</span> <span class="dim">sk_sbx_...</span>
+        </div>
+        <h1>EFRIS Sandbox API<br>for <span class="accent">Ugandan Vendors</span></h1>
+        <p>Test your POS, ERP, or accounting system's URA EFRIS integration without a live account.
+          Realistic mock responses — FDN numbers, anti-fake codes, QR data.</p>
+        <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;">
+          <a href="#signup" class="sandbox-cta sandbox-cta-primary" id="hero-signup-btn">Get Free API Key →</a>
+          <a href="#endpoints" class="sandbox-cta sandbox-cta-secondary">View API Docs</a>
+        </div>
+      </section>
+
+      <section class="sandbox-features" id="features">
+        <h2>Why use the Sandbox?</h2>
+        <div class="sandbox-feature-grid">
+          <div class="sandbox-feature-card">
+            <div class="sandbox-feature-icon">⚡</div>
+            <h3>Instant Setup</h3>
+            <p>Sign up, get an API key, and start testing in under 5 minutes. No URA registration required.</p>
+          </div>
+          <div class="sandbox-feature-card">
+            <div class="sandbox-feature-icon">🎯</div>
+            <h3>Realistic Responses</h3>
+            <p>Mock FDN numbers, anti-fake codes, QR data, and occasional rejections — just like URA.</p>
+          </div>
+          <div class="sandbox-feature-card">
+            <div class="sandbox-feature-icon">🔌</div>
+            <h3>Same Payload Format</h3>
+            <p>Use the exact same JSON payloads you'd send to EFRIS Simplified or URA direct. No changes needed.</p>
+          </div>
+          <div class="sandbox-feature-card">
+            <div class="sandbox-feature-icon">📊</div>
+            <h3>Usage Dashboard</h3>
+            <p>Track every API call, response time, and error rate from your vendor dashboard.</p>
+          </div>
+          <div class="sandbox-feature-card">
+            <div class="sandbox-feature-icon">🆓</div>
+            <h3>Free Tier Available</h3>
+            <p>100 requests/hour, 100 invoices/day — enough for development and testing.</p>
+          </div>
+          <div class="sandbox-feature-card">
+            <div class="sandbox-feature-icon">🚀</div>
+            <h3>Ready for Production</h3>
+            <p>When you're ready to go live, switch to Direct URA S2S or EFRIS Simplified — your payloads already work.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="sandbox-endpoints" id="endpoints">
+        <h2>API Endpoints</h2>
+        <div class="endpoint-card">
+          <span class="endpoint-method post">POST</span>
+          <span class="endpoint-path">/{TIN}/register-good-or-service</span>
+          <span class="endpoint-desc">Register a product with EFRIS</span>
+        </div>
+        <div class="endpoint-card">
+          <span class="endpoint-method post">POST</span>
+          <span class="endpoint-path">/{TIN}/generate-fiscal-invoice</span>
+          <span class="endpoint-desc">Submit a fiscal invoice</span>
+        </div>
+        <div class="endpoint-card">
+          <span class="endpoint-method get">GET</span>
+          <span class="endpoint-path">/{TIN}/invoices</span>
+          <span class="endpoint-desc">List submitted invoices</span>
+        </div>
+        <div class="endpoint-card">
+          <span class="endpoint-method get">GET</span>
+          <span class="endpoint-path">/{TIN}/invoices/{id}</span>
+          <span class="endpoint-desc">Get invoice details</span>
+        </div>
+        <div class="code-block" style="margin-top:24px;">
+          <div style="color:rgba(255,255,255,0.3);">// Example: Submit a fiscal invoice</div>
+          curl -X POST https://YOUR_APP/sandbox-api/1234567890/generate-fiscal-invoice \<br>
+          &nbsp;&nbsp;-H "Authorization: Bearer sk_sbx_..." \<br>
+          &nbsp;&nbsp;-H "Content-Type: application/json" \<br>
+          &nbsp;&nbsp;-d '{"invoice": {"sellerDetails": {"tin": "1234567890", ...}, ...}}'
+        </div>
+      </section>
+
+      <section class="sandbox-pricing" id="pricing">
+        <h2>Simple Pricing</h2>
+        <p class="subtitle">Start free, upgrade when you need more.</p>
+        <div class="pricing-grid">
+          <div class="pricing-card">
+            <div class="tier">Free</div>
+            <div class="price">Free <small>forever</small></div>
+            <ul>
+              <li>✅ 100 requests/hour</li>
+              <li>✅ 100 invoices/day</li>
+              <li>✅ 1 API key</li>
+              <li>✅ Email support</li>
+            </ul>
+            <button class="btn btn-secondary btn-block" onclick="showView('signup')">Get Started</button>
+          </div>
+          <div class="pricing-card featured">
+            <div class="tier">Starter</div>
+            <div class="price">UGX 50K <small>/mo</small></div>
+            <ul>
+              <li>✅ 500 requests/hour</li>
+              <li>✅ 5,000 invoices/day</li>
+              <li>✅ 3 API keys</li>
+              <li>✅ Priority support</li>
+            </ul>
+            <button class="btn btn-primary btn-block" onclick="showView('signup')">Start Free Trial</button>
+          </div>
+          <div class="pricing-card">
+            <div class="tier">Professional</div>
+            <div class="price">UGX 200K <small>/mo</small></div>
+            <ul>
+              <li>✅ 2,000 requests/hour</li>
+              <li>✅ 50,000 invoices/day</li>
+              <li>✅ Unlimited keys</li>
+              <li>✅ Dedicated support</li>
+            </ul>
+            <button class="btn btn-secondary btn-block" onclick="showView('signup')">Start Free Trial</button>
+          </div>
+        </div>
+      </section>
+
+      <footer class="sandbox-footer">
+        <p>&copy; 2026 Qwickpos. Built for Ugandan businesses.</p>
+        <p style="margin-top:8px;"><a href="./">← Back to Qwickpos</a></p>
+      </footer>
+    </div>
+
+    <!-- ===================== SIGNUP ===================== -->
+    <div id="view-signup" class="hidden">
+      <div class="auth-wrap">
+        <div class="auth-card">
+          <h2>Create your Sandbox account</h2>
+          <p class="subtitle">Get a free API key in under 2 minutes.</p>
+          <form id="signup-form">
+            <div class="auth-field">
+              <label>Business / Company Name</label>
+              <input id="su-business" required placeholder="Acme POS Ltd" />
+            </div>
+            <div class="auth-field">
+              <label>Contact Name</label>
+              <input id="su-name" required placeholder="John Doe" />
+            </div>
+            <div class="auth-field">
+              <label>Email</label>
+              <input id="su-email" type="email" required placeholder="you@company.com" />
+            </div>
+            <div class="auth-field">
+              <label>Phone (optional)</label>
+              <input id="su-phone" placeholder="+256772123456" />
+            </div>
+            <div class="auth-field">
+              <label>Password</label>
+              <input id="su-password" type="password" required minlength="8" placeholder="Min 8 characters" />
+            </div>
+            <button class="btn btn-primary btn-block" type="submit" id="su-submit">Create Account & Get API Key</button>
+            <div class="auth-error" id="su-error"></div>
+          </form>
+          <p class="auth-link">Already have an account? <a href="#" id="goto-login">Sign in</a></p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===================== LOGIN ===================== -->
+    <div id="view-login" class="hidden">
+      <div class="auth-wrap">
+        <div class="auth-card">
+          <h2>Sign in to Sandbox</h2>
+          <p class="subtitle">Access your API keys and usage dashboard.</p>
+          <form id="login-form">
+            <div class="auth-field">
+              <label>Email</label>
+              <input id="li-email" type="email" required placeholder="you@company.com" />
+            </div>
+            <div class="auth-field">
+              <label>Password</label>
+              <input id="li-password" type="password" required placeholder="••••••••" />
+            </div>
+            <button class="btn btn-primary btn-block" type="submit" id="li-submit">Sign In</button>
+            <div class="auth-error" id="li-error"></div>
+          </form>
+          <p class="auth-link">Don't have an account? <a href="#" id="goto-signup">Sign up free</a></p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===================== DASHBOARD ===================== -->
+    <div id="view-dashboard" class="hidden">
+      <div class="dash-wrap">
+        <div class="dash-header">
+          <div>
+            <h1>Sandbox Dashboard</h1>
+            <p style="color:rgba(255,255,255,0.4);font-size:14px;margin:4px 0 0;" id="dash-business"></p>
+          </div>
+          <div style="display:flex;gap:8px;">
+            <button class="btn btn-secondary btn-sm" id="dash-docs-btn">API Docs</button>
+            <button class="btn btn-secondary btn-sm" id="dash-logout-btn">Sign Out</button>
+          </div>
+        </div>
+
+        <div class="dash-kpis" id="dash-kpis">
+          <div class="dash-kpi"><div class="label">Total Requests</div><div class="value" id="kpi-total">—</div></div>
+          <div class="dash-kpi"><div class="label">Accepted</div><div class="value" id="kpi-accepted">—</div><div class="delta" id="kpi-accept-rate"></div></div>
+          <div class="dash-kpi"><div class="label">Rejected</div><div class="value" id="kpi-rejected">—</div></div>
+          <div class="dash-kpi"><div class="label">Avg Response</div><div class="value" id="kpi-avg-time">—</div></div>
+          <div class="dash-kpi"><div class="label">Today's Calls</div><div class="value" id="kpi-today">—</div></div>
+        </div>
+
+        <div class="dash-section">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+            <h2 style="margin:0;">API Keys</h2>
+            <button class="btn btn-primary btn-sm" id="dash-create-key">+ New Key</button>
+          </div>
+          <div id="dash-keys-list">
+            <div class="empty-state">Loading keys…</div>
+          </div>
+        </div>
+
+        <div class="dash-section">
+          <h2>Recent Usage</h2>
+          <div id="dash-usage-list">
+            <div class="empty-state">Loading usage…</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===================== API KEY REVEAL MODAL ===================== -->
+    <div id="key-modal" class="hidden" style="position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:9999;display:flex;align-items:center;justify-content:center;padding:24px;">
+      <div style="background:#1a1a2e;border:1px solid rgba(255,255,255,0.1);border-radius:16px;padding:32px;max-width:500px;width:100%;">
+        <h3 style="font-size:18px;font-weight:700;margin:0 0 8px;">🔑 Your API Key</h3>
+        <p style="font-size:14px;color:rgba(255,255,255,0.5);margin:0 0 16px;">Copy this key now — it won't be shown again.</p>
+        <div class="code-block" id="key-reveal-value" style="user-select:all;cursor:pointer;font-size:13px;"></div>
+        <div style="display:flex;gap:8px;margin-top:16px;">
+          <button class="btn btn-primary btn-block" id="key-copy-btn">Copy to Clipboard</button>
+          <button class="btn btn-secondary" id="key-close-btn">Done</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===================== SCRIPT ===================== -->
+    <script type="module">
+      // ─── Config ───
+      const SUPABASE_URL = "https://ixntllvgntshbfocwuur.supabase.co";
+      const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml4bnRsbHZnbnRzaGJmb2N3dXVyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTIwNDI1OTgsImV4cCI6MjA2NzYxODU5OH0.G7KNPE7bZ3KzEoMKlbxBqX-9LbCwG0Rq6t0mKQHnM0M";
+      const FN_BASE = `${SUPABASE_URL}/functions/v1`;
+
+      let session = JSON.parse(localStorage.getItem("sbx_session") || "null");
+      let currentKeys = [];
+
+      // ─── Helpers ───
+      function $(id) { return document.getElementById(id); }
+      function showToast(msg, type = "info", ms = 4000) {
+        const t = $("toast");
+        t.textContent = msg;
+        t.className = `toast ${type} show`;
+        setTimeout(() => t.classList.remove("show"), ms);
+      }
+      async function fnInvoke(name, body) {
+        const headers = { "Content-Type": "application/json", "apikey": SUPABASE_ANON };
+        if (session?.access_token) headers["Authorization"] = `Bearer ${session.access_token}`;
+        const res = await fetch(`${FN_BASE}/${name}`, { method: "POST", headers, body: JSON.stringify(body) });
+        return res.json();
+      }
+
+      // ─── View management ───
+      function showView(name) {
+        ["view-landing", "view-signup", "view-login", "view-dashboard"].forEach(v => $(v).classList.add("hidden"));
+        if (name === "landing") $("view-landing").classList.remove("hidden");
+        else if (name === "signup") $("view-signup").classList.remove("hidden");
+        else if (name === "login") $("view-login").classList.remove("hidden");
+        else if (name === "dashboard") $("view-dashboard").classList.remove("hidden");
+      }
+
+      // ─── Check hash for view ───
+      function handleHash() {
+        const h = location.hash.replace("#", "");
+        if (h === "signup") showView("signup");
+        else if (h === "login") showView("login");
+        else if (h === "dashboard" && session) showView("dashboard");
+        else if (h === "dashboard" && !session) showView("login");
+        else showView("landing");
+      }
+
+      // ─── Navigation ───
+      $("nav-signup")?.addEventListener("click", (e) => { e.preventDefault(); location.hash = "#signup"; });
+      $("nav-login")?.addEventListener("click", (e) => { e.preventDefault(); location.hash = session ? "#dashboard" : "#login"; });
+      $("goto-login")?.addEventListener("click", (e) => { e.preventDefault(); location.hash = "#login"; });
+      $("goto-signup")?.addEventListener("click", (e) => { e.preventDefault(); location.hash = "#signup"; });
+      $("hero-signup-btn")?.addEventListener("click", (e) => { e.preventDefault(); location.hash = "#signup"; });
+      $("dash-logout-btn")?.addEventListener("click", () => { session = null; localStorage.removeItem("sbx_session"); location.hash = "#"; });
+      $("dash-docs-btn")?.addEventListener("click", () => { location.href = "./app.html#sandbox-docs"; });
+      window.addEventListener("hashchange", handleHash);
+
+      // ─── Signup ───
+      $("signup-form")?.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        $("su-error").style.display = "none";
+        $("su-submit").disabled = true;
+        $("su-submit").textContent = "Creating account…";
+
+        const data = await fnInvoke("sandbox-vendor", {
+          action: "signup",
+          email: $("su-email").value.trim(),
+          password: $("su-password").value,
+          business_name: $("su-business").value.trim(),
+          contact_name: $("su-name").value.trim(),
+          phone: $("su-phone").value.trim(),
+        });
+
+        $("su-submit").disabled = false;
+        $("su-submit").textContent = "Create Account & Get API Key";
+
+        if (!data.success) {
+          $("su-error").textContent = data.error;
+          $("su-error").style.display = "block";
+          return;
+        }
+
+        // Store session
+        session = data.session;
+        localStorage.setItem("sbx_session", JSON.stringify(session));
+
+        // Show API key reveal
+        $("key-reveal-value").textContent = data.api_key;
+        $("key-modal").classList.remove("hidden");
+        $("key-modal").style.display = "flex";
+
+        showToast("Account created! Save your API key.", "success");
+        loadDashboard();
+        setTimeout(() => { location.hash = "#dashboard"; }, 1000);
+      });
+
+      // ─── Login ───
+      $("login-form")?.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        $("li-error").style.display = "none";
+        $("li-submit").disabled = true;
+        $("li-submit").textContent = "Signing in…";
+
+        const data = await fnInvoke("sandbox-vendor", {
+          action: "login",
+          email: $("li-email").value.trim(),
+          password: $("li-password").value,
+        });
+
+        $("li-submit").disabled = false;
+        $("li-submit").textContent = "Sign In";
+
+        if (!data.success) {
+          $("li-error").textContent = data.error;
+          $("li-error").style.display = "block";
+          return;
+        }
+
+        session = data.session;
+        localStorage.setItem("sbx_session", JSON.stringify(session));
+        currentKeys = data.keys || [];
+        showToast("Signed in!", "success");
+        loadDashboard();
+        location.hash = "#dashboard";
+      });
+
+      // ─── Dashboard ───
+      async function loadDashboard() {
+        if (!session) return;
+        showView("dashboard");
+
+        // Load keys
+        const keysData = await fnInvoke("sandbox-vendor", { action: "keys" });
+        if (keysData.success) currentKeys = keysData.keys || [];
+        renderKeys();
+
+        // Load usage
+        const usageData = await fnInvoke("sandbox-vendor", { action: "usage" });
+        if (usageData.success) {
+          const s = usageData.stats || {};
+          $("kpi-total").textContent = s.totalRequests ?? "—";
+          $("kpi-accepted").textContent = s.accepted ?? "—";
+          $("kpi-accept-rate").textContent = s.totalRequests ? `${Math.round((s.accepted / s.totalRequests) * 100)}% acceptance` : "";
+          $("kpi-rejected").textContent = (s.rejected || 0) + (s.errors || 0);
+          $("kpi-avg-time").textContent = s.avgResponseTime ? `${s.avgResponseTime}ms` : "—";
+          $("kpi-today").textContent = s.todayRequests ?? "—";
+          renderUsage(usageData.usage || []);
+        }
+      }
+
+      function renderKeys() {
+        const el = $("dash-keys-list");
+        if (!currentKeys.length) {
+          el.innerHTML = '<div class="empty-state">No API keys yet. Create one above.</div>';
+          return;
+        }
+        el.innerHTML = currentKeys.map(k => `
+          <div class="key-row">
+            <span class="key-label">${escHtml(k.label)}</span>
+            <span class="key-tier">${k.tier}</span>
+            <span class="key-status ${k.is_active ? 'active' : 'revoked'}">${k.is_active ? 'Active' : 'Revoked'}</span>
+            <span class="key-date">${k.last_used_at ? new Date(k.last_used_at).toLocaleDateString() : 'Never'}</span>
+            ${k.is_active ? `<button class="btn btn-danger btn-sm" data-revoke="${k.id}">Revoke</button>` : ''}
+          </div>
+        `).join("");
+
+        el.querySelectorAll("[data-revoke]").forEach(btn => {
+          btn.addEventListener("click", async () => {
+            if (!confirm("Revoke this API key? It will stop working immediately.")) return;
+            const data = await fnInvoke("sandbox-vendor", { action: "revoke_key", key_id: btn.dataset.revoke });
+            if (data.success) {
+              showToast("Key revoked", "success");
+              loadDashboard();
+            } else {
+              showToast("Error: " + data.error, "error");
+            }
+          });
+        });
+      }
+
+      function renderUsage(usage) {
+        const el = $("dash-usage-list");
+        if (!usage.length) {
+          el.innerHTML = '<div class="empty-state">No API calls yet. Start testing!</div>';
+          return;
+        }
+        el.innerHTML = `
+          <div style="overflow-x:auto;">
+            <table class="usage-table">
+              <thead><tr><th>Time</th><th>Endpoint</th><th>Status</th><th>TIN</th><th>Response</th></tr></thead>
+              <tbody>
+                ${usage.slice(0, 50).map(u => `
+                  <tr>
+                    <td>${new Date(u.created_at).toLocaleString()}</td>
+                    <td class="mono">${escHtml(u.endpoint)}</td>
+                    <td><span class="key-status ${u.status === 'accepted' ? 'active' : 'revoked'}">${u.status}</span></td>
+                    <td class="mono">${escHtml(u.tin || '—')}</td>
+                    <td>${u.response_time_ms ? u.response_time_ms + 'ms' : '—'}</td>
+                  </tr>
+                `).join("")}
+              </tbody>
+            </table>
+          </div>
+        `;
+      }
+
+      function escHtml(s) { return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+
+      // ─── Create key ───
+      $("dash-create-key")?.addEventListener("click", async () => {
+        const label = prompt("Label for this API key (e.g. 'My POS Integration'):");
+        if (!label?.trim()) return;
+        const data = await fnInvoke("sandbox-vendor", { action: "create_key", label: label.trim() });
+        if (!data.success) { showToast("Error: " + data.error, "error"); return; }
+        $("key-reveal-value").textContent = data.api_key;
+        $("key-modal").classList.remove("hidden");
+        $("key-modal").style.display = "flex";
+        showToast("Key created!", "success");
+        loadDashboard();
+      });
+
+      // ─── Key modal ───
+      $("key-copy-btn")?.addEventListener("click", () => {
+        navigator.clipboard.writeText($("key-reveal-value").textContent).then(() => showToast("Copied!", "success"));
+      });
+      $("key-close-btn")?.addEventListener("click", () => {
+        $("key-modal").classList.add("hidden");
+        $("key-modal").style.display = "none";
+      });
+
+      // ─── Init ───
+      handleHash();
+      if (session) loadDashboard();
+    </script>
+  </body>
+</html>
