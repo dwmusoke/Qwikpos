@@ -853,6 +853,9 @@ function openImportModal() {
           btn.disabled = true;
           btn.textContent = `Importing… 0/${parsedRows.length}`;
 
+          const { data: brandRows } = await supabase.from('brands').select('id,name').eq('business_id', STATE.business.id);
+          const brandList = brandRows || [];
+
           let imported = 0;
           let failed = 0;
 
@@ -866,6 +869,10 @@ function openImportModal() {
               ? STATE.categories.find(
                   (c) => c.name.toLowerCase() === row.category.toLowerCase(),
                 )?.id || null
+              : null;
+
+            const brandId = row.brand
+              ? brandList.find((b) => b.name.toLowerCase() === row.brand.toLowerCase())?.id || null
               : null;
 
             const { data: product, error } = await supabase.rpc("upsert_product", {
@@ -883,7 +890,7 @@ function openImportModal() {
               p_tax_category_code: row.tax_category || "VAT",
               p_reorder_level: parseFloat(row.reorder_level) || 5,
               p_is_active: true,
-              p_brand_id: null,
+              p_brand_id: brandId,
               p_id: null,
               p_expiry_date: row.expiry_date || null,
               p_has_batches: false,
