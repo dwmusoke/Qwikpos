@@ -168,43 +168,107 @@ export async function renderDashboard(root) {
   const creditCount = allSales.filter((s) => s.payment_status === "credit").length;
   const otherCount = allSales.length - paidCount - creditCount;
 
-  // --- SVG Line Chart ---
-  const chartW = 320;
-  const chartH = 90;
-  const padX = 32;
-  const padY = 14;
+  // --- Professional SVG Line Chart ---
+  const chartW = 560;
+  const chartH = 220;
+  const padLeft = 62;
+  const padRight = 16;
+  const padTop = 16;
+  const padBottom = 36;
+  const plotW = chartW - padLeft - padRight;
+  const plotH = chartH - padTop - padBottom;
+  const brandColor = getComputedStyle(document.documentElement).getPropertyValue("--brand").trim() || "#0f6b4a";
+
   const maxVal = Math.max(...dailySales7.map((d) => d.value), 1);
+  // Round max up to nice number for Y-axis
+  const niceMax = (() => {
+    const magnitude = Math.pow(10, Math.floor(Math.log10(maxVal)));
+    const normalized = maxVal / magnitude;
+    if (normalized <= 1) return magnitude;
+    if (normalized <= 2) return 2 * magnitude;
+    if (normalized <= 5) return 5 * magnitude;
+    return Math.ceil(normalized) * magnitude;
+  })();
+
   const points = dailySales7.map((d, i) => {
-    const x = padX + (i / (dailySales7.length - 1)) * (chartW - padX - 10);
-    const y = padY + (1 - d.value / maxVal) * (chartH - padY * 2);
+    const x = padLeft + (i / Math.max(dailySales7.length - 1, 1)) * plotW;
+    const y = padTop + (1 - d.value / niceMax) * plotH;
     return { x, y, ...d };
   });
-  const pathD = points
-    .map((p, i) => `${i === 0 ? "M" : "L"}${p.x.toFixed(1)},${p.y.toFixed(1)}`)
-    .join(" ");
-  const areaD =
-    pathD +
-    ` L${points[points.length - 1].x.toFixed(1)},${chartH - padY} L${points[0].x.toFixed(1)},${chartH - padY} Z`;
-  const brandColor = getComputedStyle(document.documentElement)
-    .getPropertyValue("--brand")
-    .trim() || "#0f6b4a";
+
+  // Y-axis grid lines and labels (5 lines)
+  const yLines = [0, 0.25, 0.5, 0.75, 1].map((pct) => {
+    const y = padTop + (1 - pct) * plotH;
+    const val = Math.round(niceMax * pct);
+    return { y, label: val >= 1000 ? `${(val / 1000).toFixed(val >= 10000 ? 0 : 1)}k` : String(val) };
+  });
+
+  // Smooth bezier curve using cubic bezier approximation
+  function smoothPath(pts) {
+    if (pts.length < 2) return pts.map((p, i) => `${i === 0 ? "M" : "L"}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ");
+    let d = `M${pts[0].x.toFixed(1)},${pts[0].y.toFixed(1)}`;
+    for (let i = 0; i < pts.length - 1; i++) {
+      const p0 = pts[Math.max(i - 1, 0)];
+      const p1 = pts[i];
+      const p2 = pts[i + 1];
+      const p3 = pts[Math.min(i + 2, pts.length - 1)];
+      const tension = 0.3;
+      const cp1x = p1.x + (p2.x - p0.x) * tension;
+      const cp1y = p1.y + (p2.y - p0.y) * tension;
+      const cp2x = p2.x - (p3.x - p1.x) * tension;
+      const cp2y = p2.y - (p3.y - p1.y) * tension;
+      d += ` C${cp1x.toFixed(1)},${cp1y.toFixed(1)} ${cp2x.toFixed(1)},${cp2y.toFixed(1)} ${p2.x.toFixed(1)},${p2.y.toFixed(1)}`;
+    }
+    return d;
+  }
+
+  const linePath = smoothPath(points);
+  const areaPath = linePath + ` L${points[points.length - 1].x.toFixed(1)},${padTop + plotH} L${points[0].x.toFixed(1)},${padTop + plotH} Z`;
+
+  const chartUid = "sc" + Math.random().toString(36).slice(2, 8);
 
   const lineChartSvg = `
-    <svg viewBox="0 0 ${chartW} ${chartH}" class="line-chart-wrap" preserveAspectRatio="xMidYMid meet">
-      <path d="${areaD}" fill="${brandColor}" class="lc-area" />
-      <path d="${pathD}" stroke="${brandColor}" class="lc-line" />
-      ${points
-        .map(
-          (p) =>
-            `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" fill="${brandColor}" class="lc-dot" />`,
-        )
-        .join("")}
-      ${points
-        .map(
-          (p) =>
-            `<text x="${p.x.toFixed(1)}" y="${chartH - 2}" class="lc-label">${p.label}</text>`,
-        )
-        .join("")}
+    <svg viewBox="0 0 ${chartW} ${chartH}" class="line-chart-wrap professional-chart" preserveAspectRatio="xMidYMid meet">
+      <defs>
+        <linearGradient id="grad-${chartUid}" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="${brandColor}" stop-opacity="0.25" />
+          <stop offset="100%" stop-color="${brandColor}" stop-opacity="0.02" />
+        </linearGradient>
+        <filter id="glow-${chartUid}">
+          <feDropShadow dx="0" dy="1" stdDeviation="2" flood-color="${brandColor}" flood-opacity="0.3" />
+        </filter>
+      </defs>
+
+      <!-- Grid lines -->
+      ${yLines.map((l) => `<line x1="${padLeft}" y1="${l.y.toFixed(1)}" x2="${chartW - padRight}" y2="${l.y.toFixed(1)}" stroke="currentColor" stroke-opacity="0.07" stroke-width="1" />`).join("")}
+
+      <!-- Y-axis labels -->
+      ${yLines.map((l) => `<text x="${padLeft - 8}" y="${(l.y + 3.5).toFixed(1)}" text-anchor="end" class="chart-y-label">${l.label}</text>`).join("")}
+
+      <!-- X-axis baseline -->
+      <line x1="${padLeft}" y1="${padTop + plotH}" x2="${chartW - padRight}" y2="${padTop + plotH}" stroke="currentColor" stroke-opacity="0.1" stroke-width="1" />
+
+      <!-- Area fill -->
+      <path d="${areaPath}" fill="url(#grad-${chartUid})" />
+
+      <!-- Line -->
+      <path d="${linePath}" stroke="${brandColor}" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round" filter="url(#glow-${chartUid})" />
+
+      <!-- Data points + hover zones -->
+      ${points.map((p, i) => {
+        const tooltipText = fmtMoney(p.value, baseCurrency);
+        const tw = Math.max(tooltipText.length * 5.5 + 16, 72);
+        return `
+        <g class="chart-point-group">
+          <circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="16" fill="transparent" class="chart-hover-zone" />
+          <circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="4.5" fill="${brandColor}" stroke="#fff" stroke-width="2" class="chart-dot" />
+          <g class="chart-tooltip" style="pointer-events:none;">
+            <rect x="${p.x - tw / 2}" y="${p.y - 32}" width="${tw}" height="22" rx="6" fill="var(--surface-2,#1e293b)" stroke="currentColor" stroke-opacity="0.1" stroke-width="1" />
+            <text x="${p.x.toFixed(1)}" y="${p.y - 17}" text-anchor="middle" class="chart-tooltip-text">${tooltipText}</text>
+          </g>
+          <text x="${p.x.toFixed(1)}" y="${padTop + plotH + 18}" text-anchor="middle" class="chart-x-label">${p.label}</text>
+        </g>`;
+      }).join("")}
     </svg>`;
 
   // --- Donut Chart (SVG) ---

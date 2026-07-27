@@ -923,15 +923,6 @@ body.sidebar-expanded .main {
   .dash-charts { grid-template-columns: 1fr; }
 }
 
-.line-chart-wrap { width: 100%; overflow: hidden; }
-.line-chart-wrap svg { width: 100%; height: auto; display: block; }
-.donut-wrap { display: flex; align-items: center; gap: var(--space-md); }
-.donut-svg { width: 100px; height: 100px; flex-shrink: 0; }
-.donut-legend { display: flex; flex-direction: column; gap: 6px; flex: 1; min-width: 0; }
-.donut-legend-item { display: flex; align-items: center; gap: 8px; font-size: 12px; }
-.donut-legend-dot { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; }
-.donut-legend-label { color: var(--text-muted); flex: 1; }
-.donut-legend-value { font-weight: 700; font-size: 12px; }
 .mini-chart { display: flex; align-items: flex-end; gap: 6px; height: 100px; padding-top: 8px; }
 
 /* ---------- 7. ENTERPRISE BUTTONS ---------- */
@@ -1300,14 +1291,26 @@ body.sidebar-expanded .main {
 
 /* Chart card */
 .card-chart {
-  min-height: 180px;
+  min-height: 240px;
   display: flex;
   flex-direction: column;
 }
 .line-chart-wrap {
   flex: 1;
-  min-height: 120px;
+  min-height: 160px;
 }
+
+/* Professional chart */
+.professional-chart { width: 100%; height: auto; display: block; }
+.professional-chart text { font-family: inherit; }
+.chart-y-label { font-size: 9.5px; fill: var(--text-muted, #94a3b8); font-weight: 500; }
+.chart-x-label { font-size: 10px; fill: var(--text-muted, #94a3b8); font-weight: 500; }
+.chart-dot { transition: r 0.15s ease, stroke-width 0.15s ease; }
+.chart-hover-zone { cursor: pointer; }
+.chart-tooltip { opacity: 0; transition: opacity 0.15s ease; }
+.chart-tooltip-text { font-size: 10px; font-weight: 700; fill: var(--text, #e2e8f0); }
+.chart-point-group:hover .chart-tooltip { opacity: 1; }
+.chart-point-group:hover .chart-dot { r: 6; stroke-width: 2.5; }
 
 /* Donut */
 .donut-wrap {
