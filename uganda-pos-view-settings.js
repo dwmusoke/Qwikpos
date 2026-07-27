@@ -4,7 +4,16 @@
 import { supabase, STATE, $, qsa, escapeHtml, toast, hasRole, applyTheme, openModal, closeModal } from './uganda-pos-core.js';
 
 export async function renderSettings(root) {
-  const { data: users } = await supabase.from('app_users').select('*').eq('business_id', STATE.business.id);
+  // Fetch users with emails from auth.users via edge function
+  let users = [];
+  const { data: userData, error: userErr } = await supabase.functions.invoke('manage-user', { body: { action: 'list' } });
+  if (!userErr && userData?.success) {
+    users = userData.users || [];
+  } else {
+    // Fallback to direct query (no emails)
+    const { data: fallbackUsers } = await supabase.from('app_users').select('*').eq('business_id', STATE.business.id);
+    users = fallbackUsers || [];
+  }
   const { data: rates } = await supabase.from('exchange_rates').select('*').order('effective_at', { ascending: false });
   const latestRates = {};
   (rates || []).forEach((r) => { if (!(r.currency_code in latestRates)) latestRates[r.currency_code] = r; });
@@ -519,7 +528,7 @@ export async function renderSettings(root) {
   $('tm-add-user')?.addEventListener('click', () => {
     openModal(`
       <div class="modal-title-row"><h3>➕ Add Team Member</h3></div>
-      <p class="help-text">This creates an auth account in Supabase and links them to your business.</p>
+      <p class="help-text">This creates an auth account and links them to your business.</p>
       <div class="field"><label>Full Name *</label><input id="tm-name" placeholder="John Doe" /></div>
       <div class="field-row">
         <div class="field"><label>Email *</label><input id="tm-email" type="email" placeholder="john@example.com" /></div>
@@ -543,13 +552,17 @@ export async function renderSettings(root) {
         const role = $('tm-role').value;
         const pw = $('tm-pw').value;
         if (!name || !email || pw.length < 8) { toast("Name, email, and password (8+ chars) required", "error"); return; }
-        const { data: authData, error: authErr } = await supabase.auth.admin.createUser({ email, password: pw, email_confirm: true });
-        if (authErr) { toast("Auth error: " + authErr.message, "error"); return; }
-        const branch = STATE.branches[0];
-        const { error: userErr } = await supabase.from("app_users").insert({
-          id: authData.user.id, business_id: STATE.business.id, branch_id: branch?.id,
-          full_name: name, phone: phone || null, role, is_active: true,
+        toast("Creating user…", "default");
+        const { data, error } = await supabase.functions.invoke('manage-user', {
+          body: { action: 'create_user', email, password: pw, full_name: name, phone: phone || null, role },
         });
+        if (error || !data?.success) { toast("Error: " + (data?.error || error?.message), "error"); return; }
+        toast("User created", "success");
+        closeModal();
+        renderSettings(root);
+      });
+    }});
+  });
         if (userErr) { toast("DB error: " + userErr.message, "error"); return; }
         toast("User created", "success");
         closeModal();
@@ -989,7 +1002,7 @@ export async function renderSettings(root) {
       <div class="field"><label>Full Name</label><input id="eu-name" value="${escapeHtml(u.full_name)}" /></div>
       <div class="field-row">
         <div class="field"><label>Phone</label><input id="eu-phone" value="${escapeHtml(u.phone || "")}" /></div>
-        <div class="field"><label>Email</label><input id="eu-email" value="${escapeHtml(u.email || "")}" disabled title="Email cannot be changed" /></div>
+        <div class="field"><label>Email</label><input id="eu-email" type="email" value="${escapeHtml(u.email || "")}" /></div>
       </div>
       <div class="field-row">
         <div class="field"><label>Role</label>
@@ -1007,13 +1020,25 @@ export async function renderSettings(root) {
       $('eu-save').addEventListener('click', async () => {
         const name = $('eu-name').value.trim();
         const phone = $('eu-phone').value.trim();
+        const newEmail = $('eu-email').value.trim();
         const role = $('eu-role').value;
         const isActive = $('eu-active').value === 'true';
         if (!name) { toast("Name is required", "error"); return; }
+
+        // Update app_users fields
         const { error } = await supabase.from('app_users').update({
           full_name: name, phone: phone || null, role, is_active: isActive,
         }).eq('id', u.id);
         if (error) { toast("Failed: " + error.message, "error"); return; }
+
+        // Update email via edge function (requires service role)
+        if (newEmail && newEmail !== (u.email || "")) {
+          const { error: emailErr } = await supabase.functions.invoke('manage-user', {
+            body: { action: 'update_email', user_id: u.id, email: newEmail },
+          });
+          if (emailErr) { toast("Email update failed: " + emailErr.message, "error"); return; }
+        }
+
         toast("User updated", "success");
         closeModal();
         renderSettings(root);

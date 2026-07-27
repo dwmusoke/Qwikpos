@@ -39,8 +39,8 @@ const fmtCompact = (val, code) => {
   return String(Math.round(val));
 };
 
-// ── Build daily data for any range ──
-function buildDailyData(allSales, days, baseCurrency) {
+// ── Build daily data for any range (extended metrics) ──
+function buildDailyData(allSales, days, baseCurrency, returnsMap) {
   const data = [];
   for (let i = days - 1; i >= 0; i--) {
     const d = new Date(); d.setDate(d.getDate() - i); d.setHours(0, 0, 0, 0);
@@ -48,15 +48,76 @@ function buildDailyData(allSales, days, baseCurrency) {
     const daySales = allSales.filter(s => { const t = new Date(s.created_at); return t >= d && t <= dEnd; });
     const dayOrders = daySales.length;
     const dayRevenue = daySales.reduce((a, s) => a + Number(s.grand_total_base || 0), 0);
+    const dayDiscount = daySales.reduce((a, s) => a + Number(s.discount_total || 0), 0);
+    const dayVat = daySales.reduce((a, s) => a + Number(s.vat_total || 0) * Number(s.exchange_rate || 1), 0);
+    const dayItems = daySales.reduce((a, s) => a + (s.sale_items || []).reduce((b, it) => b + Number(it.quantity || 0), 0), 0);
+    const dayReturns = returnsMap ? (returnsMap[d.toISOString().slice(0, 10)] || 0) : 0;
     const avgSale = dayOrders > 0 ? Math.round(dayRevenue / dayOrders) : 0;
     const label = days <= 7
       ? d.toLocaleDateString("en", { weekday: "short" })
       : days <= 31
         ? d.toLocaleDateString("en", { day: "numeric", month: "short" })
         : d.toLocaleDateString("en", { month: "short", day: "numeric" });
-    data.push({ date: d, label, revenue: dayRevenue, orders: dayOrders, avgSale });
+    data.push({ date: d, label, revenue: dayRevenue, orders: dayOrders, avgSale, discount: dayDiscount, vat: dayVat, items: dayItems, returns: dayReturns });
   }
   return data;
+}
+
+// ── Build returns map (date → total refund) ──
+function buildReturnsMap(returns, days) {
+  const map = {};
+  const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - days);
+  (returns || []).forEach(r => {
+    if (r.status === "completed" || r.status === "approved") {
+      const d = new Date(r.created_at);
+      if (d >= cutoff) {
+        const key = d.toISOString().slice(0, 10);
+        map[key] = (map[key] || 0) + Number(r.refund_amount || 0);
+      }
+    }
+  });
+  return map;
+}
+
+// ── Sparkline SVG builder ──
+function buildSparkline(values, color) {
+  if (!values || values.length < 2) return "";
+  const W = 100, H = 28, PAD = 2;
+  const max = Math.max(...values, 1);
+  const pts = values.map((v, i) => ({
+    x: PAD + (i / (values.length - 1)) * (W - PAD * 2),
+    y: H - PAD - (v / max) * (H - PAD * 2),
+  }));
+  const line = pts.map((p, i) => `${i === 0 ? "M" : "L"}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ");
+  const area = `${line} L${pts[pts.length - 1].x.toFixed(1)},${H} L${pts[0].x.toFixed(1)},${H} Z`;
+  return `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
+    <path d="${area}" fill="${color}" fill-opacity="0.1" />
+    <path d="${line}" fill="none" stroke="${color}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+  </svg>`;
+}
+
+// ── Trend percentage ──
+function trendPct(cur, prev) {
+  if (!prev || prev === 0) return null;
+  return ((cur - prev) / Math.abs(prev) * 100);
+}
+
+// ── Trend badge HTML ──
+function trendBadge(pct) {
+  if (pct === null) return "";
+  const rounded = Math.abs(Math.round(pct));
+  if (rounded < 1) return `<span class="kpi-badge kpi-neutral">0%</span>`;
+  const cls = pct > 0 ? "kpi-up" : "kpi-down";
+  const arrow = pct > 0 ? "↑" : "↓";
+  return `<span class="kpi-badge ${cls}">${arrow} ${rounded}%</span>`;
+}
+
+// ── Performance dot + text ──
+function perfDot(pct) {
+  if (pct === null) return "";
+  const cls = pct > 5 ? "green" : pct < -5 ? "red" : "amber";
+  const label = pct > 5 ? "Above trend" : pct < -5 ? "Below trend" : "On track";
+  return `<div class="kpi-perf"><span class="kpi-perf-dot ${cls}"></span><span class="kpi-perf-text ${cls}">${label}</span></div>`;
 }
 
 // ── Smooth bezier path ──
@@ -240,17 +301,20 @@ export async function renderDashboard(root) {
     { data: customers },
     { data: branchSales },
     { data: expiringBatches },
+    { data: returns },
   ] = await Promise.all([
     supabase.from("sales").select("*, sale_items(*), payments(*)").eq("business_id", STATE.business.id).gte("created_at", since.toISOString()).order("created_at", { ascending: false }),
     supabase.from("efris_invoices").select("status").eq("business_id", STATE.business.id),
-    supabase.from("customers").select("balance").eq("business_id", STATE.business.id),
+    supabase.from("customers").select("balance, created_at").eq("business_id", STATE.business.id),
     STATE.branches.length > 1
       ? supabase.from("sales").select("branch_id, grand_total_base, vat_total, exchange_rate, status, sale_type, created_at, payment_status").eq("business_id", STATE.business.id).gte("created_at", new Date(new Date().getFullYear(), 0, 1).toISOString())
       : { data: [] },
     supabase.from("stock_batches").select("*, product:products(name, unit), branch:branches(name)").eq("business_id", STATE.business.id).gt("quantity", 0).not("expiry_date", "is", null).lte("expiry_date", new Date(Date.now() + 30 * dayMs).toISOString().slice(0, 10)).order("expiry_date", { ascending: true }).limit(20),
+    supabase.from("sales_returns").select("refund_amount, status, created_at").eq("business_id", STATE.business.id).gte("created_at", since.toISOString()),
   ]);
 
   const allSales = (sales || []).filter(s => s.status !== "voided" && s.sale_type !== "quotation");
+  const allReturns = returns || [];
   const todayStr = new Date().toDateString();
   const monthStart = new Date(); monthStart.setDate(1); monthStart.setHours(0, 0, 0, 0);
   const yearStart = new Date(new Date().getFullYear(), 0, 1);
@@ -269,6 +333,46 @@ export async function renderDashboard(root) {
   const inventoryValue = STATE.products.reduce((a, p) => a + Number(p.selling_price || 0) * (STATE.stockByProduct[p.id] || 0), 0);
   const skuCount = STATE.products.length;
   const outstandingBalance = (customers || []).reduce((a, c) => a + Number(c.balance || 0), 0);
+
+  // Returns for the period
+  const returnsMap365 = buildReturnsMap(allReturns, 365);
+  const returnsMap90 = buildReturnsMap(allReturns, 90);
+  const totalReturns90 = Object.values(returnsMap90).reduce((a, v) => a + v, 0);
+
+  // Extended KPI computations
+  const totalDiscount90 = sum(allSales.filter(s => new Date(s.created_at) >= new Date(Date.now() - 90 * dayMs)), s => Number(s.discount_total || 0));
+  const totalVat90 = sum(allSales.filter(s => new Date(s.created_at) >= new Date(Date.now() - 90 * dayMs)), s => Number(s.vat_total || 0) * Number(s.exchange_rate || 1));
+  const totalItemsSold = allSales.reduce((a, s) => a + (s.sale_items || []).reduce((b, it) => b + Number(it.quantity || 0), 0), 0);
+  const uniqueCustomers = new Set(allSales.map(s => s.customer_id).filter(Boolean)).size;
+  const totalRevenue90 = sum(allSales.filter(s => new Date(s.created_at) >= new Date(Date.now() - 90 * dayMs)), s => Number(s.grand_total_base || 0));
+  const netSales90 = totalRevenue90 - totalDiscount90 - totalReturns90;
+
+  // Gross profit (revenue - cost of goods sold)
+  const grossProfit90 = allSales.filter(s => new Date(s.created_at) >= new Date(Date.now() - 90 * dayMs)).reduce((a, s) => {
+    return a + (s.sale_items || []).reduce((b, it) => {
+      const product = STATE.products.find(p => p.id === it.product_id);
+      const cost = product ? Number(product.cost_price || 0) : 0;
+      return b + (Number(it.unit_price || 0) - cost) * Number(it.quantity || 0);
+    }, 0);
+  }, 0);
+  const grossProfitPct = totalRevenue90 > 0 ? Math.round((grossProfit90 / totalRevenue90) * 100) : 0;
+
+  // Previous period comparisons (last 90 days vs the 90 before that)
+  const prev90Start = new Date(Date.now() - 180 * dayMs);
+  const prev90End = new Date(Date.now() - 90 * dayMs);
+  const prevSales = allSales.filter(s => { const t = new Date(s.created_at); return t >= prev90Start && t < prev90End; });
+  const prevRevenue = sum(prevSales, s => Number(s.grand_total_base || 0));
+  const prevOrders = prevSales.length;
+  const prevDiscount = sum(prevSales, s => Number(s.discount_total || 0));
+  const prevVat = sum(prevSales, s => Number(s.vat_total || 0) * Number(s.exchange_rate || 1));
+  const prevItems = prevSales.reduce((a, s) => a + (s.sale_items || []).reduce((b, it) => b + Number(it.quantity || 0), 0), 0);
+  const prevCustomers = new Set(prevSales.map(s => s.customer_id).filter(Boolean)).size;
+  const prevReturns = Object.values(buildReturnsMap(allReturns, 180)).slice(0, 90).reduce((a, v) => a + v, 0);
+
+  // Collection rate
+  const totalAmount90 = sum(allSales.filter(s => new Date(s.created_at) >= new Date(Date.now() - 90 * dayMs)), s => Number(s.grand_total_base || 0));
+  const paidAmount90 = allSales.filter(s => new Date(s.created_at) >= new Date(Date.now() - 90 * dayMs)).reduce((a, s) => a + (s.payments || []).reduce((p, q) => p + Number(q.amount_base || 0), 0), 0);
+  const collectionPct = totalAmount90 > 0 ? Math.round((paidAmount90 / totalAmount90) * 100) : 0;
 
   const productTally = {};
   allSales.forEach(s => (s.sale_items || []).forEach(it => { productTally[it.product_name] = (productTally[it.product_name] || 0) + Number(it.quantity); }));
@@ -292,21 +396,16 @@ export async function renderDashboard(root) {
   const creditCount = allSales.filter(s => s.payment_status === "credit").length;
   const otherCount = allSales.length - paidCount - creditCount;
 
-  // Collection totals
-  const totalAmount = sum(allSales, s => Number(s.grand_total_base || 0));
-  const paidAmount = allSales.reduce((a, s) => a + (s.payments || []).reduce((p, q) => p + Number(q.amount_base || 0), 0), 0);
-  const collectionPct = totalAmount > 0 ? Math.round((paidAmount / totalAmount) * 100) : 0;
-
   // Pre-compute data for each period (used by filters)
   const periodData = {
-    today: buildDailyData(allSales, 1, baseCurrency),
-    "7d": buildDailyData(allSales, 7, baseCurrency),
-    "30d": buildDailyData(allSales, 30, baseCurrency),
-    "90d": buildDailyData(allSales, 90, baseCurrency),
-    year: buildDailyData(allSales, 365, baseCurrency),
+    today: buildDailyData(allSales, 1, baseCurrency, returnsMap90),
+    "7d": buildDailyData(allSales, 7, baseCurrency, returnsMap90),
+    "30d": buildDailyData(allSales, 30, baseCurrency, returnsMap90),
+    "90d": buildDailyData(allSales, 90, baseCurrency, returnsMap365),
+    year: buildDailyData(allSales, 365, baseCurrency, returnsMap365),
   };
   const periodPrevData = {
-    today: buildDailyData(allSales, 1, baseCurrency),
+    today: buildDailyData(allSales, 1, baseCurrency, returnsMap90),
     "7d": (() => { const d = new Date(); d.setDate(d.getDate() - 14); const s = new Date(d); s.setDate(s.getDate() - 6); const arr = []; for (let i = 6; i >= 0; i--) { const dd = new Date(s); dd.setDate(dd.getDate() + i); dd.setHours(0,0,0,0); const de = new Date(dd); de.setHours(23,59,59,999); arr.push({ date: dd, label: dd.toLocaleDateString("en",{weekday:"short"}), revenue: allSales.filter(s2 => { const t = new Date(s2.created_at); return t >= dd && t <= de; }).reduce((a,s2) => a + Number(s2.grand_total_base||0), 0), orders: allSales.filter(s2 => { const t = new Date(s2.created_at); return t >= dd && t <= de; }).length, avgSale: 0 }); } arr.forEach(d2 => { d2.avgSale = d2.orders > 0 ? Math.round(d2.revenue / d2.orders) : 0; }); return arr; })(),
     "30d": (() => { const s = new Date(); s.setDate(s.getDate() - 60); const arr = []; for (let i = 29; i >= 0; i--) { const dd = new Date(s); dd.setDate(dd.getDate() + i); dd.setHours(0,0,0,0); const de = new Date(dd); de.setHours(23,59,59,999); const ds = allSales.filter(s2 => { const t = new Date(s2.created_at); return t >= dd && t <= de; }); arr.push({ date: dd, label: dd.toLocaleDateString("en",{day:"numeric",month:"short"}), revenue: ds.reduce((a,s2) => a + Number(s2.grand_total_base||0), 0), orders: ds.length, avgSale: 0 }); } arr.forEach(d2 => { d2.avgSale = d2.orders > 0 ? Math.round(d2.revenue / d2.orders) : 0; }); return arr; })(),
     "90d": (() => { const s = new Date(); s.setDate(s.getDate() - 180); const weeks = []; for (let i = 11; i >= 0; i--) { const ws = new Date(s); ws.setDate(ws.getDate() + i * 14); const we = new Date(ws); we.setDate(we.getDate() + 13); const ds = allSales.filter(s2 => { const t = new Date(s2.created_at); return t >= ws && t <= we; }); weeks.push({ date: ws, label: ws.toLocaleDateString("en",{month:"short",day:"numeric"}), revenue: ds.reduce((a,s2) => a + Number(s2.grand_total_base||0), 0), orders: ds.length, avgSale: 0 }); } weeks.forEach(d2 => { d2.avgSale = d2.orders > 0 ? Math.round(d2.revenue / d2.orders) : 0; }); return weeks; })(),
@@ -350,16 +449,106 @@ export async function renderDashboard(root) {
   const totalAlerts = lowStock.length + expiryAlerts + (outstandingBalance > 0 ? 1 : 0);
 
   root.innerHTML = `
-    <!-- Executive KPIs -->
+    <!-- Executive KPIs (v2 — Grouped) -->
     <div class="dash-section">
-      <div class="dash-section-header"><h2 class="dash-section-title">Executive Summary</h2></div>
-      <div class="kpi-grid">
-        <div class="kpi-card"><div class="kpi-icon" style="background:#eef7ff;">🧾</div><div class="kpi-content"><div class="label">Today's Sales</div><div class="value">${fmtMoney(todayTotal, baseCurrency)}</div><div class="delta ${todayTrend !== null ? (Number(todayTrend) >= 0 ? "up" : "down") : ""}">${todayTrend !== null ? `${Number(todayTrend) >= 0 ? "↑" : "↓"} ${Math.abs(Number(todayTrend))}% vs yesterday` : "First sale today"}</div></div></div>
-        <div class="kpi-card"><div class="kpi-icon" style="background:#eefaf0;">📅</div><div class="kpi-content"><div class="label">Monthly Sales</div><div class="value">${fmtMoney(monthTotal, baseCurrency)}</div><div class="delta">${monthSales.length} transactions</div></div></div>
-        <div class="kpi-card"><div class="kpi-icon" style="background:#f3f0ff;">📦</div><div class="kpi-content"><div class="label">Inventory Value</div><div class="value">${fmtMoney(inventoryValue, baseCurrency)}</div><div class="delta">${skuCount} SKUs</div></div></div>
-        <div class="kpi-card"><div class="kpi-icon" style="background:#fff7ed;">👥</div><div class="kpi-content"><div class="label">Receivables</div><div class="value">${fmtMoney(outstandingBalance, baseCurrency)}</div><div class="delta">${(customers || []).length} customers</div></div></div>
-        <div class="kpi-card"><div class="kpi-icon" style="background:#fff1f2;">⚠️</div><div class="kpi-content"><div class="label">Alerts</div><div class="value" style="color:${totalAlerts > 0 ? "var(--danger)" : "var(--text)"}">${totalAlerts}</div><div class="delta">${lowStock.length} low stock · ${expiryAlerts} expiring</div></div></div>
-        <div class="kpi-card"><div class="kpi-icon" style="background:#f0fdf4;">✅</div><div class="kpi-content"><div class="label">Business Health</div><div class="value">${allSales.length > 0 ? "Healthy" : "No Data"}</div><div class="delta">${fmtMoney(paidAmount, baseCurrency)} / ${fmtMoney(totalAmount, baseCurrency)} · ${collectionPct}% collected</div></div></div>
+      <div class="dash-section-header"><h2 class="dash-section-title">Executive Summary</h2><span class="dash-section-sub">Last 90 days vs prior 90 days</span></div>
+      <div class="kpi-groups">
+        <!-- Revenue Metrics -->
+        <div>
+          <div class="kpi-group-title">Revenue</div>
+          <div class="kpi-group kpi-group--revenue">
+            <div class="kpi-main-card" data-kpi="revenue">
+              <div class="kpi-top-row"><span class="kpi-emoji">💰</span>${trendBadge(trendPct(totalRevenue90, prevRevenue))}</div>
+              <div class="kpi-label">Total Revenue</div>
+              <div class="kpi-value">${fmtMoney(totalRevenue90, baseCurrency)}</div>
+              <div class="kpi-sparkline">${buildSparkline(periodData["7d"].map(d => d.revenue), "#3b82f6")}</div>
+              ${perfDot(trendPct(totalRevenue90, prevRevenue))}
+            </div>
+            <div class="kpi-main-card" data-kpi="net-sales">
+              <div class="kpi-top-row"><span class="kpi-emoji">📈</span>${trendBadge(trendPct(netSales90, prevRevenue - prevDiscount - prevReturns))}</div>
+              <div class="kpi-label">Net Sales</div>
+              <div class="kpi-value">${fmtMoney(netSales90, baseCurrency)}</div>
+              <div class="kpi-sub">Revenue − Discounts − Returns</div>
+              ${perfDot(trendPct(netSales90, prevRevenue - prevDiscount - prevReturns))}
+            </div>
+            <div class="kpi-main-card" data-kpi="profit">
+              <div class="kpi-top-row"><span class="kpi-emoji">💵</span>${trendBadge(trendPct(grossProfit90, 0))}</div>
+              <div class="kpi-label">Gross Profit</div>
+              <div class="kpi-value">${fmtMoney(grossProfit90, baseCurrency)}</div>
+              <div class="kpi-sub"><b>${grossProfitPct}%</b> margin</div>
+              ${perfDot(trendPct(grossProfit90, 0))}
+            </div>
+            <div class="kpi-main-card" data-kpi="vat">
+              <div class="kpi-top-row"><span class="kpi-emoji">🏛</span>${trendBadge(trendPct(totalVat90, prevVat))}</div>
+              <div class="kpi-label">VAT Collected</div>
+              <div class="kpi-value">${fmtMoney(totalVat90, baseCurrency)}</div>
+              <div class="kpi-sub">${totalRevenue90 > 0 ? ((totalVat90 / totalRevenue90) * 100).toFixed(1) : 0}% of revenue</div>
+              ${perfDot(trendPct(totalVat90, prevVat))}
+            </div>
+          </div>
+        </div>
+
+        <!-- Orders & Sales -->
+        <div>
+          <div class="kpi-group-title">Orders &amp; Sales</div>
+          <div class="kpi-group kpi-group--orders">
+            <div class="kpi-main-card" data-kpi="orders">
+              <div class="kpi-top-row"><span class="kpi-emoji">🛒</span>${trendBadge(trendPct(allSales.filter(s => new Date(s.created_at) >= new Date(Date.now() - 90 * dayMs)).length, prevOrders))}</div>
+              <div class="kpi-label">Orders</div>
+              <div class="kpi-value">${allSales.filter(s => new Date(s.created_at) >= new Date(Date.now() - 90 * dayMs)).length}</div>
+              <div class="kpi-sub">+${todaySales.length} today</div>
+            </div>
+            <div class="kpi-main-card" data-kpi="avg-order">
+              <div class="kpi-top-row"><span class="kpi-emoji">🧾</span>${trendBadge(trendPct(totalRevenue90 / Math.max(allSales.filter(s => new Date(s.created_at) >= new Date(Date.now() - 90 * dayMs)).length, 1), prevOrders > 0 ? prevRevenue / prevOrders : 0))}</div>
+              <div class="kpi-label">Avg Order</div>
+              <div class="kpi-value">${fmtMoney(allSales.filter(s => new Date(s.created_at) >= new Date(Date.now() - 90 * dayMs)).length > 0 ? Math.round(totalRevenue90 / allSales.filter(s => new Date(s.created_at) >= new Date(Date.now() - 90 * dayMs)).length) : 0, baseCurrency)}</div>
+              <div class="kpi-sub">per transaction</div>
+            </div>
+            <div class="kpi-main-card" data-kpi="customers">
+              <div class="kpi-top-row"><span class="kpi-emoji">👥</span>${trendBadge(trendPct(uniqueCustomers, prevCustomers))}</div>
+              <div class="kpi-label">Customers</div>
+              <div class="kpi-value">${uniqueCustomers}</div>
+              <div class="kpi-sub">${(customers || []).filter(c => new Date(c.created_at) >= new Date(Date.now() - 90 * dayMs)).length} new</div>
+            </div>
+            <div class="kpi-main-card" data-kpi="items">
+              <div class="kpi-top-row"><span class="kpi-emoji">📦</span>${trendBadge(trendPct(totalItemsSold, prevItems))}</div>
+              <div class="kpi-label">Items Sold</div>
+              <div class="kpi-value">${totalItemsSold.toLocaleString()}</div>
+              <div class="kpi-sub">${skuCount} products</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Financial Metrics -->
+        <div>
+          <div class="kpi-group-title">Financial</div>
+          <div class="kpi-group kpi-group--financial">
+            <div class="kpi-main-card" data-kpi="discounts">
+              <div class="kpi-top-row"><span class="kpi-emoji">🏷</span>${trendBadge(trendPct(totalDiscount90, prevDiscount))}</div>
+              <div class="kpi-label">Discounts</div>
+              <div class="kpi-value">${fmtMoney(totalDiscount90, baseCurrency)}</div>
+              <div class="kpi-sub">${totalRevenue90 > 0 ? ((totalDiscount90 / totalRevenue90) * 100).toFixed(1) : 0}% of revenue</div>
+            </div>
+            <div class="kpi-main-card" data-kpi="returns">
+              <div class="kpi-top-row"><span class="kpi-emoji">↩</span>${trendBadge(trendPct(totalReturns90, prevReturns))}</div>
+              <div class="kpi-label">Returns</div>
+              <div class="kpi-value">${fmtMoney(totalReturns90, baseCurrency)}</div>
+              <div class="kpi-sub">${allReturns.filter(r => (r.status === "completed" || r.status === "approved") && new Date(r.created_at) >= new Date(Date.now() - 90 * dayMs)).length} orders</div>
+            </div>
+            <div class="kpi-main-card" data-kpi="receivables">
+              <div class="kpi-top-row"><span class="kpi-emoji">⌛</span>${outstandingBalance > 0 ? `<span class="kpi-badge kpi-down">Active</span>` : `<span class="kpi-badge kpi-up">Clear</span>`}</div>
+              <div class="kpi-label">Receivables</div>
+              <div class="kpi-value">${fmtMoney(outstandingBalance, baseCurrency)}</div>
+              <div class="kpi-sub">${(customers || []).filter(c => Number(c.balance || 0) > 0).length} customers</div>
+            </div>
+            <div class="kpi-main-card" data-kpi="collection">
+              <div class="kpi-top-row"><span class="kpi-emoji">💳</span>${collectionPct >= 90 ? `<span class="kpi-badge kpi-up">Healthy</span>` : collectionPct >= 70 ? `<span class="kpi-badge kpi-neutral">Fair</span>` : `<span class="kpi-badge kpi-down">Low</span>`}</div>
+              <div class="kpi-label">Collection Rate</div>
+              <div class="kpi-value">${collectionPct}%</div>
+              <div class="kpi-sub">${fmtMoney(paidAmount90, baseCurrency)} collected</div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -498,6 +687,41 @@ export async function renderDashboard(root) {
       $("tkpi-orders").textContent = curOrders;
       $("tkpi-best").textContent = best.label;
       $("tkpi-best-sub").textContent = fmtMoney(best.revenue, baseCurrency);
+    });
+  });
+
+  // ── KPI card click → filter chart ──
+  const kpiMetricMap = {
+    "revenue": "revenue", "net-sales": "revenue", "profit": "revenue",
+    "vat": "vat", "orders": "orders", "avg-order": "revenue",
+    "customers": "orders", "items": "items", "discounts": "discount",
+    "returns": "returns", "receivables": "revenue", "collection": "revenue",
+  };
+  let activeKpi = null;
+
+  qsa(".kpi-main-card", root).forEach(card => {
+    card.addEventListener("click", () => {
+      const kpi = card.dataset.kpi;
+      if (!kpi) return;
+
+      // Toggle active state
+      if (activeKpi === kpi) {
+        activeKpi = null;
+        qsa(".kpi-main-card", root).forEach(c => c.classList.remove("kpi-active"));
+        // Reset chart to revenue
+        const cur = periodData[currentPeriod];
+        const prev = periodPrevData[currentPeriod];
+        $("trend-chart-container").innerHTML = buildTrendChart(cur, prev, "revenue", null, baseCurrency, CHART_UID());
+        return;
+      }
+
+      activeKpi = kpi;
+      qsa(".kpi-main-card", root).forEach(c => c.classList.toggle("kpi-active", c.dataset.kpi === kpi));
+
+      const metric = kpiMetricMap[kpi] || "revenue";
+      const cur = periodData[currentPeriod];
+      const prev = periodPrevData[currentPeriod];
+      $("trend-chart-container").innerHTML = buildTrendChart(cur, prev, metric, null, baseCurrency, CHART_UID());
     });
   });
 }

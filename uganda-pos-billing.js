@@ -48,7 +48,9 @@ export async function payForPlan(plan, { onSuccess, onClose } = {}) {
   // call AND the async webhook can identify what was purchased without
   // trusting anything else from the client. See uganda-pos-fn-*.ts.
   const txRef = `SUB_${STATE.business.id}_${plan.code}_${Date.now()}`;
-  const email = STATE.session?.user?.email || `${STATE.business.id}@billing.local`;
+  const email = STATE.session?.user?.email
+    || STATE.appUser?.phone
+    || `billing-${(STATE.business.id || 'unknown').slice(0, 8)}@qwickpos.com`;
 
   window.FlutterwaveCheckout({
     public_key: FLW_PUBLIC_KEY,

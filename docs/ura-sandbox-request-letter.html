@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>EFRIS Sandbox Access Request Letter</title>
+<style>
+  @page { margin: 1in; size: A4; }
+  body { font-family: 'Times New Roman', Times, serif; font-size: 12pt; line-height: 1.6; color: #000; max-width: 800px; margin: 0 auto; padding: 40px; }
+  h1 { text-align: center; font-size: 14pt; margin-bottom: 5px; }
+  h2 { font-size: 12pt; font-weight: bold; margin-top: 20px; margin-bottom: 8px; border-bottom: 1px solid #000; padding-bottom: 3px; }
+  h3 { font-size: 12pt; font-weight: bold; margin-top: 15px; margin-bottom: 5px; }
+  .center { text-align: center; }
+  .right { text-align: right; }
+  .bold { font-weight: bold; }
+  .underline { text-decoration: underline; }
+  table { width: 100%; border-collapse: collapse; margin: 10px 0; }
+  table td, table th { border: 1px solid #000; padding: 6px 10px; text-align: left; font-size: 11pt; }
+  table th { background-color: #f0f0f0; font-weight: bold; }
+  .placeholder { color: #c00; font-weight: bold; background: #fff8f8; padding: 1px 4px; }
+  .field-line { border-bottom: 1px solid #000; display: inline-block; min-width: 200px; height: 20px; }
+  .signature-block { margin-top: 50px; }
+  .signature-line { border-bottom: 1px solid #000; width: 250px; display: inline-block; margin-top: 40px; }
+  .ura-box { border: 2px solid #000; padding: 15px; margin-top: 30px; background: #fafafa; }
+  .page-break { page-break-before: always; }
+  .logo-placeholder { width: 120px; height: 60px; border: 1px dashed #999; display: flex; align-items: center; justify-content: center; color: #999; font-size: 10pt; margin-bottom: 10px; }
+  ul { margin: 5px 0; padding-left: 25px; }
+  li { margin-bottom: 3px; }
+  .confidential { text-align: center; font-size: 10pt; color: #666; margin-top: 5px; font-style: italic; }
+</style>
+</head>
+<body>
+
+<!-- ═══════════ LETTERHEAD ═══════════ -->
+<div class="logo-placeholder center">[YOUR LOGO]</div>
+
+<h1><span class="placeholder">[YOUR COMPANY NAME]</span></h1>
+<p class="center" style="font-size: 10pt; margin-top: 0;">
+  <span class="placeholder">[Company Address Line 1]</span><br>
+  <span class="placeholder">[City, Uganda]</span> | Tel: <span class="placeholder">[Phone]</span> | Email: <span class="placeholder">[Email]</span>
+</p>
+<hr style="border: 1px solid #000;">
+
+<!-- ═══════════ RECIPIENT ═══════════ -->
+<p style="margin-top: 30px;">
+  <span class="bold">Date:</span> <span class="placeholder">[DD/MM/YYYY]</span>
+</p>
+<br>
+
+<p>
+  <span class="bold">The Commissioner,</span><br>
+  <span class="bold">Uganda Revenue Authority,</span><br>
+  <span class="bold">EFRIS Integration Division,</span><br>
+  Nakawa, Kampala, Uganda.
+</p>
+<br>
+
+<!-- ═══════════ SUBJECT ═══════════ -->
+<p class="center underline bold">
+  RE: REQUEST FOR EFRIS SANDBOX / TEST ENVIRONMENT ACCESS<br>
+  (SYSTEM-TO-SYSTEM INTEGRATION)
+</p>
+<br>
+
+<!-- ═══════════ SALUTATION ═══════════ -->
+<p>Dear Sir/Madam,</p>
+
+<p>
+  We, <span class="placeholder bold">[YOUR COMPANY NAME]</span>, a registered tax agent and certified EFRIS integrator applicant, write to respectfully request for
+  <span class="bold">sandbox (test) environment access</span> to the Uganda Revenue Authority Electronic Fiscal Receipt and Invoicing System (EFRIS)
+  for the purpose of testing our System-to-System (S2S) integration prior to production deployment.
+</p>
+
+<!-- ═══════════ SECTION 1 ═══════════ -->
+<h2>1. ABOUT THE APPLICANT</h2>
+
+<table>
+  <tr><th style="width:35%;">Field</th><th>Details</th></tr>
+  <tr><td>Company Name</td><td class="placeholder">[YOUR COMPANY NAME]</td></tr>
+  <tr><td>TIN</td><td class="placeholder">[YOUR 10-DIGIT TIN]</td></tr>
+  <tr><td>Registration No.</td><td class="placeholder">[COMPANY REGISTRATION NUMBER]</td></tr>
+  <tr><td>Authorized Signatory</td><td class="placeholder">[NAME OF DIRECTOR / AUTHORIZED PERSON]</td></tr>
+  <tr><td>National ID No.</td><td class="placeholder">[NATIONAL ID NUMBER]</td></tr>
+  <tr><td>Contact Phone</td><td class="placeholder">[PHONE NUMBER]</td></tr>
+  <tr><td>Email Address</td><td class="placeholder">[EMAIL ADDRESS]</td></tr>
+</table>
+
+<!-- ═══════════ SECTION 2 ═══════════ -->
+<h2>2. INTEGRATION OVERVIEW</h2>
+
+<p>
+  Our platform, <span class="bold">QwickPOS</span>, is a cloud-based Point-of-Sale system designed for Ugandan businesses.
+  We are seeking EFRIS integrator approval to enable our clients to:
+</p>
+
+<ul>
+  <li>Generate and submit electronic fiscal invoices directly to URA</li>
+  <li>Register products and commodity codes via the EFRIS product registration interface</li>
+  <li>Query invoice status and fiscal numbers in real-time</li>
+  <li>Issue credit notes and manage invoice corrections</li>
+  <li>Comply fully with the VAT Electronic Fiscal Receipting and Invoicing regulations</li>
+</ul>
+
+<!-- ═══════════ SECTION 3 ═══════════ -->
+<h2>3. TECHNICAL ARCHITECTURE</h2>
+
+<table>
+  <tr><th style="width:35%;">Component</th><th>Details</th></tr>
+  <tr><td>Integration Type</td><td><span class="bold">Direct System-to-System (S2S)</span> &mdash; No third-party middleware</td></tr>
+  <tr><td>Endpoint (Sandbox)</td><td><code>https://efristest.ura.go.ug/efrisws/ws/taapp/getInformation</code></td></tr>
+  <tr><td>Endpoint (Production)</td><td><code>https://efrisws.ura.go.ug/ws/taapp/getInformation</code></td></tr>
+  <tr><td>Authentication</td><td>RSA-2048 key pair with AES-128 encryption</td></tr>
+  <tr><td>Digital Signature</td><td>RSA-SHA1</td></tr>
+  <tr><td>Protocol</td><td>SOAP/XML over HTTPS (TLS 1.2+)</td></tr>
+  <tr><td>Platform</td><td>Supabase Edge Functions (Deno runtime)</td></tr>
+  <tr><td>Interface Codes</td><td>T101, T104, T106, T109, T110, T115, T130</td></tr>
+</table>
+
+<!-- ═══════════ SECTION 4 ═══════════ -->
+<h2>4. WHAT WE ARE REQUESTING</h2>
+
+<p>We kindly request URA to provide the following for sandbox testing:</p>
+
+<table>
+  <tr><th style="width:8%;">#</th><th style="width:30%;">Item</th><th>Purpose</th></tr>
+  <tr><td>1</td><td><span class="bold">Test TIN</span></td><td>A sandbox taxpayer identification number for test transactions</td></tr>
+  <tr><td>2</td><td><span class="bold">Test Device Number</span></td><td>A registered device number for the sandbox environment</td></tr>
+  <tr><td>3</td><td><span class="bold">Sandbox Digital Certificate</span></td><td>So that URA can recognize and validate our RSA public key</td></tr>
+  <tr><td>4</td><td><span class="bold">Sandbox API Credentials</span></td><td>Username and password for authentication with the test endpoint</td></tr>
+</table>
+
+<!-- ═══════════ SECTION 5 ═══════════ -->
+<h2>5. TEST PLAN</h2>
+
+<p>Upon receiving sandbox access, we will execute the following test sequence:</p>
+
+<table>
+  <tr><th style="width:8%;">Step</th><th style="width:20%;">Interface Code</th><th>Description</th></tr>
+  <tr><td>1</td><td>T101</td><td>Verify connectivity &mdash; obtain server time</td></tr>
+  <tr><td>2</td><td>T104</td><td>Obtain and decrypt AES encryption key using our RSA private key</td></tr>
+  <tr><td>3</td><td>T130</td><td>Register a test product (UOM, commodity code, tax category)</td></tr>
+  <tr><td>4</td><td>T109</td><td>Submit a test invoice with fiscal data</td></tr>
+  <tr><td>5</td><td>T106</td><td>Query invoice status and retrieve fiscal number</td></tr>
+  <tr><td>6</td><td>T110</td><td>Issue a credit note against the test invoice</td></tr>
+  <tr><td>7</td><td>T108</td><td>Retrieve invoice details</td></tr>
+</table>
+
+<!-- ═══════════ SECTION 6 ═══════════ -->
+<h2>6. COMPLIANCE &amp; SECURITY</h2>
+
+<ul>
+  <li>All RSA private keys are stored server-side and <span class="bold">never exposed to client browsers</span></li>
+  <li>AES encryption follows the URA-specified ECB mode with PKCS7 padding</li>
+  <li>Digital signatures are applied to all outbound requests using RSA-SHA1</li>
+  <li>All communication is over HTTPS with TLS 1.2+</li>
+  <li>We comply with the <span class="bold">Data Protection and Privacy Act, 2019</span> of Uganda</li>
+  <li>Our system supports both sandbox and production modes with a single configuration switch</li>
+</ul>
+
+<!-- ═══════════ SECTION 7 ═══════════ -->
+<h2>7. DOCUMENTS ATTACHED</h2>
+
+<ol>
+  <li>Certificate of Incorporation</li>
+  <li>TIN Certificate</li>
+  <li>National ID / Passport of Authorized Signatory</li>
+  <li>Technical Integration Document (EFRIS S2S Architecture)</li>
+  <li>This request letter</li>
+</ol>
+
+<br>
+
+<p>
+  We are committed to full compliance with URA's EFRIS requirements and look forward to a successful integration.
+  We are available for any technical discussions or demonstrations as required.
+</p>
+
+<p>Thank you for your consideration.</p>
+
+<!-- ═══════════ SIGNATURE ═══════════ -->
+<div class="signature-block">
+  <p>Yours faithfully,</p>
+
+  <div style="margin-top: 50px;">
+    <div class="signature-line"></div>
+    <br>
+    <span class="bold placeholder">[AUTHORIZED SIGNATORY NAME]</span><br>
+    <span class="placeholder">[Title / Position]</span><br>
+    <span class="placeholder">[YOUR COMPANY NAME]</span>
+  </div>
+</div>
+
+<!-- ═══════════ URA USE ONLY ═══════════ -->
+<div class="ura-box">
+  <h2 style="margin-top: 0; border: none; text-align: center;">FOR URA USE ONLY</h2>
+
+  <table>
+    <tr><th style="width:35%;">Field</th><th>Details</th></tr>
+    <tr><td>Received by</td><td style="height: 30px;"></td></tr>
+    <tr><td>Date received</td><td style="height: 30px;"></td></tr>
+    <tr><td>Sandbox TIN assigned</td><td style="height: 30px;"></td></tr>
+    <tr><td>Device Number assigned</td><td style="height: 30px;"></td></tr>
+    <tr><td>Certificate issued</td><td>&nbsp;&nbsp;&#9744; Yes&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#9744; No</td></tr>
+    <tr><td>Remarks</td><td style="height: 50px;"></td></tr>
+  </table>
+</div>
+
+<br><br>
+
+<p class="center" style="font-size: 9pt; color: #666;">
+  This document was prepared for submission to Uganda Revenue Authority, Nakawa office.<br>
+  For questions, contact: <span class="placeholder">[YOUR PHONE]</span> / <span class="placeholder">[YOUR EMAIL]</span>
+</p>
+
+</body>
+</html>

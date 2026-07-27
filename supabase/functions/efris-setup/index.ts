@@ -21,7 +21,7 @@ const ALLOWED_ORIGINS = [Deno.env.get("APP_ORIGIN") || "", Deno.env.get("APP_ORI
 function corsHeaders(req?: Request) {
   const origin = req?.headers?.get("origin") || "";
   const allowed = ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0] || "*";
-  return { "Access-Control-Allow-Origin": allowed, "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type" };
+  return { "Access-Control-Allow-Origin": allowed, "Access-Control-Allow-Methods": "POST, OPTIONS", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type" };
 }
 function json(body: unknown, status = 200, headers: Record<string, string> = {}) {
   return new Response(JSON.stringify(body), { status, headers: { ...headers, "Content-Type": "application/json" } });
@@ -35,7 +35,7 @@ async function generateRSAKeyPair(): Promise<{ privateKeyPem: string; publicKeyP
   const keyPair = await crypto.subtle.generateKey(
     { name: "RSA-OAEP", modulusLength: 2048, publicExponent: new Uint8Array([1, 0, 1]), hash: "SHA-1" },
     true,
-    ["encrypt", "decrypt", "sign", "verify"]
+    ["encrypt", "decrypt"]
   );
 
   // Export as DER then convert to PEM
