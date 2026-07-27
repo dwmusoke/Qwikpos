@@ -48,9 +48,16 @@ export async function payForPlan(plan, { onSuccess, onClose } = {}) {
   // call AND the async webhook can identify what was purchased without
   // trusting anything else from the client. See uganda-pos-fn-*.ts.
   const txRef = `SUB_${STATE.business.id}_${plan.code}_${Date.now()}`;
-  const email = STATE.session?.user?.email
-    || STATE.appUser?.email
+
+  const isValidEmail = (v) => typeof v === 'string' && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
+  const email = [STATE.session?.user?.email, STATE.appUser?.email].find(isValidEmail)
     || `billing-${(STATE.business.id || 'unknown').slice(0, 8)}@qwickpos.com`;
+
+  const customer = { email };
+  const phone = STATE.appUser?.phone;
+  if (phone) customer.phone_number = phone;
+  const name = STATE.appUser?.full_name || STATE.business?.name;
+  if (name) customer.name = name;
 
   window.FlutterwaveCheckout({
     public_key: FLW_PUBLIC_KEY,
@@ -58,11 +65,7 @@ export async function payForPlan(plan, { onSuccess, onClose } = {}) {
     amount: Number(plan.price_ugx),
     currency: 'UGX',
     payment_options: 'mobilemoneyuganda, card, ussd, banktransfer',
-    customer: {
-      email,
-      phone_number: STATE.appUser?.phone || '',
-      name: STATE.appUser?.full_name || STATE.business?.name || 'Customer',
-    },
+    customer,
     customizations: {
       title: 'Qwickpos Subscription',
       description: `${plan.name} plan — ${Number(plan.price_ugx).toLocaleString('en-UG')} UGX / month`,
