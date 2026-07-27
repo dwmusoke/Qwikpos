@@ -500,7 +500,10 @@ export async function renderSettings(root) {
 
   qsa('[data-role-user]').forEach((sel) => sel.addEventListener('change', async () => {
     if (!hasRole('admin')) { toast('Only admins can change roles', 'error'); return; }
-    await supabase.from('app_users').update({ role: sel.value }).eq('id', sel.dataset.roleUser);
+    const { error } = await supabase.functions.invoke('manage-user', {
+      body: { action: 'update_user', user_id: sel.dataset.roleUser, role: sel.value },
+    });
+    if (error) { toast('Failed: ' + error.message, 'error'); return; }
     toast('Role updated', 'success');
   }));
 
@@ -508,7 +511,10 @@ export async function renderSettings(root) {
     if (!hasRole('admin')) { toast('Only admins can activate/deactivate users', 'error'); return; }
     if (btn.dataset.toggleUser === STATE.appUser.id) { toast("You cannot deactivate your own account", "error"); return; }
     const row = (users || []).find((u) => u.id === btn.dataset.toggleUser);
-    await supabase.from('app_users').update({ is_active: !row.is_active }).eq('id', row.id);
+    const { error } = await supabase.functions.invoke('manage-user', {
+      body: { action: 'update_user', user_id: row.id, is_active: !row.is_active },
+    });
+    if (error) { toast('Failed: ' + error.message, 'error'); return; }
     toast('Updated', 'success');
     renderSettings(root);
   }));
@@ -1026,10 +1032,11 @@ export async function renderSettings(root) {
         if (!name) { toast("Name is required", "error"); return; }
         if (newPw && newPw.length < 8) { toast("Password must be at least 8 characters", "error"); return; }
 
-        // Update app_users fields
-        const { error } = await supabase.from('app_users').update({
-          full_name: name, phone: phone || null, role, is_active: isActive,
-        }).eq('id', u.id);
+        // Update via edge function (bypasses RLS)
+        toast("Saving…", "default");
+        const { error } = await supabase.functions.invoke('manage-user', {
+          body: { action: 'update_user', user_id: u.id, full_name: name, phone: phone || null, role, is_active: isActive },
+        });
         if (error) { toast("Failed: " + error.message, "error"); return; }
 
         // Update email via edge function (requires service role)
