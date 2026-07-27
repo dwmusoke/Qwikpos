@@ -563,13 +563,6 @@ export async function renderSettings(root) {
       });
     }});
   });
-        if (userErr) { toast("DB error: " + userErr.message, "error"); return; }
-        toast("User created", "success");
-        closeModal();
-        renderSettings(root);
-      });
-    }});
-  });
 
   // Theme: preset swatches
   qsa(".theme-color-swatch").forEach((sw) => {
