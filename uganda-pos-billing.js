@@ -49,7 +49,7 @@ export async function payForPlan(plan, { onSuccess, onClose } = {}) {
   // trusting anything else from the client. See uganda-pos-fn-*.ts.
   const txRef = `SUB_${STATE.business.id}_${plan.code}_${Date.now()}`;
   const email = STATE.session?.user?.email
-    || STATE.appUser?.phone
+    || STATE.appUser?.email
     || `billing-${(STATE.business.id || 'unknown').slice(0, 8)}@qwickpos.com`;
 
   window.FlutterwaveCheckout({
