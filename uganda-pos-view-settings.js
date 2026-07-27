@@ -169,11 +169,11 @@ export async function renderSettings(root) {
                 <td>${u.is_active ? '<span class="badge badge-green">active</span>' : '<span class="badge badge-gray">inactive</span>'}</td>
                 <td>
                   <div style="display:flex;gap:4px;">
+                    <button class="btn btn-secondary btn-sm" data-edit-user="${u.id}" title="Edit">✏️</button>
                     ${u.id !== STATE.appUser.id ? `
-                      <button class="btn btn-secondary btn-sm" data-edit-user="${u.id}" title="Edit">✏️</button>
                       <button class="btn btn-secondary btn-sm" data-toggle-user="${u.id}" title="${u.is_active ? 'Deactivate' : 'Activate'}">${u.is_active ? '🔒' : '🔓'}</button>
                       <button class="btn btn-secondary btn-sm" data-share-user="${u.id}" title="Copy user info">📋</button>
-                    ` : '<span class="text-muted" style="font-size:11px;">you</span>'}
+                    ` : ''}
                   </div>
                 </td>
               </tr>`).join('')}
@@ -506,6 +506,7 @@ export async function renderSettings(root) {
 
   qsa('[data-toggle-user]').forEach((btn) => btn.addEventListener('click', async () => {
     if (!hasRole('admin')) { toast('Only admins can activate/deactivate users', 'error'); return; }
+    if (btn.dataset.toggleUser === STATE.appUser.id) { toast("You cannot deactivate your own account", "error"); return; }
     const row = (users || []).find((u) => u.id === btn.dataset.toggleUser);
     await supabase.from('app_users').update({ is_active: !row.is_active }).eq('id', row.id);
     toast('Updated', 'success');

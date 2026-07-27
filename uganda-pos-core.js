@@ -357,6 +357,13 @@ export async function loadBootstrapData() {
   STATE.appUser = appUser;
   STATE.isSuperadmin = appUser.role === "superadmin";
 
+  // Auto-activate user on login — if they can authenticate, they're active
+  if (!appUser.is_active) {
+    await supabase.from("app_users").update({ is_active: true }).eq("id", appUser.id);
+    appUser.is_active = true;
+    STATE.appUser.is_active = true;
+  }
+
   // A superadmin with no business_id manages the whole platform from the
   // Admin console instead of a single vendor's dashboard — nothing else
   // to bootstrap for them.
