@@ -181,8 +181,8 @@ export async function renderSettings(root) {
         </table>
       </div>
       <p class="help-text" style="margin-top:10px;">
-        To add a new team member: create their login in <b>Supabase Dashboard → Authentication → Users</b>, then run
-        the linking SQL shown in <b>uganda-pos-seed.sql</b> with their new user ID, full name and role.
+        Click <b>+ Add User</b> to create a new team member with their login credentials.
+        They'll receive full access based on the role you assign.
       </p>
     </div>
 
