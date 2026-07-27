@@ -1005,6 +1005,11 @@ export async function renderSettings(root) {
           <select id="eu-active"><option value="true" ${u.is_active ? 'selected' : ''}>Active</option><option value="false" ${!u.is_active ? 'selected' : ''}>Inactive</option></select>
         </div>
       </div>
+      <div style="margin-top:16px;border-top:1px dashed var(--border);padding-top:14px;">
+        <div style="font-weight:600;font-size:13px;margin-bottom:8px;">🔑 Reset Password</div>
+        <p class="help-text" style="margin-bottom:8px;">Leave blank to keep current password.</p>
+        <div class="field"><label>New Password</label><input id="eu-pw" type="password" minlength="8" placeholder="Min 8 characters" /></div>
+      </div>
       <div class="flex gap" style="margin-top:14px;">
         <button class="btn btn-secondary btn-block" data-close-modal>Cancel</button>
         <button class="btn btn-primary btn-block" id="eu-save">Save Changes</button>
@@ -1016,7 +1021,9 @@ export async function renderSettings(root) {
         const newEmail = $('eu-email').value.trim();
         const role = $('eu-role').value;
         const isActive = $('eu-active').value === 'true';
+        const newPw = $('eu-pw').value;
         if (!name) { toast("Name is required", "error"); return; }
+        if (newPw && newPw.length < 8) { toast("Password must be at least 8 characters", "error"); return; }
 
         // Update app_users fields
         const { error } = await supabase.from('app_users').update({
@@ -1030,6 +1037,15 @@ export async function renderSettings(root) {
             body: { action: 'update_email', user_id: u.id, email: newEmail },
           });
           if (emailErr) { toast("Email update failed: " + emailErr.message, "error"); return; }
+        }
+
+        // Reset password via edge function (requires service role)
+        if (newPw) {
+          toast("Resetting password…", "default");
+          const { error: pwErr } = await supabase.functions.invoke('manage-user', {
+            body: { action: 'reset_password', user_id: u.id, password: newPw },
+          });
+          if (pwErr) { toast("Password reset failed: " + pwErr.message, "error"); return; }
         }
 
         toast("User updated", "success");

@@ -107,6 +107,14 @@ Deno.serve(async (req) => {
         return json({ success: true }, 200, cors);
       }
 
+      case "reset_password": {
+        const { password } = body;
+        if (!password || password.length < 8) return json({ success: false, error: "Password must be at least 8 characters" }, 400, cors);
+        const { error } = await admin.auth.admin.updateUserById(user_id, { password });
+        if (error) return json({ success: false, error: error.message }, 400, cors);
+        return json({ success: true }, 200, cors);
+      }
+
       case "update_user": {
         const updates: any = {};
         if (full_name !== undefined) updates.full_name = full_name;
