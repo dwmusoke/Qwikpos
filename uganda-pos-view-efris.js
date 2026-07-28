@@ -171,6 +171,8 @@ function viewPayload(invoice) {
     <div class="flex gap" style="margin-top:12px; flex-wrap:wrap;">
       ${invoice.status === "accepted" ? `<button class="btn btn-secondary" data-print-payload="${invoice.id}">🖨️ Print EFRIS Receipt</button>` : ""}
       ${invoice.status === "accepted" ? `<button class="btn btn-primary" data-whatsapp-payload="${invoice.id}">📱 Share via WhatsApp</button>` : ""}
+      ${invoice.status === "accepted" ? `<button class="btn btn-secondary" data-email-payload="${invoice.id}">📧 Email Receipt</button>` : ""}
+      ${invoice.status === "accepted" ? `<button class="btn btn-secondary" data-sms-payload="${invoice.id}">📱 SMS Receipt</button>` : ""}
     </div>
     <button class="btn btn-secondary btn-block" data-close-modal style="margin-top:10px;">Close</button>
   `,
@@ -182,6 +184,12 @@ function viewPayload(invoice) {
 
   const whatsappBtn = document.querySelector("[data-whatsapp-payload]");
   whatsappBtn?.addEventListener("click", () => shareEfrisReceiptWhatsApp(invoice));
+
+  const emailBtn = document.querySelector("[data-email-payload]");
+  emailBtn?.addEventListener("click", () => shareEfrisReceiptEmail(invoice));
+
+  const smsBtn = document.querySelector("[data-sms-payload]");
+  smsBtn?.addEventListener("click", () => shareEfrisReceiptSms(invoice));
 }
 
 async function printEfrisReceipt(invoice) {
@@ -550,4 +558,105 @@ Powered by Qwickpos
   }
 
   toast("WhatsApp opened — select contact to send", "success");
+}
+
+async function shareEfrisReceiptEmail(invoice) {
+  const customer = invoice.sales?.customer || {};
+  const customerEmail = customer.email || invoice.customer_email || "";
+  const message = buildEfrisReceiptText(invoice);
+
+  if (customerEmail) {
+    // Try the send-receipt edge function
+    try {
+      const { SUPABASE_URL, SUPABASE_ANON_KEY } = await import("./uganda-pos-core.js");
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/send-receipt`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ 
+          sale_id: invoice.sale_id, 
+          channel: "email",
+          custom_message: message,
+          to_email: customerEmail 
+        }),
+      });
+      const result = await res.json();
+      if (result.success) {
+        toast("Email receipt sent!", "success");
+        return;
+      }
+    } catch (e) {
+      console.warn("Email via edge function failed, falling back to mailto:", e);
+    }
+  }
+
+  // Fallback: open mailto link
+  const subject = `EFRIS Receipt — ${invoice.fiscal_invoice_number}`;
+  const mailtoUrl = `mailto:${encodeURIComponent(customerEmail)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(message)}`;
+  window.open(mailtoUrl, "_blank");
+  toast("Email client opened" + (customerEmail ? ` to ${customerEmail}` : ""), "success");
+}
+
+async function shareEfrisReceiptSms(invoice) {
+  const customerPhone = invoice.customer_phone || invoice.sales?.customer?.phone || "";
+  const message = buildEfrisReceiptText(invoice);
+
+  if (customerPhone) {
+    // Try the send-receipt edge function
+    try {
+      const { SUPABASE_URL, SUPABASE_ANON_KEY } = await import("./uganda-pos-core.js");
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/send-receipt`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ 
+          sale_id: invoice.sale_id, 
+          channel: "sms",
+          custom_message: message,
+          to_phone: customerPhone 
+        }),
+      });
+      const result = await res.json();
+      if (result.success) {
+        toast("SMS receipt sent!", "success");
+        return;
+      }
+    } catch (e) {
+      console.warn("SMS via edge function failed, falling back to sms:", e);
+    }
+  }
+
+  // Fallback: open sms link
+  const phone = customerPhone?.replace(/[^0-9]/g, "");
+  const smsUrl = phone ? `sms:${phone}?body=${encodeURIComponent(message)}` : `sms:?body=${encodeURIComponent(message)}`;
+  window.open(smsUrl, "_blank");
+  toast("SMS app opened" + (customerPhone ? ` to ${customerPhone}` : ""), "success");
+}
+
+function buildEfrisReceiptText(invoice) {
+  const business = STATE.business;
+  const customerName = invoice.customer_name || "Walk-in Customer";
+  const currency = invoice.currency_code || business.base_currency || "UGX";
+  const formatMoney = (amt) => `${currency} ${Number(amt || 0).toLocaleString()}`;
+
+  return `
+${business.name || "Qwickpos"} — EFRIS Fiscal Receipt
+FDN: ${invoice.fiscal_invoice_number}
+${invoice.antifake_code ? `Anti-fake: ${invoice.antifake_code}` : ""}
+Date: ${new Date(invoice.created_at).toLocaleString("en-UG")}
+Customer: ${customerName}
+${invoice.customer_tin ? `Customer TIN: ${invoice.customer_tin}` : ""}
+Sale: ${invoice.sales?.sale_number || "—"}
+Operator: ${STATE.appUser?.full_name || "Cashier"}
+
+Total: ${formatMoney(invoice.gross_amount)}
+VAT Incl: ${formatMoney(invoice.vat_amount)}
+
+Verified via URA EFRIS: efris.ura.go.ug
+Powered by Qwickpos
+  `.trim();
 }
