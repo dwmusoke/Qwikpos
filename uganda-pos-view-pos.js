@@ -580,6 +580,7 @@ function addToCart(productId, qty = 1) {
     STATE.cart.push({
       productId,
       name: product.name,
+      imageUrl: product.image_url || null,
       qty: addQty,
       unitPriceBase: Number(product.selling_price),
       taxCode: product.tax_category_code || "VAT",
@@ -657,6 +658,7 @@ function renderCart() {
         (l, idx) => `
       <div class="cart-row" data-id="${l.productId}" data-idx="${idx}">
         <div class="cart-row-top">
+          ${l.imageUrl ? `<img src="${escapeHtml(l.imageUrl)}" alt="" style="width:28px;height:28px;border-radius:4px;object-fit:cover;flex-shrink:0;margin-right:8px" />` : `<div style="width:28px;height:28px;border-radius:4px;background:var(--surface-2);display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;margin-right:8px">📦</div>`}
           <div class="info">
             <div class="name">${escapeHtml(l.name)}</div>
             <div class="unit">${fmtMoneyRaw(l.unitPrice, posSaleCurrency)} each${l.expiryDate ? ` · Exp: ${l.expiryDate}` : ""}${l.batchNumber ? ` · Batch: ${escapeHtml(l.batchNumber)}` : ""}</div>

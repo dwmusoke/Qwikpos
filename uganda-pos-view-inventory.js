@@ -152,7 +152,7 @@ function renderProductTable() {
       <tr>
         <td>
           <div style="display:flex;align-items:center;gap:10px">
-            ${p.image_url ? `<img src="${escapeHtml(p.image_url)}" alt="" style="width:36px;height:36px;border-radius:6px;object-fit:cover" />` : `<div style="width:36px;height:36px;border-radius:6px;background:var(--surface-2);display:flex;align-items:center;justify-content:center;font-size:16px">📦</div>`}
+            ${p.image_url ? `<img src="${escapeHtml(p.image_url)}" alt="" style="width:28px;height:28px;border-radius:4px;object-fit:cover" />` : `<div style="width:28px;height:28px;border-radius:4px;background:var(--surface-2);display:flex;align-items:center;justify-content:center;font-size:14px">📦</div>`}
             <div><b>${escapeHtml(p.name)}</b>${expired ? ' <span class="badge badge-red" style="font-size:10px;">EXPIRED</span>' : expiringSoon ? ' <span class="badge badge-yellow" style="font-size:10px;">EXPIRING SOON</span>' : ""}<br/><span class="text-muted" style="font-size:11.5px;">SKU: ${escapeHtml(p.sku || "—")} · Barcode: ${escapeHtml(p.barcode || "—")}</span></div>
           </div>
         </td>
