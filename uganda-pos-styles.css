@@ -1941,8 +1941,8 @@ tbody tr:hover {
 
 .product-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
-  gap: 6px;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 8px;
   overflow-y: auto;
   padding-bottom: 12px;
   flex: 1;
@@ -1958,7 +1958,7 @@ tbody tr:hover {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
-  padding: 8px 6px;
+  padding: 10px 8px;
   cursor: pointer;
   text-align: center;
   display: flex;
@@ -1967,8 +1967,8 @@ tbody tr:hover {
   gap: 4px;
   transition: all var(--dur-fast) var(--ease);
   -webkit-tap-highlight-color: transparent;
-  min-height: 125px;
-  max-height: 140px;
+  min-height: 140px;
+  max-height: 160px;
 }
 .product-card:hover {
   border-color: var(--brand);
@@ -1994,8 +1994,9 @@ tbody tr:hover {
   letter-spacing: -0.02em;
 }
 .product-card .pstock {
-  font-size: 10.5px;
-  color: var(--text-muted);
+  font-size: 11px;
+  color: var(--text-secondary);
+  font-weight: 500;
 }
 .product-card .pstock.low {
   color: var(--danger);
