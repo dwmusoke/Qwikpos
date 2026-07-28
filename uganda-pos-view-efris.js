@@ -120,6 +120,7 @@ export async function renderEfris(root) {
         <td class="flex gap">
           <button class="btn btn-secondary btn-sm" data-view="${inv.id}">Payload</button>
           ${["pending", "queued", "failed"].includes(inv.status) ? `<button class="btn btn-primary btn-sm" data-submit="${inv.id}">Submit</button>` : ""}
+          ${inv.status === "accepted" ? `<button class="btn btn-secondary btn-sm" data-print="${inv.id}">🖨️ Print EFRIS</button>` : ""}
         </td>
       </tr>`,
       )
@@ -132,6 +133,9 @@ export async function renderEfris(root) {
     );
     qsa("[data-submit]", tbody).forEach((b) =>
       b.addEventListener("click", () => submitInvoice(b.dataset.submit)),
+    );
+    qsa("[data-print]", tbody).forEach((b) =>
+      b.addEventListener("click", () => printEfrisReceipt(invoices.find((i) => i.id === b.dataset.print))),
     );
   };
 
@@ -162,11 +166,106 @@ function viewPayload(invoice) {
     <div class="modal-title-row"><h3>EFRIS Payload — ${escapeHtml(invoice.fiscal_invoice_number)}</h3></div>
     <pre style="background:var(--surface-2); padding:14px; border-radius:8px; max-height:400px; overflow:auto; font-size:11.5px;">${escapeHtml(JSON.stringify(invoice.payload_json, null, 2))}</pre>
     ${invoice.antifake_code ? `<p class="help-text">Anti-fake code: <b>${escapeHtml(invoice.antifake_code)}</b></p>` : ""}
+    ${invoice.qr_code ? `<p class="help-text">QR Code: <b>${escapeHtml(invoice.qr_code)}</b></p>` : ""}
     ${invoice.error_message ? `<p class="help-text" style="color:var(--danger);">Error: ${escapeHtml(invoice.error_message)}</p>` : ""}
+    ${invoice.status === "accepted" ? `<button class="btn btn-secondary btn-block" data-print-payload="${invoice.id}" style="margin-top:10px;">🖨️ Print EFRIS Receipt</button>` : ""}
     <button class="btn btn-secondary btn-block" data-close-modal style="margin-top:10px;">Close</button>
   `,
     { large: true },
   );
+
+  const printBtn = document.querySelector("[data-print-payload]");
+  printBtn?.addEventListener("click", () => printEfrisReceipt(invoice));
+}
+
+async function printEfrisReceipt(invoice) {
+  const sale = invoice.sales || {};
+  const business = STATE.business;
+  const customerName = invoice.customer_name || "Walk-in Customer";
+  const customerTin = invoice.customer_tin || "";
+  const items = sale.sale_items || [];
+  const currency = invoice.currency_code || business.base_currency || "UGX";
+
+  const formatMoney = (amt) => fmtMoneyRaw(Number(amt || 0), currency);
+
+  const linesHtml = items
+    .map(
+      (it) => `
+    <tr>
+      <td>${escapeHtml(it.product_name || it.name)}</td>
+      <td class="text-right">${it.quantity || it.qty}</td>
+      <td class="text-right">${formatMoney(it.unit_price || it.price)}</td>
+      <td class="text-right font-bold">${formatMoney(it.line_total || it.total)}</td>
+    </tr>
+  `,
+    )
+    .join("");
+
+  const efrisHtml = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>EFRIS Receipt - ${escapeHtml(invoice.fiscal_invoice_number)}</title>
+      <style>
+        @media print { @page { width: 80mm; margin: 2mm; } body { margin: 0; } }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: monospace; font-size: 12px; color: #333; display: flex; justify-content: center; padding: 10px; }
+        .receipt { width: 300px; padding: 12px; }
+        .center { text-align: center; }
+        hr { border: none; border-top: 1px dashed #333; margin: 8px 0; }
+        .qr-wrap { text-align: center; margin: 8px 0; }
+        .qr-wrap img { width: 100px; height: 100px; image-rendering: pixelated; }
+        .title { font-weight: bold; font-size: 14px; text-align: center; color: #0f6b4a; }
+        .label { font-size: 11px; color: #999; }
+        .value { font-size: 11px; font-weight: bold; }
+        table { width: 100%; font-size: 11px; }
+        td { padding: 2px 0; }
+        .total-row { font-weight: bold; font-size: 13px; color: #0f6b4a; border-top: 1px solid #0f6b4a; padding-top: 6px; margin-top: 6px; }
+      </style>
+    </head>
+    <body>
+    <div class="receipt">
+      ${business.logo_url ? `<div class="center"><img src="${escapeHtml(business.logo_url)}" style="max-height:50px;" /></div>` : ""}
+      <div class="center" style="font-weight:bold; font-size:14px; color:#0f6b4a;">${escapeHtml(business.name || "Business")}</div>
+      ${business.tin ? `<div class="center" style="font-size:11px;">TIN: ${escapeHtml(business.tin)}</div>` : ""}
+      ${business.address ? `<div class="center" style="font-size:11px;">${escapeHtml(business.address)}</div>` : ""}
+      <hr />
+      <div class="title">FISCAL RECEIPT (EFRIS)</div>
+      <div style="font-size:11px;">FDN: ${escapeHtml(invoice.fiscal_invoice_number)}</div>
+      ${invoice.antifake_code ? `<div style="font-size:11px;">Anti-fake: ${escapeHtml(invoice.antifake_code)}</div>` : ""}
+      ${invoice.qr_code ? `<div class="qr-wrap"><img src="https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent(invoice.qr_code)}" alt="EFRIS QR" /></div>` : ""}
+      <hr />
+      <div style="font-size:11px;">Sale: ${escapeHtml(sale.sale_number || "—")}</div>
+      <div style="font-size:11px;">Date: ${new Date(invoice.created_at).toLocaleString("en-UG")}</div>
+      <div style="font-size:11px;">Customer: ${escapeHtml(customerName)}${customerTin ? ` (TIN: ${escapeHtml(customerTin)})` : ""}</div>
+      <hr />
+      <table>
+        <thead>
+          <tr style="border-bottom:1px solid #333;"><th style="text-align:left;">Item</th><th style="text-align:right;">Qty</th><th style="text-align:right;">Price</th><th style="text-align:right;">Total</th></tr>
+        </thead>
+        <tbody>
+          ${linesHtml}
+        </tbody>
+      </table>
+      <hr />
+      <table style="width:100%; font-size:11px;">
+        <tr><td>Subtotal</td><td style="text-align:right;">${formatMoney(invoice.gross_amount - invoice.vat_amount)}</td></tr>
+        <tr><td>VAT (18%)</td><td style="text-align:right;">${formatMoney(invoice.vat_amount)}</td></tr>
+        <tr class="total-row"><td>TOTAL</td><td style="text-align:right;">${formatMoney(invoice.gross_amount)}</td></tr>
+      </table>
+      <hr />
+      <div class="center" style="font-size:10px; color:#999;">Verified via URA EFRIS</div>
+      <div class="center" style="font-size:10px; color:#999;">Thank you for your business!</div>
+    </div>
+    </body>
+    </html>
+  `;
+
+  const w = window.open("", "_blank");
+  if (!w) { toast("Popup blocked. Allow popups to print.", "error", 4000); return; }
+  w.document.write(efrisHtml);
+  w.document.close();
+  w.onload = () => { w.focus(); w.print(); w.close(); };
 }
 
 async function submitInvoice(invoiceId) {
@@ -329,4 +428,80 @@ function exportCsv(invoices) {
   a.download = `efris-invoices-${new Date().toISOString().slice(0, 10)}.csv`;
   a.click();
   URL.revokeObjectURL(url);
+}
+
+async function printEfrisReceipt(invoice) {
+  if (!invoice || invoice.status !== "accepted") {
+    toast("Only accepted invoices can be printed as EFRIS receipts", "error");
+    return;
+  }
+
+  const qrData = invoice.qr_code || invoice.payload_json?.qrCode || "";
+  const qrImageUrl = qrData
+    ? `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(qrData)}`
+    : "";
+
+  const business = STATE.business;
+  const sale = invoice.sales;
+  const customer = {
+    name: invoice.customer_name || "Walk-in Customer",
+    tin: invoice.customer_tin || "",
+    phone: "",
+    email: "",
+  };
+
+  const html = `
+    <!doctype html>
+    <html>
+    <head>
+      <title>EFRIS Receipt — ${escapeHtml(invoice.fiscal_invoice_number)}</title>
+      <style>
+        @media print { @page { width: 80mm; margin: 2mm; } body { margin: 0; } }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: monospace; font-size: 12px; display: flex; justify-content: center; padding: 10px; }
+        .receipt { width: 300px; padding: 12px; background: white; }
+        .center { text-align: center; }
+        .bold { font-weight: bold; }
+        .qr { display: block; margin: 8px auto; }
+        hr { border: none; border-top: 1px dashed #000; margin: 8px 0; }
+        .row { display: flex; justify-content: space-between; margin: 4px 0; }
+        .label { color: #666; }
+        .value { text-align: right; }
+        .total { font-weight: bold; font-size: 14px; border-top: 1px solid #000; padding-top: 6px; margin-top: 6px; }
+        .footer { text-align: center; font-size: 10px; margin-top: 8px; color: #666; }
+      </style>
+    </head>
+    <body>
+    <div class="receipt">
+      ${business.logo_url ? `<div class="center"><img src="${escapeHtml(business.logo_url)}" style="max-height:40px;"></div>` : ""}
+      <div class="center bold" style="font-size:14px; color:#0f6b4a;">${escapeHtml(business.name || "Qwickpos")}</div>
+      ${business.address ? `<div class="center" style="font-size:10px;">${escapeHtml(business.address)}</div>` : ""}
+      ${business.tin ? `<div class="center" style="font-size:10px;">TIN: ${escapeHtml(business.tin)}</div>` : ""}
+      ${business.phone ? `<div class="center" style="font-size:10px;">${escapeHtml(business.phone)}</div>` : ""}
+      <hr />
+      <div class="center bold" style="color:#0f6b4a;">TAX INVOICE</div>
+      <div class="center" style="font-size:11px;">EFRIS Fiscal Invoice</div>
+      <hr />
+      <div class="row"><span class="label">Fiscal No:</span><span class="value bold">${escapeHtml(invoice.fiscal_invoice_number)}</span></div>
+      ${sale ? `<div class="row"><span class="label">Sale No:</span><span class="value">${escapeHtml(sale.sale_number)}</span></div>` : ""}
+      <div class="row"><span class="label">Customer:</span><span class="value">${escapeHtml(customer.name)}</span></div>
+      ${customer.tin ? `<div class="row"><span class="label">Customer TIN:</span><span class="value">${escapeHtml(customer.tin)}</span></div>` : ""}
+      <div class="row"><span class="label">Date:</span><span class="value">${new Date(invoice.created_at).toLocaleString("en-UG")}</span></div>
+      <div class="row"><span class="label">Operator:</span><span class="value">${escapeHtml(STATE.appUser?.full_name || "Cashier")}</span></div>
+      <hr />
+      ${qrImageUrl ? `<img src="${qrImageUrl}" alt="EFRIS QR" class="qr" style="width:100px;height:100px;">` : ""}
+      ${invoice.antifake_code ? `<div class="center" style="font-size:10px;margin:4px 0;"><b>Anti-fake:</b> ${escapeHtml(invoice.antifake_code)}</div>` : ""}
+      <hr />
+      <div class="row total"><span>TOTAL</span><span>${escapeHtml(invoice.currency_code || "UGX")} ${Number(invoice.gross_amount || 0).toLocaleString()}</span></div>
+      <div class="row"><span class="label">VAT Incl.</span><span class="value">${escapeHtml(invoice.currency_code || "UGX")} ${Number(invoice.vat_amount || 0).toLocaleString()}</span></div>
+      <hr />
+      <div class="footer">Verify at efris.ura.go.ug</div>
+      <div class="footer">Powered by Qwickpos</div>
+    </div>
+    </body></html>`;
+
+  const win = window.open("", "_blank");
+  win.document.write(html);
+  win.document.close();
+  setTimeout(() => win.print(), 500);
 }
