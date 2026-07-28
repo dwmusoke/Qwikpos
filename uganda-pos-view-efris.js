@@ -168,7 +168,10 @@ function viewPayload(invoice) {
     ${invoice.antifake_code ? `<p class="help-text">Anti-fake code: <b>${escapeHtml(invoice.antifake_code)}</b></p>` : ""}
     ${invoice.qr_code ? `<p class="help-text">QR Code: <b>${escapeHtml(invoice.qr_code)}</b></p>` : ""}
     ${invoice.error_message ? `<p class="help-text" style="color:var(--danger);">Error: ${escapeHtml(invoice.error_message)}</p>` : ""}
-    ${invoice.status === "accepted" ? `<button class="btn btn-secondary btn-block" data-print-payload="${invoice.id}" style="margin-top:10px;">🖨️ Print EFRIS Receipt</button>` : ""}
+    <div class="flex gap" style="margin-top:12px; flex-wrap:wrap;">
+      ${invoice.status === "accepted" ? `<button class="btn btn-secondary" data-print-payload="${invoice.id}">🖨️ Print EFRIS Receipt</button>` : ""}
+      ${invoice.status === "accepted" ? `<button class="btn btn-primary" data-whatsapp-payload="${invoice.id}">📱 Share via WhatsApp</button>` : ""}
+    </div>
     <button class="btn btn-secondary btn-block" data-close-modal style="margin-top:10px;">Close</button>
   `,
     { large: true },
@@ -176,6 +179,9 @@ function viewPayload(invoice) {
 
   const printBtn = document.querySelector("[data-print-payload]");
   printBtn?.addEventListener("click", () => printEfrisReceipt(invoice));
+
+  const whatsappBtn = document.querySelector("[data-whatsapp-payload]");
+  whatsappBtn?.addEventListener("click", () => shareEfrisReceiptWhatsApp(invoice));
 }
 
 async function printEfrisReceipt(invoice) {
@@ -504,4 +510,44 @@ async function printEfrisReceipt(invoice) {
   win.document.write(html);
   win.document.close();
   setTimeout(() => win.print(), 500);
+}
+
+function shareEfrisReceiptWhatsApp(invoice) {
+  const business = STATE.business;
+  const customerName = invoice.customer_name || "Walk-in Customer";
+  const customerPhone = invoice.customer_phone || "";
+  const currency = invoice.currency_code || business.base_currency || "UGX";
+  const formatMoney = (amt) => `${currency} ${Number(amt || 0).toLocaleString()}`;
+
+  const message = `
+*${business.name || "Qwickpos"} — EFRIS Fiscal Receipt*
+FDN: ${invoice.fiscal_invoice_number}
+${invoice.antifake_code ? `Anti-fake: ${invoice.antifake_code}` : ""}
+Date: ${new Date(invoice.created_at).toLocaleString("en-UG")}
+Customer: ${customerName}
+${invoice.customer_tin ? `Customer TIN: ${invoice.customer_tin}` : ""}
+Sale: ${invoice.sales?.sale_number || "—"}
+Operator: ${STATE.appUser?.full_name || "Cashier"}
+
+Total: *${formatMoney(invoice.gross_amount)}*
+VAT Incl: ${formatMoney(invoice.vat_amount)}
+
+Verified via URA EFRIS
+efris.ura.go.ug
+Powered by Qwickpos
+  `.trim();
+
+  const encodedMsg = encodeURIComponent(message);
+
+  if (customerPhone) {
+    // Try to use customer's phone number
+    const phone = customerPhone.replace(/[^0-9]/g, "");
+    const url = `https://wa.me/${phone.startsWith("0") ? "256" + phone.slice(1) : phone}?text=${encodedMsg}`;
+    window.open(url, "_blank");
+  } else {
+    // Open WhatsApp with pre-filled message (user selects contact)
+    window.open(`https://wa.me/?text=${encodedMsg}`, "_blank");
+  }
+
+  toast("WhatsApp opened — select contact to send", "success");
 }
