@@ -1071,19 +1071,25 @@ function openCameraScanner() {
 
         // Try to use BarcodeDetector API if available
         if ("BarcodeDetector" in window) {
-          const detector = new BarcodeDetector({
-            formats: [
-              "ean_13",
-              "ean_8",
-              "code_128",
-              "code_39",
-              "upc_a",
-              "upc_e",
-            ],
-          });
+          let detector;
+          try {
+            detector = new BarcodeDetector({
+              formats: [
+                "ean_13",
+                "ean_8",
+                "code_128",
+                "code_39",
+                "upc_a",
+                "upc_e",
+              ],
+            });
+          } catch (_) {
+            resultEl.textContent = "Barcode detection not supported on this browser";
+            return;
+          }
           const scan = async () => {
             if (!stream || !video.videoWidth) {
-              requestAnimationFrame(scan);
+              setTimeout(() => requestAnimationFrame(scan), 200);
               return;
             }
             try {
@@ -1093,7 +1099,7 @@ function openCameraScanner() {
                 return;
               }
             } catch (_) {}
-            requestAnimationFrame(scan);
+            setTimeout(() => requestAnimationFrame(scan), 200);
           };
           video.addEventListener("playing", () => requestAnimationFrame(scan));
         }
@@ -1107,11 +1113,6 @@ function openCameraScanner() {
           );
           if (product) {
             resultEl.innerHTML = `✅ Found: <b>${escapeHtml(product.name)}</b> — ${fmtMoney(product.selling_price)}`;
-            // Add to cart
-            const { STATE: S } = window;
-            if (typeof window._addToCart === "function") {
-              window._addToCart(product.id);
-            }
           } else {
             resultEl.innerHTML = `❌ No product found for: <b>${escapeHtml(code)}</b>`;
           }

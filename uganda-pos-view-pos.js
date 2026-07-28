@@ -1574,7 +1574,7 @@ async function openCameraScanner() {
     "position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.85);display:flex;flex-direction:column;align-items:center;justify-content:center;";
   overlay.innerHTML = `
     <video id="scanner-video" autoplay playsinline style="max-width:90%;max-height:70vh;border-radius:12px;border:2px solid #0f6b4a;"></video>
-    <div style="color:white;margin-top:16px;font-size:14px;">Point camera at barcode…</div>
+    <div id="scanner-hint" style="color:white;margin-top:16px;font-size:14px;">Point camera at barcode…</div>
     <button id="scanner-close" style="margin-top:12px;padding:8px 24px;border:none;border-radius:8px;background:#d64545;color:white;font-size:14px;cursor:pointer;">Cancel</button>
   `;
   document.body.appendChild(overlay);
@@ -1583,20 +1583,33 @@ async function openCameraScanner() {
   video.srcObject = stream;
   await video.play();
 
-  const detector = new BarcodeDetector({
-    formats: [
-      "ean_13",
-      "ean_8",
-      "upc_a",
-      "upc_e",
-      "code_128",
-      "code_39",
-      "qr_code",
-      "codabar",
-      "itf",
-    ],
-  });
+  let detector;
+  try {
+    detector = new BarcodeDetector({
+      formats: [
+        "ean_13",
+        "ean_8",
+        "upc_a",
+        "upc_e",
+        "code_128",
+        "code_39",
+        "qr_code",
+        "codabar",
+        "itf",
+      ],
+    });
+  } catch (e) {
+    document.getElementById("scanner-hint").textContent =
+      "Barcode detection not available on this browser";
+    stream.getTracks().forEach((t) => t.stop());
+    return;
+  }
   let scanning = true;
+
+  // Wait until the video has actual frames before starting detection
+  while (video.readyState < 2) {
+    await new Promise((r) => setTimeout(r, 100));
+  }
 
   async function scan() {
     if (!scanning) return;
@@ -1606,13 +1619,11 @@ async function openCameraScanner() {
         const value = barcodes[0].rawValue;
         scanning = false;
         closeScanner();
-        // Auto-add matched product to cart or search
         const searchEl = $("pos-search");
         if (searchEl) {
           searchEl.value = value;
           searchEl.dispatchEvent(new Event("input"));
         }
-        // If exactly one product matches its barcode, add it directly
         const matched = STATE.products.filter(
           (p) => p.barcode === value && (STATE.stockByProduct[p.id] || 0) > 0,
         );
@@ -1623,9 +1634,9 @@ async function openCameraScanner() {
         return;
       }
     } catch (_) {}
-    requestAnimationFrame(scan);
+    setTimeout(() => requestAnimationFrame(scan), 200);
   }
-  scan();
+  video.addEventListener("playing", () => requestAnimationFrame(scan));
 
   function closeScanner() {
     scanning = false;
