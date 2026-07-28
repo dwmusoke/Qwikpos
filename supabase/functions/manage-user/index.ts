@@ -34,23 +34,22 @@ Deno.serve(async (req) => {
       global: { headers: { Authorization: authHeader } },
     });
     const { data: userData, error: userErr } = await userClient.auth.getUser();
-    if (userErr || !userData?.user) return json({ success: false, error: "Not authenticated" }, 401, cors);
+    if (userErr || !userData?.user) return json({ success: false, error: "Not authenticated" }, 200, cors);
 
     const { data: appUser } = await admin.from("app_users").select("business_id, role").eq("id", userData.user.id).single();
-    if (!appUser?.business_id) return json({ success: false, error: "No business linked" }, 400, cors);
-    if (!["admin", "superadmin"].includes(appUser.role)) return json({ success: false, error: "Only admins can manage users" }, 403, cors);
+    if (!appUser?.business_id) return json({ success: false, error: "No business linked" }, 200, cors);
+    if (!["admin", "superadmin"].includes(appUser.role)) return json({ success: false, error: "Only admins can manage users" }, 200, cors);
 
     const body = await req.json();
     const { action, user_id, email, full_name, phone, role, is_active, password, branch_id } = body;
 
-    // user_id is only required for actions that target an existing user
     if (!["list", "create_user"].includes(action || "") && !user_id) {
-      return json({ success: false, error: "user_id required" }, 400, cors);
+      return json({ success: false, error: "user_id required" }, 200, cors);
     }
     if (user_id && action !== "create_user") {
       const { data: targetUser } = await admin.from("app_users").select("business_id").eq("id", user_id).single();
       if (targetUser?.business_id !== appUser.business_id) {
-        return json({ success: false, error: "User does not belong to your business" }, 403, cors);
+        return json({ success: false, error: "User does not belong to your business" }, 200, cors);
       }
     }
 
@@ -59,7 +58,7 @@ Deno.serve(async (req) => {
       case "list": {
         const { data: appUsers, error: appErr } = await admin
           .from("app_users").select("*").eq("business_id", appUser.business_id).order("created_at", { ascending: false });
-        if (appErr) return json({ success: false, error: appErr.message }, 400, cors);
+        if (appErr) return json({ success: false, error: appErr.message }, 200, cors);
 
         const userIds = (appUsers || []).map((u: any) => u.id);
         const emailMap: Record<string, string> = {};
@@ -76,13 +75,13 @@ Deno.serve(async (req) => {
       case "create_user": {
         const { email, password, full_name, phone, role } = body;
         if (!email || !password || !full_name) {
-          return json({ success: false, error: "email, password, and full_name required" }, 400, cors);
+          return json({ success: false, error: "email, password, and full_name required" }, 200, cors);
         }
 
         const { data: authData, error: authErr } = await admin.auth.admin.createUser({
           email, password, email_confirm: true,
         });
-        if (authErr) return json({ success: false, error: authErr.message }, 400, cors);
+        if (authErr) return json({ success: false, error: authErr.message }, 200, cors);
 
         const branchId = body.branch_id || null;
         const { error: userErr } = await admin.from("app_users").insert({
@@ -95,26 +94,25 @@ Deno.serve(async (req) => {
           is_active: true,
         });
         if (userErr) {
-          // Rollback: delete the auth user if app_users insert fails
           await admin.auth.admin.deleteUser(authData.user.id);
-          return json({ success: false, error: userErr.message }, 400, cors);
+          return json({ success: false, error: userErr.message }, 200, cors);
         }
 
         return json({ success: true, user_id: authData.user.id }, 200, cors);
       }
 
       case "update_email": {
-        if (!email || !email.includes("@")) return json({ success: false, error: "Valid email required" }, 400, cors);
+        if (!email || !email.includes("@")) return json({ success: false, error: "Valid email required" }, 200, cors);
         const { error } = await admin.auth.admin.updateUserById(user_id, { email });
-        if (error) return json({ success: false, error: error.message }, 400, cors);
+        if (error) return json({ success: false, error: error.message }, 200, cors);
         return json({ success: true }, 200, cors);
       }
 
       case "reset_password": {
         const { password } = body;
-        if (!password || password.length < 8) return json({ success: false, error: "Password must be at least 8 characters" }, 400, cors);
+        if (!password || password.length < 8) return json({ success: false, error: "Password must be at least 8 characters" }, 200, cors);
         const { error } = await admin.auth.admin.updateUserById(user_id, { password });
-        if (error) return json({ success: false, error: error.message }, 400, cors);
+        if (error) return json({ success: false, error: error.message }, 200, cors);
         return json({ success: true }, 200, cors);
       }
 
@@ -124,23 +122,23 @@ Deno.serve(async (req) => {
         if (phone !== undefined) updates.phone = phone || null;
         if (role !== undefined) updates.role = role;
         if (is_active !== undefined) updates.is_active = is_active;
-        if (Object.keys(updates).length === 0) return json({ success: false, error: "No fields to update" }, 400, cors);
+        if (Object.keys(updates).length === 0) return json({ success: false, error: "No fields to update" }, 200, cors);
         const { error } = await admin.from("app_users").update(updates).eq("id", user_id);
-        if (error) return json({ success: false, error: error.message }, 400, cors);
+        if (error) return json({ success: false, error: error.message }, 200, cors);
         return json({ success: true }, 200, cors);
       }
 
       case "delete_user": {
         const { error } = await admin.from("app_users").update({ is_active: false }).eq("id", user_id);
-        if (error) return json({ success: false, error: error.message }, 400, cors);
+        if (error) return json({ success: false, error: error.message }, 200, cors);
         return json({ success: true }, 200, cors);
       }
 
       default:
-        return json({ success: false, error: `Unknown action: ${action}` }, 400, cors);
+        return json({ success: false, error: `Unknown action: ${action}` }, 200, cors);
     }
   } catch (err: any) {
     console.error("manage-user error:", err);
-    return json({ success: false, error: err.message || "Internal error" }, 500, cors);
+    return json({ success: false, error: err.message || "Internal error" }, 200, cors);
   }
 });
