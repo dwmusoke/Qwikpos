@@ -1,6 +1,7 @@
 // =====================================================================
 // QWICKPOS — DOCUMENT TEMPLATE CUSTOMIZER
-// Receipt, Invoice, Quotation template settings with live preview
+// Per-document-type template settings (receipt, invoice, quotation,
+// statement, order, delivery) with live preview
 // =====================================================================
 import {
   STATE,
@@ -12,7 +13,12 @@ import {
   fmtMoneyRaw,
 } from "./uganda-pos-core.js";
 
-const STORAGE_KEY = "ugpos_doc_template";
+const STORAGE_KEY_ALL = "ugpos_doc_templates";
+const STORAGE_KEY_LEGACY = "ugpos_doc_template";
+
+const DOC_TYPES = [
+  "receipt", "invoice", "quotation", "statement", "order", "delivery",
+];
 
 const DEFAULTS = {
   logoUrl: "",
@@ -34,32 +40,64 @@ const DEFAULTS = {
   footerText: "Thank you for your business!",
   headerText: "",
   invoiceTitle: "RECEIPT",
-  paperWidth: "80", // 58mm or 80mm thermal
+  paperWidth: "80",
 };
 
-function loadTemplate() {
+// Load all templates (object keyed by doc type)
+function loadAllTemplates() {
   try {
-    const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
-    return { ...DEFAULTS, ...saved };
+    const stored = JSON.parse(localStorage.getItem(STORAGE_KEY_ALL) || "{}");
+    return stored;
   } catch {
-    return { ...DEFAULTS };
+    return {};
   }
 }
 
-function saveTemplate(settings) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+function saveAllTemplates(all) {
+  localStorage.setItem(STORAGE_KEY_ALL, JSON.stringify(all));
 }
 
-export function getReceiptTemplate() {
-  return loadTemplate();
+const DEFAULT_TITLES = {
+  receipt: "RECEIPT",
+  invoice: "INVOICE",
+  quotation: "QUOTATION",
+  statement: "STATEMENT",
+  order: "ORDER",
+  delivery: "DELIVERY NOTE",
+};
+
+// Load template for a specific doc type
+export function loadTemplate(docType = "receipt") {
+  const all = loadAllTemplates();
+  if (all[docType]) return { ...DEFAULTS, ...all[docType] };
+  // Fallback: try the old single-template key
+  try {
+    const legacy = JSON.parse(localStorage.getItem(STORAGE_KEY_LEGACY) || "{}");
+    return { ...DEFAULTS, ...legacy, invoiceTitle: DEFAULT_TITLES[docType] || DEFAULTS.invoiceTitle };
+  } catch {
+    return { ...DEFAULTS, invoiceTitle: DEFAULT_TITLES[docType] || DEFAULTS.invoiceTitle };
+  }
 }
 
-export function initTemplateSettings() {
-  // Patch receiptHtml to use template settings
+// Save template for a specific doc type
+export function saveTemplate(settings, docType = "receipt") {
+  const all = loadAllTemplates();
+  all[docType] = settings;
+  saveAllTemplates(all);
+  // Also update legacy key for backward compat
+  localStorage.setItem(STORAGE_KEY_LEGACY, JSON.stringify(settings));
 }
+
+export function getReceiptTemplate(docType) {
+  return loadTemplate(docType || "receipt");
+}
+
+export { DOC_TYPES };
+
+let activeDocType = "receipt";
 
 export async function renderTemplateSettings(root) {
-  const tpl = loadTemplate();
+  const tpl = loadTemplate(activeDocType);
 
   root.innerHTML = `
     <div class="page-header">
@@ -68,6 +106,9 @@ export async function renderTemplateSettings(root) {
     <div class="grid-2" style="gap:24px;">
       <div class="card">
         <div class="card-title">🎨 Template Settings</div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;">
+          ${DOC_TYPES.map(d => `<button class="chip ${d === activeDocType ? 'active' : ''}" data-tpl-tab="${d}">${d.charAt(0).toUpperCase() + d.slice(1)}</button>`).join("")}
+        </div>
 
         <div class="field">
           <label>Business Logo URL</label>
@@ -208,17 +249,25 @@ export async function renderTemplateSettings(root) {
     el.addEventListener("change", updatePreview);
   });
 
+  // Doc type tabs
+  root.querySelectorAll("[data-tpl-tab]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      activeDocType = btn.dataset.tplTab;
+      renderTemplateSettings(root);
+    });
+  });
+
   // Save
   $("tpl-save").addEventListener("click", () => {
     const settings = collectSettings();
-    saveTemplate(settings);
-    toast("Template saved", "success");
+    saveTemplate(settings, activeDocType);
+    toast("Template saved for " + activeDocType, "success");
   });
 
   // Reset
   $("tpl-reset").addEventListener("click", () => {
     if (confirm("Reset template to defaults?")) {
-      saveTemplate({ ...DEFAULTS });
+      saveTemplate({ ...DEFAULTS }, activeDocType);
       renderTemplateSettings(root);
     }
   });

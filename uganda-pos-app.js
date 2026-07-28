@@ -36,6 +36,7 @@ import { renderDeliveries } from "./uganda-pos-view-deliveries.js";
 import { renderHRM } from "./uganda-pos-view-hrm.js";
 import { renderTemplateSettings } from "./uganda-pos-view-templates.js";
 import { renderBackupRestore } from "./uganda-pos-view-backup.js";
+import { BUSINESS_TYPES, seedDefaultsForType } from "./uganda-pos-view-onboarding.js";
 import {
   getLang,
   setLang,
@@ -595,6 +596,20 @@ async function initCreateBusinessScreen() {
   const errEl = $("cb-error");
   if (!form) return;
 
+  // Populate business type selector
+  const typeSelect = $("cb-type");
+  const typeDesc = $("cb-type-desc");
+  if (typeSelect) {
+    typeSelect.innerHTML = BUSINESS_TYPES.map(t =>
+      `<option value="${t.id}">${t.icon} ${t.label}</option>`
+    ).join("");
+    typeDesc.textContent = BUSINESS_TYPES[0].desc;
+    typeSelect.addEventListener("change", () => {
+      const t = BUSINESS_TYPES.find(t => t.id === typeSelect.value);
+      if (t) typeDesc.textContent = t.desc;
+    });
+  }
+
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
     errEl.style.display = "none";
@@ -605,6 +620,7 @@ async function initCreateBusinessScreen() {
     const fullName = $("cb-full-name").value.trim();
     const phone = $("cb-phone").value.trim();
     const currency = $("cb-currency").value;
+    const businessType = $("cb-type")?.value || "retail";
 
     if (!businessName || !fullName) {
       errEl.textContent = "Business name and your name are required.";
@@ -631,6 +647,7 @@ async function initCreateBusinessScreen() {
           name: businessName,
           base_currency: currency,
           primary_phone: phone || null,
+          business_type: businessType,
         })
         .select()
         .single();
@@ -671,6 +688,9 @@ async function initCreateBusinessScreen() {
       });
 
       if (subErr) throw subErr;
+
+      // Seed defaults for the chosen business type
+      await seedDefaultsForType(business.id, businessType, branch.id);
 
       toast("Business created! Starting your 14-day trial…", "success", 4000);
       await boot();

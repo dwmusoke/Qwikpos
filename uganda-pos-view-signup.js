@@ -52,6 +52,20 @@ export async function initSignupScreen() {
     grid.classList.remove("hidden");
   });
 
+  // Populate business type selector
+  const typeSelect = $("signup-type");
+  const typeDesc = $("signup-type-desc");
+  if (typeSelect) {
+    typeSelect.innerHTML = BUSINESS_TYPES.map(t =>
+      `<option value="${t.id}">${t.icon} ${t.label}</option>`
+    ).join("");
+    typeDesc.textContent = BUSINESS_TYPES[0].desc;
+    typeSelect.addEventListener("change", () => {
+      const t = BUSINESS_TYPES.find(t => t.id === typeSelect.value);
+      if (t) typeDesc.textContent = t.desc;
+    });
+  }
+
   $("signup-form").addEventListener("submit", onSubmit);
 }
 
@@ -68,6 +82,7 @@ async function onSubmit(e) {
     currency: $("signup-currency").value,
     planCode: $("signup-plan-code").value || "starter",
     email: $("signup-email").value.trim(),
+    businessType: $("signup-type")?.value || "retail",
   };
   const password = $("signup-password").value;
 
@@ -144,7 +159,7 @@ export async function finishPendingSignupIfAny() {
     };
   }
 
-  const { error } = await supabase.rpc("create_business_and_owner", {
+  const { data: businessId, error } = await supabase.rpc("create_business_and_owner", {
     p_business_name: payload.businessName,
     p_full_name: payload.fullName,
     p_phone: payload.phone,
@@ -155,6 +170,16 @@ export async function finishPendingSignupIfAny() {
   if (error && !error.message?.includes("already linked")) {
     return { ok: false, error: error.message };
   }
+
+  // Seed defaults for the chosen business type
+  if (businessId && payload.businessType) {
+    await supabase
+      .from("businesses")
+      .update({ business_type: payload.businessType })
+      .eq("id", businessId);
+    await seedDefaultsForType(businessId, payload.businessType, null);
+  }
+
   localStorage.removeItem(PENDING_KEY);
   return { ok: true };
 }
