@@ -173,6 +173,7 @@ function viewPayload(invoice) {
       ${invoice.status === "accepted" ? `<button class="btn btn-primary" data-whatsapp-payload="${invoice.id}">📱 Share via WhatsApp</button>` : ""}
       ${invoice.status === "accepted" ? `<button class="btn btn-secondary" data-email-payload="${invoice.id}">📧 Email Receipt</button>` : ""}
       ${invoice.status === "accepted" ? `<button class="btn btn-secondary" data-sms-payload="${invoice.id}">📱 SMS Receipt</button>` : ""}
+      ${invoice.status === "accepted" ? `<button class="btn btn-secondary" data-pdf-payload="${invoice.id}">📄 Save as PDF</button>` : ""}
     </div>
     <button class="btn btn-secondary btn-block" data-close-modal style="margin-top:10px;">Close</button>
   `,
@@ -190,6 +191,9 @@ function viewPayload(invoice) {
 
   const smsBtn = document.querySelector("[data-sms-payload]");
   smsBtn?.addEventListener("click", () => shareEfrisReceiptSms(invoice));
+
+  const pdfBtn = document.querySelector("[data-pdf-payload]");
+  pdfBtn?.addEventListener("click", () => saveEfrisReceiptPdf(invoice));
 }
 
 function exportCsv(invoices) {
@@ -444,4 +448,101 @@ VAT Incl: ${formatMoney(invoice.vat_amount)}
 Verified via URA EFRIS: efris.ura.go.ug
 Powered by Qwickpos
   `.trim();
+}
+
+async function saveEfrisReceiptPdf(invoice) {
+  const { jsPDF } = await import("https://cdn.jsdelivr.net/npm/jspdf@2.5.1/+esm");
+
+  const business = STATE.business;
+  const sale = invoice.sales || {};
+  const customerName = invoice.customer_name || "Walk-in Customer";
+  const customerTin = invoice.customer_tin || "";
+  const currency = invoice.currency_code || business.base_currency || "UGX";
+  const formatMoney = (amt) => `${currency} ${Number(amt || 0).toLocaleString()}`;
+
+  const doc = new jsPDF({ unit: "mm", format: [80, 297] });
+  let y = 10;
+
+  const addCenter = (text, size = 10, bold = false, color = "#000") => {
+    doc.setFontSize(size);
+    doc.setTextColor(color);
+    doc.setFont(undefined, bold ? "bold" : "normal");
+    doc.text(text, 40, y, { align: "center" });
+    y += size * 0.5 + 1;
+  };
+
+  const addRow = (label, value, size = 9, bold = false) => {
+    doc.setFontSize(size);
+    doc.setTextColor("#666");
+    doc.setFont(undefined, "normal");
+    doc.text(label, 5, y);
+    doc.setTextColor("#000");
+    doc.setFont(undefined, bold ? "bold" : "normal");
+    doc.text(value, 75, y, { align: "right" });
+    y += 4.5;
+  };
+
+  if (business.logo_url) {
+    try {
+      doc.addImage(business.logo_url, "JPEG", 20, y, 40, 20);
+      y += 22;
+    } catch { }
+  }
+
+  addCenter(business.name || "Business", 14, true, "#0f6b4a");
+  if (business.tin) addCenter(`TIN: ${business.tin}`, 8);
+  if (business.address) addCenter(business.address, 8);
+  addCenter("FISCAL RECEIPT (EFRIS)", 12, true, "#0f6b4a");
+  addCenter(`FDN: ${invoice.fiscal_invoice_number}`, 9);
+  if (invoice.antifake_code) addCenter(`Anti-fake: ${invoice.antifake_code}`, 8);
+  if (invoice.qr_code) {
+    try {
+      const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=40x40&data=${encodeURIComponent(invoice.qr_code)}`;
+      doc.addImage(qrUrl, "PNG", 20, y, 40, 40);
+      y += 42;
+    } catch { }
+  }
+  addRow("Sale:", sale.sale_number || "—");
+  addRow("Date:", new Date(invoice.created_at).toLocaleString("en-UG"));
+  addRow("Customer:", customerName);
+  if (customerTin) addRow("Customer TIN:", customerTin);
+  addRow("Operator:", STATE.appUser?.full_name || "Cashier");
+
+  doc.setDrawColor(0);
+  doc.line(5, y, 75, y);
+  y += 3;
+
+  const items = sale.sale_items || [];
+  items.forEach((it) => {
+    const name = it.product_name || it.name || "";
+    const qty = it.quantity || it.qty || 0;
+    const price = formatMoney(it.unit_price || it.price || 0);
+    const total = formatMoney(it.line_total || it.total || 0);
+    doc.setFontSize(8);
+    doc.text(name, 5, y);
+    y += 3.5;
+    doc.text(`${qty} x ${price}`, 5, y);
+    doc.text(total, 75, y, { align: "right" });
+    y += 4.5;
+  });
+
+  doc.line(5, y, 75, y);
+  y += 3;
+  addRow("Subtotal:", formatMoney(invoice.gross_amount - invoice.vat_amount));
+  addRow("VAT (18%):", formatMoney(invoice.vat_amount));
+  doc.setFontSize(11);
+  doc.setTextColor("#0f6b4a");
+  doc.setFont(undefined, "bold");
+  doc.text("TOTAL", 5, y);
+  doc.text(formatMoney(invoice.gross_amount), 75, y, { align: "right" });
+  y += 6;
+
+  doc.line(5, y, 75, y);
+  y += 3;
+  addCenter("Verified via URA EFRIS", 8);
+  addCenter("efris.ura.go.ug", 8);
+  addCenter("Powered by Qwickpos", 8);
+
+  doc.save(`EFRIS-${invoice.fiscal_invoice_number}.pdf`);
+  toast("PDF downloaded", "success");
 }
