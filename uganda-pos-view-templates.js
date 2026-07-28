@@ -77,7 +77,7 @@ export async function renderTemplateSettings(root) {
 
         <div class="field-row">
           <div class="field">
-            <label>Primary Color</label>
+            <label>Primary Color <span class="text-muted" style="font-size:11px;cursor:pointer" id="tpl-use-brand">(use brand ↻)</span></label>
             <div style="display:flex; gap:8px; align-items:center;">
               <input type="color" id="tpl-primary" value="${tpl.primaryColor}" style="width:40px; height:36px; padding:2px; cursor:pointer;" />
               <input id="tpl-primary-hex" value="${tpl.primaryColor}" style="flex:1;" />
@@ -166,6 +166,15 @@ export async function renderTemplateSettings(root) {
       </div>
     </div>
   `;
+
+  // "Use Brand Color" link
+  $("tpl-use-brand")?.addEventListener("click", () => {
+    const brandColor = STATE.business?.theme_color || "#0f6b4a";
+    $("tpl-primary").value = brandColor;
+    $("tpl-primary-hex").value = brandColor;
+    updatePreview();
+    toast("Brand color applied", "success");
+  });
 
   // Color sync
   const syncColors = () => {

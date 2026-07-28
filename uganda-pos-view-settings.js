@@ -319,7 +319,7 @@ export async function renderSettings(root) {
       </div>
       <div id="tpl-body">
         <div class="field-row">
-          <div class="field"><label>Primary Color</label><input type="color" id="tpl-primary" value="${STATE.business.tpl_primary_color || STATE.business.receipt_color || '#0f6b4a'}" style="height:44px;" /></div>
+          <div class="field"><label>Primary Color <span class="text-muted" style="font-size:11px;cursor:pointer" id="tpl-use-brand">(use brand ↻)</span></label><input type="color" id="tpl-primary" value="${STATE.business.tpl_primary_color || STATE.business.theme_color || STATE.business.receipt_color || '#0f6b4a'}" style="height:44px;" /></div>
           <div class="field"><label>Font Size</label>
             <select id="tpl-fontsize">
               <option value="11" ${(STATE.business.tpl_font_size || '13') === '11' ? 'selected' : ''}>Small (11px)</option>
@@ -769,13 +769,25 @@ export async function renderSettings(root) {
     toast(`Editing ${chip.textContent.trim()} template`, 'default', 2000);
   }));
 
-  // Templates: save (persist to businesses table)
+  // "Use Brand Color" link
+  $('tpl-use-brand')?.addEventListener('click', () => {
+    const brandColor = STATE.business.theme_color || '#0f6b4a';
+    $('tpl-primary').value = brandColor;
+    $('tpl-primary').dispatchEvent(new Event('input', { bubbles: true }));
+    toast('Brand color applied', 'success');
+  });
+
+  // Templates: save (persist to businesses table + localStorage for print)
   $('save-tpl-btn')?.addEventListener('click', async () => {
+    const primaryColor = $('tpl-primary').value;
+    const fontSize = $('tpl-fontsize').value;
+    const invoiceTitle = $('tpl-title').value.trim() || 'TAX INVOICE';
+    const footerText = $('tpl-footer').value.trim() || 'Thank you for your business!';
     const updates = {
-      tpl_primary_color: $('tpl-primary').value,
-      tpl_font_size: $('tpl-fontsize').value,
-      tpl_invoice_title: $('tpl-title').value.trim() || 'TAX INVOICE',
-      tpl_footer_text: $('tpl-footer').value.trim() || 'Thank you for your business!',
+      tpl_primary_color: primaryColor,
+      tpl_font_size: fontSize,
+      tpl_invoice_title: invoiceTitle,
+      tpl_footer_text: footerText,
       tpl_show_logo: $('tpl-show-logo').checked,
       tpl_show_name: $('tpl-show-name').checked,
       tpl_show_tin: $('tpl-show-tin').checked,
@@ -788,18 +800,42 @@ export async function renderSettings(root) {
       tpl_show_tax: $('tpl-show-tax').checked,
       tpl_show_disc: $('tpl-show-disc').checked,
       tpl_show_footer: $('tpl-show-footer').checked,
-      receipt_color: $('tpl-primary').value, // keep backward compat
+      receipt_color: primaryColor,
     };
+
+    // Always write to the print system's localStorage key first
+    const docTemplate = {
+      primaryColor,
+      secondaryColor: '#333333',
+      fontSize,
+      invoiceTitle,
+      footerText,
+      showLogo: updates.tpl_show_logo,
+      showBusinessName: updates.tpl_show_name,
+      showAddress: updates.tpl_show_addr,
+      showTin: updates.tpl_show_tin,
+      showPhone: updates.tpl_show_phone,
+      showEmail: updates.tpl_show_email,
+      showDate: updates.tpl_show_date,
+      showInvoiceNumber: updates.tpl_show_inv,
+      showServerName: updates.tpl_show_server,
+      showTaxBreakdown: updates.tpl_show_tax,
+      showDiscount: updates.tpl_show_disc,
+      showFooter: updates.tpl_show_footer,
+      headerText: '',
+      paperWidth: '80',
+      logoUrl: STATE.business.logo_url || '',
+    };
+    localStorage.setItem('ugpos_doc_template', JSON.stringify(docTemplate));
+
     const { error } = await supabase.from('businesses').update(updates).eq('id', STATE.business.id);
     if (error) {
-      // Columns may not exist yet — fallback to localStorage
       localStorage.setItem('ugpos_receipt_template', JSON.stringify(updates));
-      STATE.business.receipt_color = updates.receipt_color;
-      toast('Template saved locally. Run v8c.sql to add DB columns.', 'success', 4000);
-      return;
+      toast('Template saved to local storage (DB not available)', 'success', 3000);
+    } else {
+      Object.assign(STATE.business, updates);
+      toast('Template saved', 'success');
     }
-    Object.assign(STATE.business, updates);
-    toast('Template saved', 'success');
   });
 
   // Warehouses: add
