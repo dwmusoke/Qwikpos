@@ -42,6 +42,8 @@ included — no build tools, no framework, just static files +
 | `uganda-pos-fn-flutterwave-webhook.ts` | Edge function: Flutterwave's async webhook (source of truth) |
 | `uganda-pos-fn-efris-register-product.ts` | Edge function: registers a product with your live EFRIS provider |
 | `uganda-pos-fn-efris-submit-invoice.ts` | Edge function: fiscalises a staged invoice with your live EFRIS provider |
+| `uganda-pos-fn-efris-stock-api.ts` | Edge function: REST stock API (increase/decrease/transfer/set stock levels) |
+| `uganda-pos-fn-efris-query-api.ts` | Edge function: REST query API (taxpayer search, excise duty, products, invoices, sync) |
 | `uganda-pos-fn-daily-summary.ts` | Edge function: SMS daily sales summary (Africa's Talking), run on a schedule |
 
 ## 1. Create your Supabase project
@@ -257,6 +259,51 @@ actual FDN, anti-fake code and QR code on acceptance.
 
 Uganda's standard VAT rate (18%) is seeded in `tax_categories`, along with
 Zero-rated, Exempt and Deemed categories.
+
+### 9.1 Stock Management API (`efris-stock-api`)
+
+RESTful stock operations matching the WEAF EFRIS stock endpoints:
+
+```bash
+mkdir -p supabase/functions/efris-stock-api
+cp uganda-pos-fn-efris-stock-api.ts supabase/functions/efris-stock-api/index.ts
+supabase functions deploy efris-stock-api
+```
+
+**Actions** (POST, JWT required):
+
+| Action | Body | Description |
+|---|---|---|
+| `increase_stock` | `{ product_id, branch_id, quantity, notes? }` | Add stock to a product at a branch |
+| `decrease_stock` | `{ product_id, branch_id, quantity, notes? }` | Remove stock (validates sufficient quantity) |
+| `set_stock` | `{ product_id, branch_id, quantity }` | Set absolute stock level |
+| `transfer_stock` | `{ product_id, from_branch_id, to_branch_id, quantity, notes? }` | Move stock between branches |
+
+Records a `stock_movements` row for each operation automatically.
+
+### 9.2 EFRIS Query API (`efris-query-api`)
+
+High-level query endpoints mirroring the WEAF EFRIS REST API. Delegates
+cryptographic S2S operations to `efris-s2s` internally.
+
+```bash
+mkdir -p supabase/functions/efris-query-api
+cp uganda-pos-fn-efris-query-api.ts supabase/functions/efris-query-api/index.ts
+supabase functions deploy efris-query-api
+```
+
+**Actions** (POST, JWT required):
+
+| Action | Body | Description |
+|---|---|---|
+| `search_taxpayer` | `{ tin }` | Query taxpayer info by TIN (requires S2S credentials) |
+| `excise_duty` | `{}` | Get excise duty info (S2S) or local tax categories |
+| `registration_details` | `{}` | Get business EFRIS registration status & credentials |
+| `measure_units` | `{}` | Get measure units (S2S dictionary or local) |
+| `goods_and_services` | `{ payload? }` | Get company products from EFRIS or local |
+| `sync_products` | `{ payload? }` | Fetch products from EFRIS and upsert locally |
+| `query_invoices` | `{ payload }` | Query fiscal invoice receipts via S2S (T106) |
+| `invoice_details` | `{ invoiceNo }` | Get invoice details via S2S (T108) or local fallback |
 
 ## 10. Quotations
 
