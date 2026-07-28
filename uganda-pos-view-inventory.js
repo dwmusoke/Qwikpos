@@ -1057,7 +1057,7 @@ function openCameraScanner() {
         const video = $("scanner-video");
         const resultEl = $("scan-result");
 
-        // Start camera
+        // Start camera (rear cam first, fall back to front/any for laptops)
         navigator.mediaDevices
           ?.getUserMedia({ video: { facingMode: "environment" } })
           .then((s) => {
@@ -1065,8 +1065,16 @@ function openCameraScanner() {
             video.srcObject = stream;
           })
           .catch(() => {
-            resultEl.textContent =
-              "Camera not available — use manual entry below";
+            navigator.mediaDevices
+              ?.getUserMedia({ video: true })
+              .then((s) => {
+                stream = s;
+                video.srcObject = stream;
+              })
+              .catch(() => {
+                resultEl.textContent =
+                  "Camera not available — use manual entry below";
+              });
           });
 
         // Try to use BarcodeDetector API if available

@@ -1563,9 +1563,16 @@ async function openCameraScanner() {
         height: { ideal: 720 },
       },
     });
-  } catch (e) {
-    toast("Camera access denied or unavailable", "error");
-    return;
+  } catch (_) {
+    // Laptops only have a front camera — fall back to "user" or any camera
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({
+        video: { width: { ideal: 1280 }, height: { ideal: 720 } },
+      });
+    } catch (_2) {
+      toast("Camera access denied or unavailable", "error");
+      return;
+    }
   }
 
   const overlay = document.createElement("div");
