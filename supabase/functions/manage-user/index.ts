@@ -41,14 +41,17 @@ Deno.serve(async (req) => {
     if (!["admin", "superadmin"].includes(appUser.role)) return json({ success: false, error: "Only admins can manage users" }, 403, cors);
 
     const body = await req.json();
-    const { action, user_id, email, full_name, phone, role, is_active } = body;
+    const { action, user_id, email, full_name, phone, role, is_active, password, branch_id } = body;
 
-    if (!user_id) return json({ success: false, error: "user_id required" }, 400, cors);
-
-    // Verify the target user belongs to the same business
-    const { data: targetUser } = await admin.from("app_users").select("business_id").eq("id", user_id).single();
-    if (targetUser?.business_id !== appUser.business_id) {
-      return json({ success: false, error: "User does not belong to your business" }, 403, cors);
+    // user_id is only required for actions that target an existing user
+    if (!["list", "create_user"].includes(action || "") && !user_id) {
+      return json({ success: false, error: "user_id required" }, 400, cors);
+    }
+    if (user_id && action !== "create_user") {
+      const { data: targetUser } = await admin.from("app_users").select("business_id").eq("id", user_id).single();
+      if (targetUser?.business_id !== appUser.business_id) {
+        return json({ success: false, error: "User does not belong to your business" }, 403, cors);
+      }
     }
 
     switch (action) {
