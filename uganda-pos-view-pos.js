@@ -13,7 +13,6 @@ import {
   fmtMoney,
   fmtDate,
   sanitizeCsvValue,
-  printHtml,
   printThermalReceipt,
   thermalReceiptHtml,
   cartTotalsSnapshot,
