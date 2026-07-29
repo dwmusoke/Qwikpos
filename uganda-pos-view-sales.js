@@ -6,7 +6,7 @@ import {
   supabase, STATE, $, qsa, escapeHtml, toast, openModal, closeModal,
   fmtMoney, fmtDate, sanitizeCsvValue, refreshProducts, stockFor,
   makePaginationState, paginationHtml, wirePagination,
-  printHtml, receiptHtml, emptyStateHtml,
+  printHtml, printThermalReceipt, thermalReceiptHtml, receiptHtml, emptyStateHtml,
   buildEfrisCreditDebitPayload,
 } from './uganda-pos-core.js';
 
@@ -165,6 +165,7 @@ async function renderSalesListTab(body) {
     const { data: sale } = await supabase.from('sales').select('*, sale_items(*), payments(*), cashier:app_users!cashier_id(full_name), customer:customers(name)').eq('id', saleId).single();
     if (!sale) { toast('Sale not found', 'error'); return; }
 
+    let thermalWidth = 80;
     openModal(`
       <div class="modal-title-row"><h3>Sale — ${escapeHtml(sale.sale_number)}</h3></div>
       <div class="summary-row"><span>Date</span><span>${fmtDate(sale.created_at)}</span></div>
@@ -181,13 +182,35 @@ async function renderSalesListTab(body) {
       <div class="card-title" style="margin-top:12px;">Payments</div>
       ${(sale.payments || []).map((p) => `<div class="summary-row"><span style="text-transform:capitalize;">${escapeHtml(p.method)}</span><span>${fmtMoney(p.amount_base)}</span></div>`).join('')}
       <div class="flex gap" style="margin-top:14px;flex-wrap:wrap;">
-        <button class="btn btn-secondary" data-print-receipt="${sale.id}">🖨️ Print Receipt</button>
+        <div class="field" style="min-width:160px;">
+          <label style="font-size:11px;">Paper Size</label>
+          <select id="thermal-paper-size" style="width:100%;padding:8px 10px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text);">
+            <option value="80" selected>80mm (Standard)</option>
+            <option value="58">58mm (Small)</option>
+          </select>
+        </div>
+        <button class="btn btn-secondary" data-print-thermal="${sale.id}">🖨️ Thermal Print</button>
+        <button class="btn btn-secondary" data-print-receipt="${sale.id}">🖨️ Print (A4)</button>
         <button class="btn btn-secondary" data-download-csv="${sale.id}">📥 Download CSV</button>
         <button class="btn btn-secondary" data-close-modal>Close</button>
       </div>
     `, {
       large: true,
       onMount: () => {
+        const paperSelect = $("thermal-paper-size");
+        paperSelect?.addEventListener("change", () => { thermalWidth = parseInt(paperSelect.value); });
+        const thermalBtn = document.querySelector("[data-print-thermal]");
+        thermalBtn?.addEventListener("click", () => {
+          const lines = (sale.sale_items || []).map((it) => ({ name: it.product_name, qty: it.quantity, unitPrice: it.unit_price, lineGross: it.line_total }));
+          const thermalHtml = thermalReceiptHtml({
+            sale: { ...sale, sale_items: lines },
+            business: STATE.business,
+            docLabel: "RECEIPT",
+            currencyCode: sale.currency_code || "UGX",
+            width: thermalWidth,
+          });
+          printThermalReceipt(thermalHtml, { width: thermalWidth, title: `Receipt ${sale.sale_number}` });
+        });
         const printBtn = document.querySelector("[data-print-receipt]");
         printBtn?.addEventListener("click", () => {
           const lines = (sale.sale_items || []).map((it) => ({ name: it.product_name, qty: it.quantity, price: it.unit_price, total: it.line_total }));

@@ -13,6 +13,7 @@ import {
   closeModal,
   fmtDate,
   sanitizeCsvValue,
+  printHtml,
 } from "./uganda-pos-core.js";
 
 let activeTab = "logs";
@@ -79,6 +80,7 @@ export async function renderAuditLogs(root) {
       </div>
       <div class="page-header-actions">
         <div class="flex gap">
+          <button class="btn btn-secondary btn-sm" id="audit-print">🖨️ Print</button>
           <button class="btn btn-secondary btn-sm" id="audit-export-csv">📤 Export CSV</button>
         </div>
       </div>
@@ -110,6 +112,9 @@ export async function renderAuditLogs(root) {
 
   $("audit-export-csv")?.addEventListener("click", () =>
     exportAuditCsv(allLogs),
+  );
+  $("audit-print")?.addEventListener("click", () =>
+    printAuditLogs(allLogs),
   );
   renderAuditTab(allLogs);
 }
@@ -328,6 +333,67 @@ function exportAuditCsv(logs) {
   a.click();
   URL.revokeObjectURL(url);
   toast("Audit logs exported", "success");
+}
+
+function printAuditLogs(logs) {
+  const html = `
+    <style>
+      @media print {
+        @page { margin: 10mm; }
+        body { font-size: 10px; }
+        .no-print { display: none !important; }
+        table { page-break-inside: auto; }
+        tr { page-break-inside: avoid; page-break-after: auto; }
+      }
+      table { width: 100%; border-collapse: collapse; font-size: 11px; }
+      th, td { border: 1px solid #ddd; padding: 4px 6px; text-align: left; }
+      th { background: #f5f5f5; font-weight: 600; }
+      .header { text-align: center; margin-bottom: 16px; }
+      .header h1 { margin: 0; font-size: 18px; }
+      .header p { margin: 4px 0 0; color: #666; font-size: 12px; }
+      .meta { display: flex; justify-content: space-between; margin-bottom: 12px; font-size: 11px; color: #666; }
+      .badge { display: inline-block; padding: 1px 6px; border-radius: 3px; font-size: 9px; font-weight: 600; }
+      .badge-green { background: #dcfce7; color: #166534; }
+      .badge-blue { background: #dbeafe; color: #1e40af; }
+      .badge-red { background: #fee2e2; color: #991b1b; }
+      .badge-gray { background: #f3f4f6; color: #374151; }
+    </style>
+    <div class="header">
+      <h1>Audit Logs</h1>
+      <p>${STATE.business?.name || "Business"} — ${new Date().toLocaleString()}</p>
+    </div>
+    <div class="meta">
+      <span>Total Actions: ${logs.length}</span>
+      <span>Period: Last 30 days</span>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th style="width:130px">Time</th>
+          <th>User</th>
+          <th style="width:100px">Action</th>
+          <th style="width:120px">Entity</th>
+          <th>Details</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${logs
+          .map(
+            (l) => `
+          <tr>
+            <td style="white-space:nowrap;">${fmtDate(l.created_at)}</td>
+            <td>${escapeHtml(l.user_name)} <span style="font-size:9px;color:#666;">(${escapeHtml(l.user_role || "")})</span></td>
+            <td><span class="badge badge-${actionBadge(l.action)}">${ACTION_ICONS[l.action] || "📌"} ${escapeHtml(l.action)}</span></td>
+            <td>${ENTITY_ICONS[l.entity_type] || "📌"} ${escapeHtml(l.entity_type)}<br><span style="font-size:9px;color:#666;">${escapeHtml(l.entity_name || l.entity_id?.slice(0, 8) || "")}</span></td>
+            <td>${l.old_value || l.new_value ? "View Details" : "—"}</td>
+          </tr>
+        `,
+          )
+          .join("")}
+      </tbody>
+    </table>
+  `;
+  printHtml(html, `Audit Logs - ${new Date().toISOString().slice(0, 10)}`);
 }
 
 // ---------------------------------------------------------------------

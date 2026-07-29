@@ -268,11 +268,135 @@ export function professionalDocHtml(opts = {}) {
   `;
 }
 
+// =====================================================================
+// THERMAL RECEIPT HTML — optimized for 80mm/58mm thermal printers
+// =====================================================================
+export function thermalReceiptHtml(opts = {}) {
+  const {
+    sale,
+    business,
+    docLabel = "RECEIPT",
+    footNote = "",
+    currencyCode = "UGX",
+    width = 80, // mm
+    template = null, // custom template from settings
+  } = opts;
+
+  const tpl = template || getReceiptTemplate();
+  const color = tpl.primaryColor || "#0f6b4a";
+  const textColor = tpl.secondaryColor || "#333333";
+  const fontSize = tpl.fontSize || "12";
+  const fmtMoney = (amt) => `${currencyCode} ${Number(amt || 0).toLocaleString()}`;
+
+  const { lines, subtotal, discountTotal, vatTotal, grandTotal } = cartTotalsSnapshot(sale);
+  const customer = sale.customer || {};
+  const payment = sale.payments?.[0] || {};
+
+  const logoHtml = tpl.showLogo && (tpl.logoUrl || business.logo_url)
+    ? `<div class="center"><img src="${escapeHtml(tpl.logoUrl || business.logo_url)}" style="max-height:35px;max-width:100%;" /></div>`
+    : "";
+  const headerHtml = tpl.headerText ? `<div class="center small" style="color:#999;">${escapeHtml(tpl.headerText)}</div>` : "";
+  const businessNameHtml = tpl.showBusinessName ? `<div class="center bold" style="color:${color};font-size:${parseInt(fontSize)+2}px;">${escapeHtml(business.name)}</div>` : "";
+  const addressHtml = tpl.showAddress && business.address ? `<div class="center small">${escapeHtml(business.address)}</div>` : "";
+  const tinHtml = tpl.showTin && business.tin ? `<div class="center small">TIN: ${escapeHtml(business.tin)}</div>` : "";
+  const phoneHtml = tpl.showPhone && business.phone ? `<div class="center small">${escapeHtml(business.phone)}</div>` : "";
+  const emailHtml = tpl.showEmail && business.email ? `<div class="center small">${escapeHtml(business.email)}</div>` : "";
+
+  const invoiceTitle = tpl.invoiceTitle || docLabel;
+  const invoiceNumberHtml = tpl.showInvoiceNumber ? `<div>No: ${escapeHtml(sale.sale_number)}</div>` : "";
+  const dateHtml = tpl.showDate ? `<div>Date: ${new Date(sale.created_at || Date.now()).toLocaleString("en-UG")}</div>` : "";
+  const serverHtml = tpl.showServerName ? `<div>Served by: ${escapeHtml(STATE.appUser?.full_name || "Cashier")}</div>` : "";
+  const customerHtml = customer.name ? `<div>Customer: ${escapeHtml(customer.name)}</div>` : "";
+  const customerTinHtml = customer.tin ? `<div>Customer TIN: ${escapeHtml(customer.tin)}</div>` : "";
+  const paymentMethodHtml = payment.method ? `<div>Payment: ${escapeHtml(payment.method)}</div>` : "";
+
+  const itemRows = lines.map((l) => `
+    <tr><td colspan="2">${escapeHtml(l.name)}</td></tr>
+    <tr><td>${l.qty} x ${fmtMoney(l.unitPrice)}</td><td class="text-right">${fmtMoney(l.lineGross)}</td></tr>
+  `).join("");
+
+  const subtotalRow = `<tr><td>Subtotal</td><td class="text-right">${fmtMoney(subtotal)}</td></tr>`;
+  const discountRow = tpl.showDiscount && discountTotal > 0 ? `<tr><td>Discount</td><td class="text-right">- ${fmtMoney(discountTotal)}</td></tr>` : "";
+  const vatRow = tpl.showTaxBreakdown ? `<tr><td>VAT (incl.)</td><td class="text-right">${fmtMoney(vatTotal)}</td></tr>` : "";
+  const totalRow = `<tr><td class="bold" style="border-top:1px solid #000;">TOTAL</td><td class="text-right bold" style="border-top:1px solid #000;color:${color};">${fmtMoney(grandTotal)}</td></tr>`;
+
+  const footerHtml = tpl.showFooter ? `<div class="center small" style="margin-top:6px;">${escapeHtml(footNote || tpl.footerText)}</div>` : "";
+  const verifyHtml = business.efris_live_enabled && sale.fiscal_invoice_number
+    ? `<div class="center small" style="margin-top:4px;color:#0f6b4a;">EFRIS Verified: ${escapeHtml(sale.fiscal_invoice_number)}</div>`
+    : "";
+
+  return `
+    <div class="receipt" style="font-size:${fontSize}px; color:${textColor}; width:${width}mm;">
+      ${logoHtml}
+      ${headerHtml}
+      ${businessNameHtml}
+      ${addressHtml}
+      ${tinHtml}
+      ${phoneHtml}
+      ${emailHtml}
+      <hr style="border-color:${color};" />
+      <div class="center bold" style="color:${color};">${escapeHtml(invoiceTitle)}</div>
+      ${invoiceNumberHtml}
+      ${dateHtml}
+      ${serverHtml}
+      <hr style="border-color:${color};" />
+      ${customerHtml}
+      ${customerTinHtml}
+      ${paymentMethodHtml}
+      <hr style="border-color:${color};" />
+      <table>
+        ${itemRows}
+      </table>
+      <hr style="border-color:${color};" />
+      <table>
+        ${subtotalRow}
+        ${discountRow}
+        ${vatRow}
+        ${totalRow}
+      </table>
+      <hr style="border-color:${color};" />
+      ${verifyHtml}
+      ${footerHtml}
+      <div class="cut-line">✂ ──────────────────── ✂</div>
+    </div>
+  `;
+}
+
+// Helper to get receipt template from localStorage (set in Settings)
+export function getReceiptTemplate() {
+  try {
+    const stored = localStorage.getItem("ugpos_receipt_template");
+    if (stored) return JSON.parse(stored);
+  } catch {}
+  return {
+    primaryColor: "#0f6b4a",
+    secondaryColor: "#333333",
+    fontSize: "12",
+    showLogo: true,
+    showBusinessName: true,
+    showAddress: true,
+    showTin: true,
+    showPhone: true,
+    showEmail: false,
+    showInvoiceNumber: true,
+    showDate: true,
+    showServerName: true,
+    showDiscount: true,
+    showTaxBreakdown: true,
+    showFooter: true,
+    invoiceTitle: "RECEIPT",
+    footerText: "Thank you for your business!",
+    headerText: "",
+    logoUrl: "",
+  };
+}
+
 // Re-export core sales functions from POS module
 export { submitSaleToSupabase } from "./uganda-pos-view-pos.js";
 export { submitQuotationToSupabase } from "./uganda-pos-view-pos.js";
 export { receiptHtml } from "./uganda-pos-view-pos.js";
 export { printHtml as posPrintHtml } from "./uganda-pos-view-pos.js";
+export { cartTotalsSnapshot } from "./uganda-pos-view-pos.js";
 
 // ---------------------------------------------------------------------
 // 5. PAGINATION HELPER
@@ -1273,4 +1397,41 @@ export function resizeImage(file, maxSize = 400, quality = 0.7) {
     };
     reader.readAsDataURL(file);
   });
+}
+
+// =====================================================================
+// THERMAL RECEIPT PRINT — 80mm / 58mm paper sizes with auto-print
+// =====================================================================
+export function printThermalReceipt(html, opts = {}) {
+  const { width = 80, title = "Receipt" } = opts; // width in mm
+  const w = window.open("", "_blank");
+  if (!w) { toast("Popup blocked. Allow popups to print.", "error", 4000); return; }
+  w.document.write(`<!doctype html>
+<html>
+<head>
+  <title>${escapeHtml(title)}</title>
+  <style>
+    @media print {
+      @page { size: ${width}mm auto; margin: 0; }
+      html, body { margin: 0; padding: 0; width: ${width}mm; background: white; }
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: monospace, 'Courier New', monospace; font-size: 12px; width: ${width}mm; padding: 4mm; color: #000; background: white; }
+    .center { text-align: center; }
+    .bold { font-weight: bold; }
+    .large { font-size: 14px; }
+    .small { font-size: 10px; }
+    hr { border: none; border-top: 1px dashed #000; margin: 4px 0; }
+    .row { display: flex; justify-content: space-between; margin: 3px 0; }
+    .qr { display: block; margin: 6px auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 11px; }
+    td { padding: 2px 0; vertical-align: top; }
+    .text-right { text-align: right; }
+    .cut-line { text-align: center; margin-top: 12px; color: #999; font-size: 9px; }
+  </style>
+</head>
+<body>${html}</body>
+</html>`);
+  w.document.close();
+  w.onload = () => { w.focus(); w.print(); };
 }

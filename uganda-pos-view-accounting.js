@@ -16,6 +16,10 @@ import {
   fmtDate,
   stockFor,
   sanitizeCsvValue,
+  openModal,
+  closeModal,
+  uid,
+  logAuditAction,
 } from "./uganda-pos-core.js";
 
 let acctTab = "ledger";
@@ -78,6 +82,7 @@ export async function renderAccounting(root) {
     </div>
     <div class="notif-filters" id="acct-tabs" style="margin-bottom:16px;">
       ${[
+        ["coa", "📊 Chart of Accounts"],
         ["ledger", "📒 General Ledger"],
         ["journal", "📓 Journal Entries"],
         ["trial", "⚖️ Trial Balance"],
@@ -111,7 +116,8 @@ export async function renderAccounting(root) {
 
   async function renderTab() {
     const body = $("acct-body");
-    if (acctTab === "ledger") await renderLedgerTab(body);
+    if (acctTab === "coa") await renderCoaTab(body);
+    else if (acctTab === "ledger") await renderLedgerTab(body);
     else if (acctTab === "journal") await renderJournalTab(body);
     else if (acctTab === "trial") await renderTrialBalanceTab(body);
     else if (acctTab === "expenses") await renderExpensesTab(body);
@@ -155,7 +161,141 @@ function nonStatutoryNote() {
 }
 
 // =====================================================================
-// GENERAL LEDGER — aggregated from sales, expenses, POs
+// CHART OF ACCOUNTS — full CRUD
+// =====================================================================
+const COA_TYPES = [
+  ["asset", "Asset"],
+  ["liability", "Liability"],
+  ["equity", "Equity"],
+  ["income", "Income"],
+  ["expense", "Expense"],
+];
+
+const COA_SUBTYPES = {
+  asset: ["Current Asset", "Fixed Asset", "Other Asset"],
+  liability: ["Current Liability", "Long Term Liability"],
+  equity: ["Equity"],
+  income: ["Revenue", "Other Income"],
+  expense: ["COGS", "Operating Expense", "Other Expense"],
+};
+
+function coaTypeColor(type) {
+  return {
+    asset: "badge-green",
+    liability: "badge-red",
+    equity: "badge-blue",
+    income: "badge-yellow",
+    expense: "badge-gray",
+  }[type] || "badge-gray";
+}
+
+async function renderCoaTab(body) {
+  body.innerHTML = `
+    <div class="card">
+      <div class="card-title" style="justify-content:space-between;">
+        <span>Chart of Accounts</span>
+        <button class="btn btn-primary btn-sm" id="coa-add-btn">+ New Account</button>
+      </div>
+    </div>
+    <div id="coa-output"><div class="empty-state">Loading…</div></div>`;
+
+  $("coa-add-btn").addEventListener("click", () => openCoaForm(null));
+  await loadCoa();
+
+  async function loadCoa() {
+    const out = $("coa-output");
+    const { data: accounts } = await supabase
+      .from("chart_of_accounts")
+      .select("*")
+      .or(`business_id.eq.${STATE.business.id},business_id.is.null`)
+      .eq("is_active", true)
+      .order("account_code");
+
+    const list = accounts || [];
+    out.innerHTML = list.length ? `
+      <div class="card">
+        <div class="table-wrap"><table>
+          <thead><tr><th>Code</th><th>Name</th><th>Type</th><th>Subtype</th><th>System</th><th></th></tr></thead>
+          <tbody>
+            ${list.map((a) => `
+              <tr>
+                <td><code>${escapeHtml(a.account_code)}</code></td>
+                <td><b>${escapeHtml(a.name)}</b></td>
+                <td><span class="badge ${coaTypeColor(a.type)}">${escapeHtml(a.type)}</span></td>
+                <td class="text-muted">${escapeHtml(a.subtype || "")}</td>
+                <td>${a.is_system ? '<span class="badge badge-gray">System</span>' : ""}</td>
+                <td class="flex gap">
+                  <button class="btn btn-ghost btn-sm" data-edit-coa="${a.id}">Edit</button>
+                  ${a.is_system ? "" : `<button class="btn btn-ghost btn-sm" style="color:var(--danger);" data-del-coa="${a.id}">Delete</button>`}
+                </td>
+              </tr>
+            `).join("")}
+          </tbody>
+        </table></div>
+      </div>` : '<div class="card"><div class="empty-state">No accounts yet. Add your first account.</div></div>';
+
+    qsa("[data-edit-coa]", body).forEach((btn) =>
+      btn.addEventListener("click", () => openCoaForm(list.find((a) => a.id === btn.dataset.editCoa))));
+    qsa("[data-del-coa]", body).forEach((btn) =>
+      btn.addEventListener("click", async () => {
+        if (!confirm("Delete this account?")) return;
+        await supabase.from("chart_of_accounts").update({ is_active: false }).eq("id", btn.dataset.delCoa);
+        toast("Account deactivated", "success");
+        loadCoa();
+      }));
+  }
+}
+
+function openCoaForm(account) {
+  const isEdit = !!account;
+  openModal(`
+    <h3>${isEdit ? "Edit Account" : "New Account"}</h3>
+    <div class="field"><label>Account Code</label><input id="coa-code" value="${escapeHtml(account?.account_code || "")}" placeholder="e.g. 1-1000" /></div>
+    <div class="field"><label>Account Name</label><input id="coa-name" value="${escapeHtml(account?.name || "")}" placeholder="e.g. Cash at Bank" /></div>
+    <div class="field"><label>Type</label><select id="coa-type">${COA_TYPES.map(([v, l]) => `<option value="${v}" ${account?.type === v ? "selected" : ""}>${l}</option>`).join("")}</select></div>
+    <div class="field"><label>Subtype</label><select id="coa-subtype"><option value="">— Select —</option></select></div>
+    <div class="field"><label>Description</label><textarea id="coa-desc" rows="2">${escapeHtml(account?.description || "")}</textarea></div>
+    <button class="btn btn-primary btn-block" id="coa-save">${isEdit ? "Update" : "Create"}</button>
+    <button class="btn btn-secondary btn-block" data-close-modal>Cancel</button>
+  `);
+
+  const typeSelect = $("coa-type");
+  const subtypeSelect = $("coa-subtype");
+
+  function updateSubtypes() {
+    const subs = COA_SUBTYPES[typeSelect.value] || [];
+    subtypeSelect.innerHTML = `<option value="">— Select —</option>` +
+      subs.map((s) => `<option value="${s}" ${account?.subtype === s ? "selected" : ""}>${s}</option>`).join("");
+  }
+  updateSubtypes();
+  typeSelect.addEventListener("change", updateSubtypes);
+
+  $("coa-save").addEventListener("click", async () => {
+    const code = $("coa-code").value.trim();
+    const name = $("coa-name").value.trim();
+    const type = typeSelect.value;
+    const subtype = subtypeSelect.value;
+    const description = $("coa-desc").value.trim();
+    if (!code || !name) { toast("Code and name required", "error"); return; }
+
+    const data = { account_code: code, name, type, subtype, description: description || null };
+    if (isEdit) {
+      const { error } = await supabase.from("chart_of_accounts").update(data).eq("id", account.id);
+      if (error) { toast("Failed: " + error.message, "error"); return; }
+      toast("Account updated", "success");
+    } else {
+      data.business_id = STATE.business.id;
+      const { error } = await supabase.from("chart_of_accounts").insert(data);
+      if (error) { toast("Failed: " + error.message, "error"); return; }
+      toast("Account created", "success");
+    }
+    closeModal();
+    renderCoaTab($("acct-body"));
+  });
+}
+
+// =====================================================================
+// GENERAL LEDGER — reads from journal_entry_lines (proper double-entry)
 // =====================================================================
 async function renderLedgerTab(body) {
   const range = periodRange("month");
@@ -163,174 +303,104 @@ async function renderLedgerTab(body) {
     <div class="card">
       <div class="card-title">General Ledger</div>
       ${periodPickerHtml("month", "gl")}
+      <div class="field" style="margin-top:8px;">
+        <label>Filter by Account</label>
+        <select id="gl-account-filter"><option value="all">All Accounts</option></select>
+      </div>
     </div>
     <div id="gl-output"><div class="empty-state">Loading…</div></div>`;
 
   wirePeriodButtons("gl");
   let allEntries = [];
 
+  const { data: accounts } = await supabase
+    .from("chart_of_accounts")
+    .select("id, account_code, name, type")
+    .or(`business_id.eq.${STATE.business.id},business_id.is.null`)
+    .eq("is_active", true)
+    .order("account_code");
+
+  const acctFilter = $("gl-account-filter");
+  (accounts || []).forEach((a) => {
+    const opt = document.createElement("option");
+    opt.value = a.id;
+    opt.textContent = `${a.account_code} — ${a.name}`;
+    acctFilter.appendChild(opt);
+  });
+
   $("gl-run").addEventListener("click", () => load());
   $("gl-export").addEventListener("click", () => exportGl());
+  $("gl-account-filter").addEventListener("change", () => load());
   await load();
 
   async function load() {
     const from = $("gl-from").value;
     const to = $("gl-to").value;
+    const accountId = $("gl-account-filter").value;
     const out = $("gl-output");
     out.innerHTML = `<div class="empty-state">Loading…</div>`;
 
-    const [
-      { data: sales },
-      { data: expenses },
-      { data: payments },
-      { data: supplierPayments },
-    ] = await Promise.all([
-      supabase
-        .from("sales")
-        .select("*, sale_items(*)")
-        .eq("business_id", STATE.business.id)
-        .neq("status", "voided")
-        .neq("sale_type", "quotation")
-        .gte("created_at", `${from}T00:00:00`)
-        .lte("created_at", `${to}T23:59:59`),
-      supabase
-        .from("expenses")
-        .select("*")
-        .eq("business_id", STATE.business.id)
-        .gte("expense_date", from)
-        .lte("expense_date", to),
-      supabase
-        .from("payments")
-        .select("*, sales!inner(business_id, sale_number)")
-        .eq("sales.business_id", STATE.business.id)
-        .gte("created_at", `${from}T00:00:00`)
-        .lte("created_at", `${to}T23:59:59`),
-      supabase
-        .from("supplier_payments")
-        .select("*, suppliers!inner(business_id)")
-        .eq("suppliers.business_id", STATE.business.id)
-        .gte("created_at", `${from}T00:00:00`)
-        .lte("created_at", `${to}T23:59:59`),
-    ]);
+    let query = supabase
+      .from("journal_entries")
+      .select("*, lines:journal_entry_lines(*, account:chart_of_accounts(account_code, name, type))")
+      .eq("business_id", STATE.business.id)
+      .gte("entry_date", from)
+      .lte("entry_date", to)
+      .eq("is_posted", true)
+      .order("entry_date", { ascending: true });
+
+    const { data: jeList } = await query;
 
     allEntries = [];
-
-    // Sales → Revenue
-    (sales || []).forEach((s) => {
-      allEntries.push({
-        date: s.created_at,
-        ref: s.sale_number,
-        account: "Sales Revenue",
-        debit: 0,
-        credit: Number(s.grand_total_base || 0),
-        description: `Sale ${s.sale_number}`,
-      });
-      if (Number(s.vat_total || 0) > 0) {
+    (jeList || []).forEach((je) => {
+      (je.lines || []).forEach((l) => {
+        if (accountId !== "all" && l.account_id !== accountId) return;
         allEntries.push({
-          date: s.created_at,
-          ref: s.sale_number,
-          account: "VAT Payable",
-          debit: 0,
-          credit: Number(s.vat_total || 0) * Number(s.exchange_rate || 1),
-          description: `VAT on ${s.sale_number}`,
+          date: je.entry_date,
+          ref: je.journal_number,
+          accountCode: l.account?.account_code || "",
+          accountName: l.account?.name || "",
+          accountType: l.account?.type || "",
+          debit: Number(l.debit),
+          credit: Number(l.credit),
+          description: l.description || je.description || "",
         });
-      }
-      if (Number(s.discount_total || 0) > 0) {
-        allEntries.push({
-          date: s.created_at,
-          ref: s.sale_number,
-          account: "Discounts Allowed",
-          debit: Number(s.discount_total || 0) * Number(s.exchange_rate || 1),
-          credit: 0,
-          description: `Discount on ${s.sale_number}`,
-        });
-      }
-    });
-
-    // Payments → Cash
-    (payments || []).forEach((p) => {
-      allEntries.push({
-        date: p.created_at,
-        ref: p.sales?.sale_number || "—",
-        account: "Cash & Bank",
-        debit: Number(p.amount_base || 0),
-        credit: 0,
-        description: `Payment received (${p.method})`,
-      });
-    });
-
-    // Expenses
-    (expenses || []).forEach((e) => {
-      allEntries.push({
-        date: e.created_at,
-        ref: "EXP",
-        account: `Expense — ${e.category}`,
-        debit: Number(e.amount_base || 0),
-        credit: 0,
-        description: e.description || e.category,
-      });
-      allEntries.push({
-        date: e.created_at,
-        ref: "EXP",
-        account: "Cash & Bank",
-        debit: 0,
-        credit: Number(e.amount_base || 0),
-        description: e.description || e.category,
-      });
-    });
-
-    // Supplier payments
-    (supplierPayments || []).forEach((sp) => {
-      allEntries.push({
-        date: sp.created_at,
-        ref: "SUP",
-        account: "Accounts Payable",
-        debit: Number(sp.amount || 0),
-        credit: 0,
-        description: "Supplier payment",
-      });
-      allEntries.push({
-        date: sp.created_at,
-        ref: "SUP",
-        account: "Cash & Bank",
-        debit: 0,
-        credit: Number(sp.amount || 0),
-        description: "Supplier payment",
       });
     });
 
     allEntries.sort((a, b) => new Date(a.date) - new Date(b.date));
 
-    // Running balance
     let balance = 0;
     allEntries.forEach((e) => {
       balance += e.debit - e.credit;
       e.balance = balance;
     });
 
+    const totalDebit = allEntries.reduce((s, e) => s + e.debit, 0);
+    const totalCredit = allEntries.reduce((s, e) => s + e.credit, 0);
+
     out.innerHTML = `
       <div class="card">
-        <div class="card-title">Ledger Entries (${allEntries.length})</div>
+        <div class="card-title" style="justify-content:space-between;">
+          <span>GL Entries (${allEntries.length})</span>
+          <span style="font-size:13px;">Total Debit: <b>${fmtMoney(totalDebit)}</b> | Total Credit: <b>${fmtMoney(totalCredit)}</b> | Balance: <b>${fmtMoney(balance)}</b></span>
+        </div>
         <div class="table-wrap" style="max-height:500px; overflow-y:auto;"><table>
-          <thead><tr><th>Date</th><th>Ref</th><th>Account</th><th>Debit</th><th>Credit</th><th>Balance</th><th>Description</th></tr></thead>
+          <thead><tr><th>Date</th><th>Ref</th><th>Account</th><th>Type</th><th>Debit</th><th>Credit</th><th>Balance</th><th>Description</th></tr></thead>
           <tbody>
-            ${
-              allEntries.length
-                ? allEntries
-                    .map(
-                      (e) => `
-              <tr>
-                <td>${fmtDate(e.date)}</td>
-                <td>${escapeHtml(e.ref)}</td>
-                <td>${escapeHtml(e.account)}</td>
-                <td class="num">${e.debit ? fmtMoney(e.debit) : ""}</td>
-                <td class="num">${e.credit ? fmtMoney(e.credit) : ""}</td>
-                <td class="num" style="font-weight:700;">${fmtMoney(e.balance)}</td>
-                <td class="text-muted">${escapeHtml(e.description)}</td>
-              </tr>`,
-                    )
-                    .join("")
-                : '<tr><td colspan="7"><div class="empty-state">No entries in this range.</div></td></tr>'
+            ${allEntries.length
+              ? allEntries.map((e) => `
+                <tr>
+                  <td>${fmtDate(e.date)}</td>
+                  <td>${escapeHtml(e.ref)}</td>
+                  <td><code>${escapeHtml(e.accountCode)}</code> ${escapeHtml(e.accountName)}</td>
+                  <td><span class="badge ${coaTypeColor(e.accountType)}">${escapeHtml(e.accountType)}</span></td>
+                  <td class="num">${e.debit ? fmtMoney(e.debit) : ""}</td>
+                  <td class="num">${e.credit ? fmtMoney(e.credit) : ""}</td>
+                  <td class="num" style="font-weight:700;">${fmtMoney(e.balance)}</td>
+                  <td class="text-muted">${escapeHtml(e.description)}</td>
+                </tr>`).join("")
+              : '<tr><td colspan="8"><div class="empty-state">No entries in this range.</div></td></tr>'
             }
           </tbody></table></div>
       </div>`;
@@ -338,29 +408,24 @@ async function renderLedgerTab(body) {
 
   function exportGl() {
     downloadCsv(
-      allEntries.map((e) => [
-        e.date,
-        e.ref,
-        e.account,
-        e.debit,
-        e.credit,
-        e.balance,
-        e.description,
-      ]),
-      ["Date", "Ref", "Account", "Debit", "Credit", "Balance", "Description"],
+      allEntries.map((e) => [e.date, e.ref, e.accountCode, e.accountName, e.accountType, e.debit, e.credit, e.balance, e.description]),
+      ["Date", "Ref", "Account Code", "Account Name", "Type", "Debit", "Credit", "Balance", "Description"],
       `general-ledger-${$("gl-from").value}-to-${$("gl-to").value}.csv`,
     );
   }
 }
 
 // =====================================================================
-// JOURNAL ENTRIES
+// JOURNAL ENTRIES — read from journal_entries + journal_entry_lines
 // =====================================================================
 async function renderJournalTab(body) {
   const range = periodRange("month");
   body.innerHTML = `
     <div class="card">
-      <div class="card-title">Journal Entries</div>
+      <div class="card-title" style="justify-content:space-between;">
+        <span>Journal Entries</span>
+        <button class="btn btn-primary btn-sm" id="je-add-btn">+ New Entry</button>
+      </div>
       ${periodPickerHtml("month", "je")}
     </div>
     <div id="je-output"><div class="empty-state">Loading…</div></div>`;
@@ -370,6 +435,7 @@ async function renderJournalTab(body) {
 
   $("je-run").addEventListener("click", () => load());
   $("je-export").addEventListener("click", () => exportJe());
+  $("je-add-btn").addEventListener("click", () => openJournalEntryForm(null, () => load()));
   await load();
 
   async function load() {
@@ -378,147 +444,70 @@ async function renderJournalTab(body) {
     const out = $("je-output");
     out.innerHTML = `<div class="empty-state">Loading…</div>`;
 
-    const [{ data: sales }, { data: expenses }, { data: supplierPayments }] =
-      await Promise.all([
-        supabase
-          .from("sales")
-          .select("*")
-          .eq("business_id", STATE.business.id)
-          .neq("status", "voided")
-          .neq("sale_type", "quotation")
-          .gte("created_at", `${from}T00:00:00`)
-          .lte("created_at", `${to}T23:59:59`),
-        supabase
-          .from("expenses")
-          .select("*")
-          .eq("business_id", STATE.business.id)
-          .gte("expense_date", from)
-          .lte("expense_date", to),
-        supabase
-          .from("supplier_payments")
-          .select("*, suppliers!inner(business_id)")
-          .eq("suppliers.business_id", STATE.business.id)
-          .gte("created_at", `${from}T00:00:00`)
-          .lte("created_at", `${to}T23:59:59`),
-      ]);
+    const { data: journalHeaders } = await supabase
+      .from("journal_entries")
+      .select("*, created_by_user:app_users!created_by(full_name)")
+      .eq("business_id", STATE.business.id)
+      .gte("entry_date", from)
+      .lte("entry_date", to)
+      .order("entry_date", { ascending: false })
+      .limit(200);
 
-    entries = [];
-    let jeNum = 1;
+    // Load lines for all entries
+    const headerIds = (journalHeaders || []).map((h) => h.id);
+    const { data: allLines } = headerIds.length ? await supabase
+      .from("journal_entry_lines")
+      .select("*, account:chart_of_accounts(name, account_code)")
+      .in("journal_entry_id", headerIds) : { data: [] };
 
-    // Each sale → Journal Entry
-    (sales || []).forEach((s) => {
-      const netAmount =
-        Number(s.grand_total_base || 0) -
-        Number(s.vat_total || 0) * Number(s.exchange_rate || 1);
-      entries.push({
-        date: s.created_at,
-        je_number: `JE-${String(jeNum++).padStart(4, "0")}`,
-        reference: s.sale_number,
-        lines: [
-          {
-            account: "Cash & Bank",
-            debit: Number(s.grand_total_base || 0),
-            credit: 0,
-          },
-          { account: "Sales Revenue", debit: 0, credit: netAmount },
-          ...(Number(s.vat_total || 0) > 0
-            ? [
-                {
-                  account: "VAT Payable",
-                  debit: 0,
-                  credit:
-                    Number(s.vat_total || 0) * Number(s.exchange_rate || 1),
-                },
-              ]
-            : []),
-        ],
-        total: Number(s.grand_total_base || 0),
-        description: `Sale ${s.sale_number}`,
-      });
+    const linesByJe = {};
+    (allLines || []).forEach((l) => {
+      if (!linesByJe[l.journal_entry_id]) linesByJe[l.journal_entry_id] = [];
+      linesByJe[l.journal_entry_id].push(l);
     });
 
-    // Each expense → Journal Entry
-    (expenses || []).forEach((e) => {
-      entries.push({
-        date: e.created_at,
-        je_number: `JE-${String(jeNum++).padStart(4, "0")}`,
-        reference: "EXP",
-        lines: [
-          {
-            account: `Expense — ${e.category}`,
-            debit: Number(e.amount_base || 0),
-            credit: 0,
-          },
-          {
-            account: "Cash & Bank",
-            debit: 0,
-            credit: Number(e.amount_base || 0),
-          },
-        ],
-        total: Number(e.amount_base || 0),
-        description: e.description || e.category,
-      });
-    });
+    entries = (journalHeaders || []).map((je) => ({
+      ...je,
+      lines: linesByJe[je.id] || [],
+      totalDebit: (linesByJe[je.id] || []).reduce((s, l) => s + Number(l.debit), 0),
+      totalCredit: (linesByJe[je.id] || []).reduce((s, l) => s + Number(l.credit), 0),
+    }));
 
-    // Supplier payments → Journal Entry
-    (supplierPayments || []).forEach((sp) => {
-      entries.push({
-        date: sp.created_at,
-        je_number: `JE-${String(jeNum++).padStart(4, "0")}`,
-        reference: "SUP",
-        lines: [
-          {
-            account: "Accounts Payable",
-            debit: Number(sp.amount || 0),
-            credit: 0,
-          },
-          { account: "Cash & Bank", debit: 0, credit: Number(sp.amount || 0) },
-        ],
-        total: Number(sp.amount || 0),
-        description: "Supplier payment",
-      });
-    });
-
-    entries.sort((a, b) => new Date(a.date) - new Date(b.date));
-
-    out.innerHTML = `
+    out.innerHTML = entries.length ? `
       <div class="card">
-        <div class="card-title">Journal Entries (${entries.length})</div>
         <div class="table-wrap" style="max-height:500px; overflow-y:auto;"><table>
-          <thead><tr><th>Date</th><th>JE #</th><th>Reference</th><th>Description</th><th>Debit</th><th>Credit</th></tr></thead>
+          <thead><tr><th>Date</th><th>JE #</th><th>Reference</th><th>Description</th><th>Debit</th><th>Credit</th><th></th></tr></thead>
           <tbody>
-            ${
-              entries.length
-                ? entries
-                    .map(
-                      (je) => `
+            ${entries.map((je) => `
               <tr>
-                <td>${fmtDate(je.date)}</td>
-                <td><b>${escapeHtml(je.je_number)}</b></td>
-                <td>${escapeHtml(je.reference)}</td>
+                <td>${fmtDate(je.entry_date)}</td>
+                <td><b>${escapeHtml(je.journal_number)}</b></td>
+                <td>${escapeHtml(je.reference_number || "")}</td>
                 <td>${escapeHtml(je.description)}</td>
-                <td class="num">${fmtMoney(je.total)}</td>
-                <td class="num">${fmtMoney(je.total)}</td>
+                <td class="num">${fmtMoney(je.totalDebit)}</td>
+                <td class="num">${fmtMoney(je.totalCredit)}</td>
+                <td><button class="btn btn-ghost btn-xs" data-view-je="${je.id}">View</button></td>
               </tr>
-              ${je.lines
-                .map(
-                  (l) => `
+              ${je.lines.map((l) => `
                 <tr style="background:var(--surface-2);">
                   <td></td><td></td>
-                  <td style="padding-left:24px;">↳ ${escapeHtml(l.account)}</td>
-                  <td></td>
+                  <td style="padding-left:24px;">↳ ${escapeHtml(l.account?.account_code || "")} ${escapeHtml(l.account?.name || "")}</td>
+                  <td class="text-muted">${escapeHtml(l.description || "")}</td>
                   <td class="num">${l.debit ? fmtMoney(l.debit) : ""}</td>
                   <td class="num">${l.credit ? fmtMoney(l.credit) : ""}</td>
-                </tr>`,
-                )
-                .join("")}
-            `,
-                    )
-                    .join("")
-                : '<tr><td colspan="6"><div class="empty-state">No journal entries in this range.</div></td></tr>'
-            }
-          </tbody></table></div>
-      </div>`;
+                  <td></td>
+                </tr>
+              `).join("")}
+            `).join("")}
+          </tbody>
+        </table></div>
+      </div>` : '<div class="card"><div class="empty-state">No journal entries in this range.</div></div>';
+
+    qsa("[data-view-je]", body).forEach((btn) =>
+      btn.addEventListener("click", () => {
+        const je = entries.find((e) => e.id === btn.dataset.viewJe);
+        if (je) openJournalEntryForm(je, () => load());
+      }));
   }
 
   function exportJe() {
@@ -526,34 +515,193 @@ async function renderJournalTab(body) {
     entries.forEach((je) => {
       je.lines.forEach((l) => {
         rows.push([
-          je.date,
-          je.je_number,
-          je.reference,
-          l.account,
+          je.entry_date,
+          je.journal_number,
+          je.reference_number || "",
+          l.account?.account_code || "",
+          l.account?.name || "",
           l.debit,
           l.credit,
-          je.description,
+          l.description || je.description,
         ]);
       });
     });
-    downloadCsv(
-      rows,
-      [
-        "Date",
-        "JE #",
-        "Reference",
-        "Account",
-        "Debit",
-        "Credit",
-        "Description",
-      ],
-      `journal-entries-${$("je-from").value}-to-${$("je-to").value}.csv`,
-    );
+    downloadCsv(rows,
+      ["Date", "JE #", "Reference", "Account Code", "Account Name", "Debit", "Credit", "Description"],
+      `journal-entries-${$("je-from").value}-to-${$("je-to").value}.csv`);
+  }
+}
+
+function openJournalEntryForm(existing, onSaved) {
+  const isEdit = !!existing;
+  let lines = existing ? existing.lines.map((l) => ({
+    accountId: l.account_id,
+    accountName: l.account?.name || "",
+    accountCode: l.account?.account_code || "",
+    debit: Number(l.debit),
+    credit: Number(l.credit),
+    description: l.description || "",
+  })) : [];
+
+  function renderForm() {
+    const totalDebit = lines.reduce((s, l) => s + l.debit, 0);
+    const totalCredit = lines.reduce((s, l) => s + l.credit, 0);
+    const balanced = Math.abs(totalDebit - totalCredit) < 0.01;
+
+    openModal(`
+      <h3>${isEdit ? "View Journal Entry" : "New Journal Entry"}</h3>
+      <div class="field"><label>Date</label><input type="date" id="je-form-date" value="${existing ? existing.entry_date : new Date().toISOString().slice(0, 10)}" /></div>
+      <div class="field"><label>Description / Narration</label><input id="je-form-desc" value="${escapeHtml(existing ? existing.description : "")}" placeholder="Brief description of this entry" ${isEdit ? "disabled" : ""} /></div>
+      ${isEdit && existing.reference_number ? `<div class="field"><label>Reference</label><input value="${escapeHtml(existing.reference_number)}" disabled /></div>` : ""}
+      <div class="field"><label style="display:flex;justify-content:space-between;"><span>Lines</span><span style="color:${balanced ? "var(--success)" : "var(--danger)"};">${fmtMoney(totalDebit)} = ${fmtMoney(totalCredit)} ${balanced ? "✅" : "❌"}</span></label></div>
+      <div id="je-lines">
+        ${lines.map((l, i) => `
+          <div class="field-row" style="align-items:end;margin-bottom:6px;" data-line="${i}">
+            <div class="field" style="flex:2;">
+              <select data-je-account="${i}" style="width:100%;" ${isEdit ? "disabled" : ""}>
+                <option value="">Select account</option>
+                ${window._coaOptions || ""}
+              </select>
+            </div>
+            <div class="field" style="flex:1;">
+              <input type="number" step="0.01" min="0" value="${l.debit || ""}" placeholder="Debit" data-je-debit="${i}" ${isEdit ? "disabled" : ""} />
+            </div>
+            <div class="field" style="flex:1;">
+              <input type="number" step="0.01" min="0" value="${l.credit || ""}" placeholder="Credit" data-je-credit="${i}" ${isEdit ? "disabled" : ""} />
+            </div>
+            <div class="field" style="flex:1.5;">
+              <input value="${escapeHtml(l.description)}" placeholder="Line description" data-je-desc="${i}" ${isEdit ? "disabled" : ""} />
+            </div>
+            ${isEdit ? "" : `<button class="btn btn-ghost btn-sm" style="color:var(--danger);" data-je-remove="${i}">✕</button>`}
+          </div>
+        `).join("")}
+      </div>
+      ${isEdit ? "" : `<button class="btn btn-secondary btn-sm" id="je-add-line">+ Add Line</button>`}
+      <div style="margin-top:12px;">
+        ${isEdit ? `<button class="btn btn-secondary btn-block" data-close-modal>Close</button>` :
+          `<button class="btn btn-primary btn-block" id="je-save" ${balanced ? "" : "disabled"}>Post Journal Entry</button>
+           <button class="btn btn-secondary btn-block" data-close-modal>Cancel</button>`}
+      </div>
+    `, { large: true, onMount: () => {
+      if (isEdit) return;
+      const coaSelects = qsa("[data-je-account]");
+      coaSelects.forEach((sel) => {
+        const idx = parseInt(sel.dataset.jeAccount);
+        if (lines[idx]) sel.value = lines[idx].accountId;
+      });
+    }});
+
+    if (isEdit) return;
+
+    qsa("[data-je-debit]").forEach((inp) => {
+      inp.addEventListener("input", () => {
+        const idx = parseInt(inp.dataset.jeDebit);
+        lines[idx].debit = parseFloat(inp.value) || 0;
+        closeModal(); renderForm();
+      });
+    });
+    qsa("[data-je-credit]").forEach((inp) => {
+      inp.addEventListener("input", () => {
+        const idx = parseInt(inp.dataset.jeCredit);
+        lines[idx].credit = parseFloat(inp.value) || 0;
+        closeModal(); renderForm();
+      });
+    });
+    qsa("[data-je-desc]").forEach((inp) => {
+      inp.addEventListener("change", () => {
+        const idx = parseInt(inp.dataset.jeDesc);
+        lines[idx].description = inp.value;
+      });
+    });
+    qsa("[data-je-remove]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const idx = parseInt(btn.dataset.jeRemove);
+        lines.splice(idx, 1);
+        closeModal(); renderForm();
+      });
+    });
+    qsa("[data-je-account]").forEach((sel) => {
+      sel.addEventListener("change", () => {
+        const idx = parseInt(sel.dataset.jeAccount);
+        lines[idx].accountId = sel.value;
+        lines[idx].accountName = sel.options[sel.selectedIndex]?.text || "";
+        lines[idx].accountCode = sel.options[sel.selectedIndex]?.dataset?.code || "";
+      });
+    });
+    $("je-add-line")?.addEventListener("click", () => {
+      lines.push({ accountId: "", accountName: "", debit: 0, credit: 0, description: "" });
+      closeModal(); renderForm();
+    });
+    $("je-save")?.addEventListener("click", async () => {
+      const date = $("je-form-date").value;
+      const desc = $("je-form-desc").value.trim();
+      if (!date || !desc) { toast("Date and description required", "error"); return; }
+      const validLines = lines.filter((l) => l.accountId && (l.debit > 0 || l.credit > 0));
+      if (validLines.length < 2) { toast("Need at least 2 lines for a double-entry", "error"); return; }
+      const td = validLines.reduce((s, l) => s + l.debit, 0);
+      const tc = validLines.reduce((s, l) => s + l.credit, 0);
+      if (Math.abs(td - tc) > 0.01) { toast(`Journal doesn't balance: ${fmtMoney(td)} ≠ ${fmtMoney(tc)}`, "error"); return; }
+
+      const { data: je } = await supabase.rpc("fn_next_journal_number").then(() =>
+        supabase.from("journal_entries").insert({
+          business_id: STATE.business.id,
+          branch_id: STATE.branch?.id,
+          journal_number: "JE-" + Date.now(),
+          entry_date: date,
+          description: desc,
+          reference_type: "manual",
+          created_by: STATE.appUser.id,
+        }).select().single()
+      ).catch(async () => {
+        // fallback: direct insert
+        const { data } = await supabase.from("journal_entries").insert({
+          business_id: STATE.business.id,
+          branch_id: STATE.branch?.id,
+          journal_number: "JE-" + Date.now(),
+          entry_date: date,
+          description: desc,
+          reference_type: "manual",
+          created_by: STATE.appUser.id,
+        }).select().single();
+        return { data };
+      });
+
+      if (!je) { toast("Failed to create journal entry", "error"); return; }
+
+      const linesToInsert = validLines.map((l) => ({
+        journal_entry_id: je.id,
+        account_id: l.accountId,
+        debit: l.debit,
+        credit: l.credit,
+        description: l.description || null,
+      }));
+      const { error } = await supabase.from("journal_entry_lines").insert(linesToInsert);
+      if (error) { toast("Failed to save lines: " + error.message, "error"); return; }
+
+      logAuditAction({ action: "create", entityType: "journal_entry", entityId: je.id, entityName: je.journal_number, newValue: { lines: linesToInsert } });
+      toast(`Journal entry ${je.journal_number} posted`, "success");
+      closeModal();
+      if (onSaved) onSaved();
+    });
+  }
+
+  // Preload CoA options
+  if (!window._coaOptions) {
+    supabase.from("chart_of_accounts").select("id, account_code, name, type")
+      .or(`business_id.eq.${STATE.business.id},business_id.is.null`)
+      .eq("is_active", true).order("account_code").then(({ data }) => {
+        window._coaOptions = (data || []).map((a) =>
+          `<option value="${a.id}" data-code="${escapeHtml(a.account_code)}">${escapeHtml(a.account_code)} — ${escapeHtml(a.name)} (${a.type})</option>`
+        ).join("");
+        renderForm();
+      });
+  } else {
+    renderForm();
   }
 }
 
 // =====================================================================
-// TRIAL BALANCE
+// TRIAL BALANCE — reads from journal_entry_lines
 // =====================================================================
 async function renderTrialBalanceTab(body) {
   const range = periodRange("month");
@@ -571,124 +719,45 @@ async function renderTrialBalanceTab(body) {
   await load();
 
   async function load() {
-    const from = $("tb-from").value;
     const to = $("tb-to").value;
     const out = $("tb-output");
     out.innerHTML = `<div class="empty-state">Loading…</div>`;
 
-    const [
-      { data: sales },
-      { data: expenses },
-      { data: payments },
-      { data: supplierPayments },
-      { data: poItems },
-    ] = await Promise.all([
-      supabase
-        .from("sales")
-        .select("*")
-        .eq("business_id", STATE.business.id)
-        .neq("status", "voided")
-        .neq("sale_type", "quotation")
-        .gte("created_at", `${from}T00:00:00`)
-        .lte("created_at", `${to}T23:59:59`),
-      supabase
-        .from("expenses")
-        .select("*")
-        .eq("business_id", STATE.business.id)
-        .gte("expense_date", from)
-        .lte("expense_date", to),
-      supabase
-        .from("payments")
-        .select("amount_base, sales!inner(business_id)")
-        .eq("sales.business_id", STATE.business.id)
-        .gte("created_at", `${from}T00:00:00`)
-        .lte("created_at", `${to}T23:59:59`),
-      supabase
-        .from("supplier_payments")
-        .select("amount, suppliers!inner(business_id)")
-        .eq("suppliers.business_id", STATE.business.id)
-        .gte("created_at", `${from}T00:00:00`)
-        .lte("created_at", `${to}T23:59:59`),
-      supabase
-        .from("purchase_order_items")
-        .select(
-          "quantity, unit_cost, purchase_orders!inner(business_id, status)",
-        )
-        .eq("purchase_orders.business_id", STATE.business.id)
-        .eq("purchase_orders.status", "received"),
-    ]);
+    const { data: accounts } = await supabase
+      .from("chart_of_accounts")
+      .select("id, account_code, name, type")
+      .or(`business_id.eq.${STATE.business.id},business_id.is.null`)
+      .eq("is_active", true)
+      .order("account_code");
 
-    const accounts = {};
+    const { data: lines } = await supabase
+      .from("journal_entry_lines")
+      .select("debit, credit, account_id, entry:journal_entries!inner(business_id, entry_date, is_posted)")
+      .eq("entry.business_id", STATE.business.id)
+      .lte("entry.entry_date", to)
+      .eq("entry.is_posted", true);
 
-    function debit(account, amount) {
-      if (!accounts[account]) accounts[account] = { debit: 0, credit: 0 };
-      accounts[account].debit += amount;
-    }
-    function credit(account, amount) {
-      if (!accounts[account]) accounts[account] = { debit: 0, credit: 0 };
-      accounts[account].credit += amount;
-    }
+    const acctMap = {};
+    (accounts || []).forEach((a) => { acctMap[a.id] = a; });
 
-    // Sales
-    (sales || []).forEach((s) => {
-      const base = Number(s.grand_total_base || 0);
-      const vat = Number(s.vat_total || 0) * Number(s.exchange_rate || 1);
-      debit("Cash & Bank", base);
-      credit("Sales Revenue", base - vat);
-      if (vat > 0) credit("VAT Payable", vat);
+    const agg = {};
+    (lines || []).forEach((l) => {
+      if (!agg[l.account_id]) agg[l.account_id] = { debit: 0, credit: 0 };
+      agg[l.account_id].debit += Number(l.debit);
+      agg[l.account_id].credit += Number(l.credit);
     });
 
-    // Payments
-    (payments || []).forEach((p) => {
-      debit("Cash & Bank", Number(p.amount_base || 0));
-    });
-
-    // Expenses
-    (expenses || []).forEach((e) => {
-      debit(`Expense — ${e.category}`, Number(e.amount_base || 0));
-      credit("Cash & Bank", Number(e.amount_base || 0));
-    });
-
-    // Supplier payments
-    (supplierPayments || []).forEach((sp) => {
-      debit("Accounts Payable", Number(sp.amount || 0));
-      credit("Cash & Bank", Number(sp.amount || 0));
-    });
-
-    // Inventory (asset)
-    const inventoryValue = STATE.products.reduce(
-      (a, p) => a + stockFor(p.id) * Number(p.cost_price || 0),
-      0,
-    );
-    debit("Inventory", inventoryValue);
-
-    // Accounts Receivable
-    const ar = STATE.customers.reduce(
-      (a, c) => a + Math.max(0, Number(c.balance || 0)),
-      0,
-    );
-    debit("Accounts Receivable", ar);
-
-    // Accounts Payable (from received POs)
-    const apGross = (poItems || []).reduce(
-      (a, it) => a + Number(it.quantity || 0) * Number(it.unit_cost || 0),
-      0,
-    );
-    const apPaid = (supplierPayments || []).reduce(
-      (a, sp) => a + Number(sp.amount || 0),
-      0,
-    );
-    const ap = Math.max(0, apGross - apPaid);
-    credit("Accounts Payable", ap);
-
-    const rows = Object.entries(accounts)
-      .map(([name, v]) => ({
-        name,
+    const rows = Object.entries(agg)
+      .map(([id, v]) => ({
+        id,
+        code: acctMap[id]?.account_code || "",
+        name: acctMap[id]?.name || "Unknown",
+        type: acctMap[id]?.type || "",
         debit: v.debit,
         credit: v.credit,
         balance: v.debit - v.credit,
       }))
-      .sort((a, b) => a.name.localeCompare(b.name));
+      .sort((a, b) => a.code.localeCompare(b.code));
 
     const totalDebit = rows.reduce((a, r) => a + r.debit, 0);
     const totalCredit = rows.reduce((a, r) => a + r.credit, 0);
@@ -698,28 +767,27 @@ async function renderTrialBalanceTab(body) {
 
     out.innerHTML = `
       <div class="card" style="border-color:${isBalanced ? "var(--brand)" : "var(--danger)"}; background:${isBalanced ? "var(--brand-light)" : "var(--danger-light)"}; margin-bottom:16px;">
-        <b>${isBalanced ? "✅ Trial Balance is balanced" : "⚠️ Trial Balance is OUT OF BALANCE — investigate."}</b>
+        <b>${isBalanced ? "Trial Balance is balanced" : "Trial Balance is OUT OF BALANCE — investigate."}</b>
       </div>
       <div class="card">
-        <div class="card-title">Trial Balance — ${escapeHtml(from)} to ${escapeHtml(to)}</div>
+        <div class="card-title">Trial Balance — as of ${escapeHtml(to)}</div>
         <div class="table-wrap"><table>
-          <thead><tr><th>Account</th><th style="text-align:right;">Debit</th><th style="text-align:right;">Credit</th><th style="text-align:right;">Balance</th></tr></thead>
+          <thead><tr><th>Code</th><th>Account</th><th>Type</th><th style="text-align:right;">Debit</th><th style="text-align:right;">Credit</th><th style="text-align:right;">Balance</th></tr></thead>
           <tbody>
-            ${rows
-              .map(
-                (r) => `
+            ${rows.map((r) => `
               <tr>
+                <td><code>${escapeHtml(r.code)}</code></td>
                 <td>${escapeHtml(r.name)}</td>
+                <td><span class="badge ${coaTypeColor(r.type)}">${escapeHtml(r.type)}</span></td>
                 <td class="num">${r.debit ? fmtMoney(r.debit) : ""}</td>
                 <td class="num">${r.credit ? fmtMoney(r.credit) : ""}</td>
                 <td class="num" style="font-weight:700; color:${r.balance >= 0 ? "inherit" : "var(--danger)"};">${fmtMoney(r.balance)}</td>
-              </tr>`,
-              )
-              .join("")}
+              </tr>
+            `).join("")}
           </tbody>
           <tfoot>
             <tr style="font-weight:700; border-top:2px solid var(--border);">
-              <td>TOTAL</td>
+              <td colspan="3">TOTAL</td>
               <td class="num">${fmtMoney(totalDebit)}</td>
               <td class="num">${fmtMoney(totalCredit)}</td>
               <td class="num">${fmtMoney(totalDebit - totalCredit)}</td>
@@ -732,8 +800,8 @@ async function renderTrialBalanceTab(body) {
   function exportTb() {
     const rows = window._tbRows || [];
     downloadCsv(
-      rows.map((r) => [r.name, r.debit, r.credit, r.balance]),
-      ["Account", "Debit", "Credit", "Balance"],
+      rows.map((r) => [r.code, r.name, r.type, r.debit, r.credit, r.balance]),
+      ["Code", "Account", "Type", "Debit", "Credit", "Balance"],
       `trial-balance-${$("tb-from").value}-to-${$("tb-to").value}.csv`,
     );
   }
@@ -860,7 +928,7 @@ async function renderExpensesTab(body) {
 }
 
 // =====================================================================
-// PROFIT & LOSS
+// PROFIT & LOSS — reads from journal_entry_lines
 // =====================================================================
 async function renderPnlTab(body) {
   const range = periodRange("month");
@@ -880,69 +948,71 @@ async function renderPnlTab(body) {
     const from = $("pnl-from").value;
     const to = $("pnl-to").value;
     const out = $("pnl-output");
-    out.innerHTML = `<div class="empty-state">Crunching numbers…</div>`;
+    out.innerHTML = `<div class="empty-state">Calculating…</div>`;
 
+    // Use the RPC function if available, otherwise compute from GL tables
+    try {
+      const { data: glData } = await supabase.rpc("fn_profit_loss", {
+        p_business_id: STATE.business.id,
+        p_from: from,
+        p_to: to,
+      });
+
+      if (glData && glData.length) {
+        const incomeItems = glData.filter((r) => r.section === "income");
+        const expenseItems = glData.filter((r) => r.section === "expense");
+        const totalIncome = incomeItems.reduce((s, r) => s + Number(r.amount), 0);
+        const totalExpenses = expenseItems.reduce((s, r) => s + Number(r.amount), 0);
+        const netProfit = totalIncome - totalExpenses;
+
+        window._pnlData = { incomeItems, expenseItems, totalIncome, totalExpenses, netProfit };
+
+        out.innerHTML = `
+          ${nonStatutoryNote()}
+          <div class="card">
+            <div class="card-title">Profit &amp; Loss — ${escapeHtml(from)} to ${escapeHtml(to)}</div>
+            <table class="stmt-table">
+              <tr><th colspan="2">Income</th></tr>
+              ${incomeItems.map((r) => `
+                <tr><td style="padding-left:16px;">${escapeHtml(r.account_name)} (${escapeHtml(r.account_code)})</td><td class="num">${fmtMoney(r.amount)}</td></tr>
+              `).join("")}
+              <tr class="subtotal"><td><b>Total Income</b></td><td class="num"><b>${fmtMoney(totalIncome)}</b></td></tr>
+              <tr><th colspan="2">Expenses</th></tr>
+              ${expenseItems.map((r) => `
+                <tr><td style="padding-left:16px;">${escapeHtml(r.account_name)} (${escapeHtml(r.account_code)})</td><td class="num">(${fmtMoney(r.amount)})</td></tr>
+              `).join("")}
+              <tr class="subtotal"><td><b>Total Expenses</b></td><td class="num"><b>(${fmtMoney(totalExpenses)})</b></td></tr>
+              <tr class="total"><td><b>Net Profit ${netProfit >= 0 ? "" : "(Loss)"}</b></td><td class="num"><b>${fmtMoney(netProfit)}</b></td></tr>
+            </table>
+          </div>`;
+        return;
+      }
+    } catch (e) { /* fall through to legacy */ }
+
+    // Fallback: compute from sales & expenses
     const [{ data: sales }, { data: expenses }] = await Promise.all([
-      supabase
-        .from("sales")
-        .select("*, sale_items(*)")
-        .eq("business_id", STATE.business.id)
-        .neq("sale_type", "quotation")
-        .neq("status", "voided")
-        .gte("created_at", `${from}T00:00:00`)
-        .lte("created_at", `${to}T23:59:59`),
-      supabase
-        .from("expenses")
-        .select("*")
-        .eq("business_id", STATE.business.id)
-        .gte("expense_date", from)
-        .lte("expense_date", to),
+      supabase.from("sales").select("*, sale_items(*)").eq("business_id", STATE.business.id)
+        .neq("sale_type", "quotation").neq("status", "voided")
+        .gte("created_at", `${from}T00:00:00`).lte("created_at", `${to}T23:59:59`),
+      supabase.from("expenses").select("*").eq("business_id", STATE.business.id)
+        .gte("expense_date", from).lte("expense_date", to),
     ]);
 
     const salesRows = sales || [];
-    const grossRevenue = salesRows.reduce(
-      (a, s) => a + Number(s.grand_total_base || 0),
-      0,
-    );
-    const vatCollected = salesRows.reduce(
-      (a, s) => a + Number(s.vat_total || 0) * Number(s.exchange_rate || 1),
-      0,
-    );
+    const grossRevenue = salesRows.reduce((a, s) => a + Number(s.grand_total_base || 0), 0);
+    const vatCollected = salesRows.reduce((a, s) => a + Number(s.vat_total || 0) * Number(s.exchange_rate || 1), 0);
     const netRevenue = grossRevenue - vatCollected;
-
-    const costByProduct = Object.fromEntries(
-      STATE.products.map((p) => [p.id, Number(p.cost_price || 0)]),
-    );
+    const costByProduct = Object.fromEntries(STATE.products.map((p) => [p.id, Number(p.cost_price || 0)]));
     let cogs = 0;
-    salesRows.forEach((s) =>
-      (s.sale_items || []).forEach((it) => {
-        cogs += Number(it.quantity || 0) * (costByProduct[it.product_id] || 0);
-      }),
-    );
+    salesRows.forEach((s) => (s.sale_items || []).forEach((it) => { cogs += Number(it.quantity || 0) * (costByProduct[it.product_id] || 0); }));
     const grossProfit = netRevenue - cogs;
-
     const expenseRows = expenses || [];
     const expenseByCategory = {};
-    expenseRows.forEach((e) => {
-      expenseByCategory[e.category] =
-        (expenseByCategory[e.category] || 0) + Number(e.amount_base || 0);
-    });
-    const totalExpenses = expenseRows.reduce(
-      (a, e) => a + Number(e.amount_base || 0),
-      0,
-    );
+    expenseRows.forEach((e) => { expenseByCategory[e.category] = (expenseByCategory[e.category] || 0) + Number(e.amount_base || 0); });
+    const totalExpenses = expenseRows.reduce((a, e) => a + Number(e.amount_base || 0), 0);
     const netProfit = grossProfit - totalExpenses;
 
-    window._pnlData = {
-      grossRevenue,
-      vatCollected,
-      netRevenue,
-      cogs,
-      grossProfit,
-      expenseByCategory,
-      totalExpenses,
-      netProfit,
-    };
+    window._pnlData = { grossRevenue, vatCollected, netRevenue, cogs, grossProfit, expenseByCategory, totalExpenses, netProfit };
 
     out.innerHTML = `
       ${nonStatutoryNote()}
@@ -950,16 +1020,11 @@ async function renderPnlTab(body) {
         <div class="card-title">Profit &amp; Loss — ${escapeHtml(from)} to ${escapeHtml(to)}</div>
         <table class="stmt-table">
           <tr><td>Gross Sales Revenue (VAT-inclusive)</td><td class="num">${fmtMoney(grossRevenue)}</td></tr>
-          <tr><td>Less: VAT Collected (not revenue)</td><td class="num">(${fmtMoney(vatCollected)})</td></tr>
+          <tr><td>Less: VAT Collected</td><td class="num">(${fmtMoney(vatCollected)})</td></tr>
           <tr class="subtotal"><td><b>Net Sales Revenue</b></td><td class="num"><b>${fmtMoney(netRevenue)}</b></td></tr>
-          <tr><td>Less: Cost of Goods Sold <span class="text-muted">(at today's cost price)</span></td><td class="num">(${fmtMoney(cogs)})</td></tr>
+          <tr><td>Less: COGS</td><td class="num">(${fmtMoney(cogs)})</td></tr>
           <tr class="subtotal"><td><b>Gross Profit</b></td><td class="num"><b>${fmtMoney(grossProfit)}</b></td></tr>
-          ${Object.entries(expenseByCategory)
-            .map(
-              ([cat, amt]) =>
-                `<tr><td>Less: ${escapeHtml(cat)}</td><td class="num">(${fmtMoney(amt)})</td></tr>`,
-            )
-            .join("")}
+          ${Object.entries(expenseByCategory).map(([cat, amt]) => `<tr><td>Less: ${escapeHtml(cat)}</td><td class="num">(${fmtMoney(amt)})</td></tr>`).join("")}
           <tr><td><b>Total Operating Expenses</b></td><td class="num">(${fmtMoney(totalExpenses)})</td></tr>
           <tr class="total"><td><b>Net Profit ${netProfit >= 0 ? "" : "(Loss)"}</b></td><td class="num"><b>${fmtMoney(netProfit)}</b></td></tr>
         </table>
@@ -968,97 +1033,107 @@ async function renderPnlTab(body) {
 
   function exportPnl() {
     const d = window._pnlData || {};
-    const rows = [
-      ["Gross Sales Revenue", d.grossRevenue, ""],
-      ["Less: VAT Collected", "", d.vatCollected],
-      ["Net Sales Revenue", d.netRevenue, ""],
-      ["Less: COGS", "", d.cogs],
-      ["Gross Profit", d.grossProfit, ""],
-      ...Object.entries(d.expenseByCategory || {}).map(([cat, amt]) => [
-        `Less: ${cat}`,
-        "",
-        amt,
-      ]),
-      ["Total Expenses", "", d.totalExpenses],
-      ["Net Profit", d.netProfit, ""],
+    const rows = "incomeItems" in d ? [
+      ...d.incomeItems.map((r) => [r.account_name, r.amount]),
+      ["Total Income", d.totalIncome],
+      ...d.expenseItems.map((r) => [r.account_name, -r.amount]),
+      ["Total Expenses", -d.totalExpenses],
+      ["Net Profit", d.netProfit],
+    ] : [
+      ["Gross Sales Revenue", d.grossRevenue], ["Less: VAT Collected", d.vatCollected],
+      ["Net Sales Revenue", d.netRevenue], ["Less: COGS", d.cogs],
+      ["Gross Profit", d.grossProfit],
+      ...Object.entries(d.expenseByCategory || {}).map(([cat, amt]) => [`Less: ${cat}`, amt]),
+      ["Total Expenses", d.totalExpenses], ["Net Profit", d.netProfit],
     ];
-    downloadCsv(
-      rows,
-      ["Line Item", "Amount", "Deduction"],
-      `pnl-${$("pnl-from").value}-to-${$("pnl-to").value}.csv`,
-    );
+    downloadCsv(rows, ["Line Item", "Amount"], `pnl-${$("pnl-from").value}-to-${$("pnl-to").value}.csv`);
   }
 }
 
 // =====================================================================
-// BALANCE SHEET
+// BALANCE SHEET — reads from journal_entry_lines
 // =====================================================================
 async function renderBalanceSheetTab(body) {
   body.innerHTML = `<div class="empty-state">Loading balance sheet…</div>`;
+  const to = new Date().toISOString().slice(0, 10);
 
-  const [
-    { data: allPayments },
-    { data: allExpenses },
-    { data: allSupplierPayments },
-    { data: receivedPOItems },
-  ] = await Promise.all([
-    supabase
-      .from("payments")
-      .select("amount_base, sales!inner(business_id)")
-      .eq("sales.business_id", STATE.business.id),
-    supabase
-      .from("expenses")
-      .select("amount_base")
-      .eq("business_id", STATE.business.id),
-    supabase
-      .from("supplier_payments")
-      .select("amount, currency_code, suppliers!inner(business_id)")
-      .eq("suppliers.business_id", STATE.business.id),
-    supabase
-      .from("purchase_order_items")
-      .select("quantity, unit_cost, purchase_orders!inner(business_id, status)")
-      .eq("purchase_orders.business_id", STATE.business.id)
-      .eq("purchase_orders.status", "received"),
+  try {
+    const { data: bsData } = await supabase.rpc("fn_balance_sheet", {
+      p_business_id: STATE.business.id,
+      p_date: to,
+    });
+
+    if (bsData && bsData.length) {
+      const assets = bsData.filter((r) => r.section === "asset");
+      const liabilities = bsData.filter((r) => r.section === "liability");
+      const equity = bsData.filter((r) => r.section === "equity");
+      const totalAssets = assets.reduce((s, r) => s + Number(r.amount), 0);
+      const totalLiabilities = liabilities.reduce((s, r) => s + Number(r.amount), 0);
+      const totalEquity = equity.reduce((s, r) => s + Number(r.amount), 0);
+
+      window._bsData = { assets, liabilities, equity, totalAssets, totalLiabilities, totalEquity };
+
+      body.innerHTML = `
+        ${nonStatutoryNote()}
+        <div class="card">
+          <div class="card-title">Balance Sheet — as of ${escapeHtml(to)}</div>
+          <table class="stmt-table">
+            <tr><th colspan="2">Assets</th></tr>
+            ${assets.map((r) => `<tr><td style="padding-left:16px;">${escapeHtml(r.account_name)}</td><td class="num">${fmtMoney(r.amount)}</td></tr>`).join("")}
+            <tr class="subtotal"><td><b>Total Assets</b></td><td class="num"><b>${fmtMoney(totalAssets)}</b></td></tr>
+            <tr><th colspan="2">Liabilities</th></tr>
+            ${liabilities.map((r) => `<tr><td style="padding-left:16px;">${escapeHtml(r.account_name)}</td><td class="num">${fmtMoney(r.amount)}</td></tr>`).join("")}
+            <tr class="subtotal"><td><b>Total Liabilities</b></td><td class="num"><b>${fmtMoney(totalLiabilities)}</b></td></tr>
+            <tr><th colspan="2">Equity</th></tr>
+            ${equity.map((r) => `<tr><td style="padding-left:16px;">${escapeHtml(r.account_name)}</td><td class="num">${fmtMoney(r.amount)}</td></tr>`).join("")}
+            <tr class="subtotal"><td><b>Total Equity</b></td><td class="num"><b>${fmtMoney(totalEquity)}</b></td></tr>
+            <tr class="total"><td><b>Liabilities + Equity</b></td><td class="num"><b>${fmtMoney(totalLiabilities + totalEquity)}</b></td></tr>
+          </table>
+        </div>`;
+      return;
+    }
+  } catch (e) { /* fall through */ }
+
+  // Fallback: compute from operational data
+  const [{ data: allPayments }, { data: allExpenses }, { data: allSupplierPayments }, { data: receivedPOItems }] = await Promise.all([
+    supabase.from("payments").select("amount_base, sales!inner(business_id)").eq("sales.business_id", STATE.business.id),
+    supabase.from("expenses").select("amount_base").eq("business_id", STATE.business.id),
+    supabase.from("supplier_payments").select("amount, suppliers!inner(business_id)").eq("suppliers.business_id", STATE.business.id),
+    supabase.from("purchase_order_items").select("quantity, unit_cost, purchase_orders!inner(business_id, status)").eq("purchase_orders.business_id", STATE.business.id).eq("purchase_orders.status", "received"),
   ]);
 
-  const cashIn = (allPayments || []).reduce(
-    (a, p) => a + Number(p.amount_base || 0),
-    0,
-  );
-  const cashOutExpenses = (allExpenses || []).reduce(
-    (a, e) => a + Number(e.amount_base || 0),
-    0,
-  );
-  const cashOutSuppliers = (allSupplierPayments || []).reduce(
-    (a, p) => a + Number(p.amount || 0),
-    0,
-  );
+  const cashIn = (allPayments || []).reduce((a, p) => a + Number(p.amount_base || 0), 0);
+  const cashOutExpenses = (allExpenses || []).reduce((a, e) => a + Number(e.amount_base || 0), 0);
+  const cashOutSuppliers = (allSupplierPayments || []).reduce((a, p) => a + Number(p.amount || 0), 0);
   const estimatedCash = cashIn - cashOutExpenses - cashOutSuppliers;
-
-  const inventoryValue = STATE.products.reduce(
-    (a, p) => a + stockFor(p.id) * Number(p.cost_price || 0),
-    0,
-  );
-  const accountsReceivable = STATE.customers.reduce(
-    (a, c) => a + Math.max(0, Number(c.balance || 0)),
-    0,
-  );
-
-  const accountsPayableGross = (receivedPOItems || []).reduce(
-    (a, it) => a + Number(it.quantity || 0) * Number(it.unit_cost || 0),
-    0,
-  );
+  const inventoryValue = STATE.products.reduce((a, p) => a + stockFor(p.id) * Number(p.cost_price || 0), 0);
+  const accountsReceivable = STATE.customers.reduce((a, c) => a + Math.max(0, Number(c.balance || 0)), 0);
+  const accountsPayableGross = (receivedPOItems || []).reduce((a, it) => a + Number(it.quantity || 0) * Number(it.unit_cost || 0), 0);
   const accountsPayable = Math.max(0, accountsPayableGross - cashOutSuppliers);
-
-  const totalAssets =
-    Math.max(0, estimatedCash) + inventoryValue + accountsReceivable;
+  const totalAssets = Math.max(0, estimatedCash) + inventoryValue + accountsReceivable;
   const totalLiabilities = accountsPayable;
   const equity = totalAssets - totalLiabilities;
 
-  window._bsData = {
-    estimatedCash,
-    inventoryValue,
-    accountsReceivable,
+  window._bsData = { estimatedCash, inventoryValue, accountsReceivable, accountsPayable, totalAssets, totalLiabilities, equity };
+
+  body.innerHTML = `
+    ${nonStatutoryNote()}
+    <div class="card">
+      <div class="card-title">Balance Sheet — Managerial Estimate</div>
+      <table class="stmt-table">
+        <tr><th colspan="2">Assets</th></tr>
+        <tr><td style="padding-left:16px;">Cash & Bank</td><td class="num">${fmtMoney(Math.max(0, estimatedCash))}</td></tr>
+        <tr><td style="padding-left:16px;">Inventory <span class="text-muted">(at cost)</span></td><td class="num">${fmtMoney(inventoryValue)}</td></tr>
+        <tr><td style="padding-left:16px;">Accounts Receivable</td><td class="num">${fmtMoney(accountsReceivable)}</td></tr>
+        <tr class="subtotal"><td><b>Total Assets</b></td><td class="num"><b>${fmtMoney(totalAssets)}</b></td></tr>
+        <tr><th colspan="2">Liabilities</th></tr>
+        <tr><td style="padding-left:16px;">Accounts Payable</td><td class="num">${fmtMoney(accountsPayable)}</td></tr>
+        <tr class="subtotal"><td><b>Total Liabilities</b></td><td class="num"><b>${fmtMoney(totalLiabilities)}</b></td></tr>
+        <tr class="subtotal"><td><b>Equity (Estimated)</b></td><td class="num"><b>${fmtMoney(equity)}</b></td></tr>
+        <tr class="total"><td><b>Liabilities + Equity</b></td><td class="num"><b>${fmtMoney(totalLiabilities + equity)}</b></td></tr>
+      </table>
+    </div>`;
+}
     totalAssets,
     accountsPayable,
     totalLiabilities,

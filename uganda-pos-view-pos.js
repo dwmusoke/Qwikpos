@@ -10,19 +10,14 @@ import {
   toast,
   openModal,
   closeModal,
-  uid,
-  toBase,
-  fromBase,
-  fmtMoneyRaw,
-  currencyMeta,
-  refreshProducts,
-  stockFor,
-  queueOfflineSale,
-  queueOfflineEfris,
-  buildEfrisPayload,
-  hasFeature,
-  createNotification,
-  lowStockProducts,
+  fmtMoney,
+  fmtDate,
+  sanitizeCsvValue,
+  printHtml,
+  printThermalReceipt,
+  thermalReceiptHtml,
+  getReceiptTemplate,
+  cartTotalsSnapshot,
 } from "./uganda-pos-core.js";
 import { logAuditAction } from "./uganda-pos-view-audit.js";
 import { getReceiptTemplate } from "./uganda-pos-view-templates.js";
@@ -1449,23 +1444,37 @@ function showOrderSuccess(sale) {
 export function printableModal(sale, opts = {}) {
   const { docLabel = "RECEIPT", footNote = "" } = opts;
   const showSendSms = docLabel !== "QUOTATION" && sale.customer_id;
+  let thermalWidth = 80; // default 80mm
   openModal(
     `
     <div class="modal-title-row"><h3>${escapeHtml(docLabel === "QUOTATION" ? "Quotation" : "Receipt")}</h3></div>
     ${receiptHtml(sale, opts)}
-    <div class="flex gap" style="margin-top:16px;">
+    <div class="flex gap" style="margin-top:16px;flex-wrap:wrap;">
       <button class="btn btn-secondary btn-block" data-close-modal>Close</button>
       ${showSendSms ? `<button class="btn btn-secondary" id="send-sms-btn" title="Send receipt via SMS">📱 SMS</button>` : ""}
-      <button class="btn btn-primary btn-block" id="print-receipt-btn">Print</button>
+      <div class="field" style="min-width:160px;">
+        <label style="font-size:11px;">Paper Size</label>
+        <select id="thermal-paper-size" style="width:100%;padding:8px 10px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text);">
+          <option value="80" selected>80mm (Standard)</option>
+          <option value="58">58mm (Small)</option>
+        </select>
+      </div>
+      <button class="btn btn-secondary btn-block" id="print-thermal-btn">🖨️ Thermal Print</button>
+      <button class="btn btn-primary btn-block" id="print-receipt-btn">Print (A4)</button>
     </div>
   `,
     {
       onMount: () => {
+        const paperSelect = $("thermal-paper-size");
+        paperSelect?.addEventListener("change", () => { thermalWidth = parseInt(paperSelect.value); });
         $("print-receipt-btn").addEventListener("click", () =>
           printHtml(
             $("receipt-print-area").outerHTML,
             docLabel === "QUOTATION" ? "Quotation" : "Receipt",
           ),
+        );
+        $("print-thermal-btn").addEventListener("click", () =>
+          printThermalReceipt(thermalReceiptHtml(sale, { ...opts, width: thermalWidth }), { width: thermalWidth, title: docLabel }),
         );
         if (showSendSms) {
           $("send-sms-btn")?.addEventListener("click", async () => {
