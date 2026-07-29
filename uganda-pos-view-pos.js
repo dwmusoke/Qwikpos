@@ -16,7 +16,6 @@ import {
   printHtml,
   printThermalReceipt,
   thermalReceiptHtml,
-  getReceiptTemplate,
   cartTotalsSnapshot,
 } from "./uganda-pos-core.js";
 import { logAuditAction } from "./uganda-pos-view-audit.js";
