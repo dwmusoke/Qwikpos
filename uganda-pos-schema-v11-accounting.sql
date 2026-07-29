@@ -436,13 +436,14 @@ $$ language plpgsql;
 -- ---------------------------------------------------------------------
 -- 12. NEXT JOURNAL NUMBER RPC
 -- ---------------------------------------------------------------------
-create or replace function fn_next_journal_number()
+create or replace function fn_next_journal_number(p_business_id uuid default null)
 returns text as $$
 declare
   v_next int;
 begin
   select coalesce(max(regexp_replace(journal_number, '[^0-9]', '', 'g')::int), 0) + 1
-    into v_next from journal_entries;
+    into v_next from journal_entries
+    where (p_business_id is null or business_id = p_business_id);
   return 'JE-' || to_char(now(), 'YYYYMMDD') || '-' || lpad(v_next::text, 4, '0');
 end;
 $$ language plpgsql;

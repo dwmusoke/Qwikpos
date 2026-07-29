@@ -18,7 +18,6 @@ import {
   sanitizeCsvValue,
   openModal,
   closeModal,
-  uid,
 } from "./uganda-pos-core.js";
 import { logAuditAction } from "./uganda-pos-view-audit.js";
 
@@ -642,29 +641,17 @@ function openJournalEntryForm(existing, onSaved) {
       const tc = validLines.reduce((s, l) => s + l.credit, 0);
       if (Math.abs(td - tc) > 0.01) { toast(`Journal doesn't balance: ${fmtMoney(td)} ≠ ${fmtMoney(tc)}`, "error"); return; }
 
-      const { data: je } = await supabase.rpc("fn_next_journal_number").then(() =>
-        supabase.from("journal_entries").insert({
-          business_id: STATE.business.id,
-          branch_id: STATE.branch?.id,
-          journal_number: "JE-" + Date.now(),
-          entry_date: date,
-          description: desc,
-          reference_type: "manual",
-          created_by: STATE.appUser.id,
-        }).select().single()
-      ).catch(async () => {
-        // fallback: direct insert
-        const { data } = await supabase.from("journal_entries").insert({
-          business_id: STATE.business.id,
-          branch_id: STATE.branch?.id,
-          journal_number: "JE-" + Date.now(),
-          entry_date: date,
-          description: desc,
-          reference_type: "manual",
-          created_by: STATE.appUser.id,
-        }).select().single();
-        return { data };
-      });
+      const { data: nextNum } = await supabase.rpc("fn_next_journal_number", { p_business_id: STATE.business.id }).catch(() => ({ data: null }));
+      const journalNumber = nextNum || "JE-" + Date.now();
+      const { data: je } = await supabase.from("journal_entries").insert({
+        business_id: STATE.business.id,
+        branch_id: STATE.branch?.id,
+        journal_number: journalNumber,
+        entry_date: date,
+        description: desc,
+        reference_type: "manual",
+        created_by: STATE.appUser.id,
+      }).select().single();
 
       if (!je) { toast("Failed to create journal entry", "error"); return; }
 
