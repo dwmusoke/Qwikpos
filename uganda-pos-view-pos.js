@@ -13,6 +13,7 @@ import {
   fmtMoney,
   fmtDate,
   sanitizeCsvValue,
+  hasFeature,
   printThermalReceipt,
   thermalReceiptHtml,
 } from "./uganda-pos-core.js";
