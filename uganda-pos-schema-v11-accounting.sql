@@ -454,40 +454,128 @@ create or replace function fn_backfill_gl(p_business_id uuid)
 returns text as $$
 declare
   v_count int := 0;
-  v_sale record;
-  v_expense record;
-  v_payment record;
+  v_row record;
+  v_journal_id uuid;
+  v_journal_num text;
+  v_acct_receivable uuid;
+  v_sales_revenue uuid;
+  v_vat_payable uuid;
+  v_cogs uuid;
+  v_inventory uuid;
+  v_discounts uuid;
+  v_cash_account uuid;
+  v_ar_account uuid;
+  v_expense_account uuid;
+  v_account_code text;
+  v_total_lines numeric;
 begin
+  -- Look up account ids (one-time)
+  select id into v_sales_revenue from chart_of_accounts where account_code = '4-1000' limit 1;
+  select id into v_vat_payable from chart_of_accounts where account_code = '2-1010' limit 1;
+  select id into v_acct_receivable from chart_of_accounts where account_code = '1-1020' limit 1;
+  select id into v_cogs from chart_of_accounts where account_code = '5-1000' limit 1;
+  select id into v_inventory from chart_of_accounts where account_code = '1-1030' limit 1;
+  select id into v_discounts from chart_of_accounts where account_code = '4-1020' limit 1;
+  select id into v_cash_account from chart_of_accounts where account_code = '1-1000' limit 1;
+  select id into v_ar_account from chart_of_accounts where account_code = '1-1020' limit 1;
+
   -- Post all completed, non-quotation sales
-  for v_sale in
+  for v_row in
     select * from sales
     where business_id = p_business_id
       and status = 'completed'
       and sale_type != 'quotation'
       and not exists (select 1 from journal_entries je where je.reference_type = 'sale' and je.reference_id = sales.id)
   loop
-    perform post_sale_to_gl() from sales where id = v_sale.id;
+    v_journal_num := 'JE-' || to_char(v_row.created_at, 'YYYYMMDD') || '-' || v_row.sale_number;
+
+    insert into journal_entries (business_id, branch_id, journal_number, entry_date, description,
+      reference_type, reference_id, reference_number, created_by)
+    values (v_row.business_id, v_row.branch_id, v_journal_num, v_row.created_at::date,
+      'Sale ' || v_row.sale_number, 'sale', v_row.id, v_row.sale_number, v_row.cashier_id)
+    returning id into v_journal_id;
+
+    if v_row.grand_total_base > 0 then
+      insert into journal_entry_lines (journal_entry_id, account_id, debit, credit, description) values
+        (v_journal_id, v_acct_receivable, v_row.grand_total_base, 0, 'Sale ' || v_row.sale_number),
+        (v_journal_id, v_sales_revenue, 0, v_row.grand_total_base - v_row.vat_total, 'Revenue from ' || v_row.sale_number);
+      if v_row.vat_total > 0 then
+        insert into journal_entry_lines (journal_entry_id, account_id, debit, credit, description) values
+          (v_journal_id, v_vat_payable, 0, v_row.vat_total, 'VAT on ' || v_row.sale_number);
+      end if;
+      if v_row.discount_total > 0 then
+        insert into journal_entry_lines (journal_entry_id, account_id, debit, credit, description) values
+          (v_journal_id, v_discounts, v_row.discount_total, 0, 'Discount on ' || v_row.sale_number);
+      end if;
+    end if;
+
+    select coalesce(sum((si.quantity * si.unit_price)), 0) into v_total_lines
+      from sale_items si where si.sale_id = v_row.id;
+    if v_total_lines > 0 then
+      insert into journal_entry_lines (journal_entry_id, account_id, debit, credit, description) values
+        (v_journal_id, v_cogs, v_total_lines, 0, 'COGS for ' || v_row.sale_number),
+        (v_journal_id, v_inventory, 0, v_total_lines, 'Inventory reduction for ' || v_row.sale_number);
+    end if;
+
     v_count := v_count + 1;
   end loop;
 
   -- Post all expenses
-  for v_expense in
+  for v_row in
     select * from expenses
     where business_id = p_business_id
       and not exists (select 1 from journal_entries je where je.reference_type = 'expense' and je.reference_id = expenses.id)
   loop
-    perform post_expense_to_gl() from expenses where id = v_expense.id;
+    v_journal_num := 'JE-EXP-' || to_char(v_row.created_at, 'YYYYMMDD') || '-' || v_row.id::text;
+
+    v_account_code := case upper(v_row.category)
+      when 'SALARY' then '5-2000'
+      when 'RENT' then '5-2010'
+      when 'UTILITIES' then '5-2010'
+      when 'SUPPLIES' then '5-2020'
+      when 'TRANSPORT' then '5-2030'
+      when 'MARKETING' then '5-2040'
+      when 'MAINTENANCE' then '5-2050'
+      when 'BANK_CHARGES' then '5-2070'
+      when 'TAX' then '5-2080'
+      else '5-3000'
+    end;
+
+    select id into v_expense_account from chart_of_accounts where account_code = v_account_code limit 1;
+
+    insert into journal_entries (business_id, journal_number, entry_date, description,
+      reference_type, reference_id, reference_number, created_by)
+    values (v_row.business_id, v_journal_num, v_row.expense_date, coalesce(v_row.description, v_row.category),
+      'expense', v_row.id, v_row.category, v_row.created_by)
+    returning id into v_journal_id;
+
+    insert into journal_entry_lines (journal_entry_id, account_id, debit, credit, description) values
+      (v_journal_id, v_expense_account, v_row.amount_base, 0, coalesce(v_row.description, v_row.category)),
+      (v_journal_id, v_cash_account, 0, v_row.amount_base, 'Payment for ' || coalesce(v_row.description, v_row.category));
+
     v_count := v_count + 1;
   end loop;
 
   -- Post all payments
-  for v_payment in
-    select p.* from payments p
+  for v_row in
+    select p.*, s.sale_number as p_sale_number from payments p
     join sales s on s.id = p.sale_id
     where s.business_id = p_business_id
       and not exists (select 1 from journal_entries je where je.reference_type = 'payment' and je.reference_id = p.id)
   loop
-    perform post_payment_to_gl() from payments where id = v_payment.id;
+    v_journal_num := 'JE-PMT-' || to_char(v_row.created_at, 'YYYYMMDD') || '-' || v_row.p_sale_number;
+
+    insert into journal_entries (business_id, journal_number, entry_date, description,
+      reference_type, reference_id, reference_number, created_by)
+    values ((select business_id from sales where id = v_row.sale_id), v_journal_num,
+      v_row.created_at::date, 'Payment received for ' || v_row.p_sale_number,
+      'payment', v_row.id, v_row.p_sale_number, v_row.received_by)
+    returning id into v_journal_id;
+
+    insert into journal_entry_lines (journal_entry_id, account_id, debit, credit, description) values
+      (v_journal_id, v_cash_account, v_row.amount_base, 0, 'Payment received ' || v_row.p_sale_number),
+      (v_journal_id, v_ar_account, 0, v_row.amount_base, 'Receipt for ' || v_row.p_sale_number);
+
     v_count := v_count + 1;
   end loop;
 
