@@ -1133,47 +1133,7 @@ async function renderBalanceSheetTab(body) {
         <tr class="total"><td><b>Liabilities + Equity</b></td><td class="num"><b>${fmtMoney(totalLiabilities + equity)}</b></td></tr>
       </table>
     </div>`;
-}
-    totalAssets,
-    accountsPayable,
-    totalLiabilities,
-    equity,
-  };
-
-  body.innerHTML = `
-    ${nonStatutoryNote()}
-    <div class="card">
-      <div class="card-title">Balance Sheet — as of ${escapeHtml(new Date().toISOString().slice(0, 10))}</div>
-      <div style="margin-bottom:12px;"><button class="btn btn-secondary btn-sm" id="bs-export">Export CSV</button></div>
-      <table class="stmt-table">
-        <tr><td colspan="2"><b>Assets</b></td></tr>
-        <tr><td>Cash &amp; Mobile Money</td><td class="num">${fmtMoney(Math.max(0, estimatedCash))}</td></tr>
-        <tr><td>Inventory on Hand <span class="text-muted">(at cost)</span></td><td class="num">${fmtMoney(inventoryValue)}</td></tr>
-        <tr><td>Accounts Receivable <span class="text-muted">(customer credit balances)</span></td><td class="num">${fmtMoney(accountsReceivable)}</td></tr>
-        <tr class="subtotal"><td><b>Total Assets</b></td><td class="num"><b>${fmtMoney(totalAssets)}</b></td></tr>
-        <tr><td colspan="2" style="padding-top:14px;"><b>Liabilities</b></td></tr>
-        <tr><td>Accounts Payable <span class="text-muted">(received stock not yet paid to suppliers)</span></td><td class="num">${fmtMoney(accountsPayable)}</td></tr>
-        <tr class="subtotal"><td><b>Total Liabilities</b></td><td class="num"><b>${fmtMoney(totalLiabilities)}</b></td></tr>
-        <tr class="total" style="margin-top:10px;"><td><b>Owner's Equity</b></td><td class="num"><b>${fmtMoney(equity)}</b></td></tr>
-      </table>
-    </div>`;
-
-  $("bs-export")?.addEventListener("click", () => {
-    downloadCsv(
-      [
-        ["Cash & Bank", Math.max(0, estimatedCash)],
-        ["Inventory", inventoryValue],
-        ["Accounts Receivable", accountsReceivable],
-        ["Total Assets", totalAssets],
-        ["Accounts Payable", accountsPayable],
-        ["Total Liabilities", totalLiabilities],
-        ["Owner's Equity", equity],
-      ],
-      ["Account", "Amount"],
-      `balance-sheet-${new Date().toISOString().slice(0, 10)}.csv`,
-    );
-  });
-}
+  }
 
 // =====================================================================
 // CASH FLOW
