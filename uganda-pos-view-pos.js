@@ -15,7 +15,6 @@ import {
   sanitizeCsvValue,
   printThermalReceipt,
   thermalReceiptHtml,
-  cartTotalsSnapshot,
 } from "./uganda-pos-core.js";
 import { logAuditAction } from "./uganda-pos-view-audit.js";
 import { getReceiptTemplate } from "./uganda-pos-view-templates.js";
@@ -1674,7 +1673,7 @@ export function printHtml(innerHtml, title = "Document") {
   w.print();
 }
 
-function cartTotalsSnapshot(sale) {
+export function cartTotalsSnapshot(sale) {
   // Rebuild a display-friendly snapshot from the sale payload (works for both online + offline sales)
   const items = sale.items || sale.sale_items || [];
   const lines = items.map((it) => ({
