@@ -19,8 +19,8 @@ import {
   openModal,
   closeModal,
   uid,
-  logAuditAction,
 } from "./uganda-pos-core.js";
+import { logAuditAction } from "./uganda-pos-view-audit.js";
 
 let acctTab = "ledger";
 
