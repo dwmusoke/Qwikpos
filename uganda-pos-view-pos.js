@@ -13,6 +13,7 @@ import {
   fmtMoney,
   fmtDate,
   fmtMoneyRaw,
+  fromBase,
   sanitizeCsvValue,
   uid,
   hasFeature,
