@@ -132,7 +132,7 @@ export async function renderEfris(root) {
       ),
     );
     qsa("[data-submit]", tbody).forEach((b) =>
-      b.addEventListener("click", () => submitInvoice(b.dataset.submit)),
+      b.addEventListener("click", () => submitInvoice(b.dataset.submit, root)),
     );
     qsa("[data-print]", tbody).forEach((b) =>
       b.addEventListener("click", () => printEfrisReceipt(invoices.find((i) => i.id === b.dataset.print))),
@@ -147,6 +147,62 @@ export async function renderEfris(root) {
     }),
   );
   $("export-efris-btn").addEventListener("click", () => exportCsv(invoices));
+}
+
+async function submitInvoice(invoiceId, rootEl) {
+  try {
+    const { data: invoice, error: fetchErr } = await supabase
+      .from("efris_invoices")
+      .select("*")
+      .eq("id", invoiceId)
+      .single();
+
+    if (fetchErr) throw new Error(fetchErr.message);
+    if (!invoice) { toast("Invoice not found", "error"); return; }
+    if (!["pending", "queued", "failed"].includes(invoice.status)) {
+      toast(`Invoice is already ${invoice.status}`, "error"); return;
+    }
+
+    if (!STATE.business.efris_live_enabled) {
+      const mockFdn = `SFDN-${Date.now()}`;
+      const mockAntiFake = `AF${Date.now().toString(36).toUpperCase()}`;
+      const mockQr = `efris://verify?fdn=${mockFdn}&tin=${STATE.business.tin || ""}`;
+
+      const { error: updateErr } = await supabase
+        .from("efris_invoices")
+        .update({
+          status: "accepted",
+          fiscal_invoice_number: invoice.fiscal_invoice_number || mockFdn,
+          antifake_code: mockAntiFake,
+          qr_code: mockQr,
+          response_json: { simulated: true, message: "Sandbox simulation — not a real URA submission" },
+          submitted_at: new Date().toISOString(),
+        })
+        .eq("id", invoiceId);
+
+      if (updateErr) throw new Error(updateErr.message);
+
+      toast("Invoice simulated as accepted (sandbox mode)", "success");
+      renderEfris(rootEl);
+    } else {
+      const isS2S = STATE.business.efris_provider === "direct_s2s";
+      const fnName = isS2S ? "efris-s2s" : "efris-submit-invoice";
+      const body = isS2S
+        ? { action: "fiscalise_invoice", payload: { efris_invoice_id: invoiceId } }
+        : { efrisInvoiceId: invoiceId };
+
+      const { data, error } = await supabase.functions.invoke(fnName, { body });
+
+      if (error) throw new Error(error.message || "Edge function error");
+      if (!data?.success) throw new Error(data?.error || "Submission failed");
+
+      toast("Invoice submitted to URA successfully!", "success");
+      renderEfris(rootEl);
+    }
+  } catch (e) {
+    console.error("submitInvoice error:", e);
+    toast("Submission failed: " + e.message, "error", 5000);
+  }
 }
 
 function statusBadge(status) {
