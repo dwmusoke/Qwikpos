@@ -945,8 +945,9 @@ export async function renderSettings(root) {
       const creds = data?.credentials || [];
 
       el.innerHTML = `
-        <div style="margin-bottom:14px;">
+        <div style="margin-bottom:14px;display:flex;gap:8px;flex-wrap:wrap;">
           <button class="btn btn-primary btn-sm" id="s2s-create-btn">+ Generate RSA Keys & Create Credential</button>
+          <button class="btn btn-secondary btn-sm" id="s2s-import-btn">📥 Import Key Pair (KeyStore Explorer)</button>
         </div>
         ${creds.length ? `
         <div class="table-wrap">
@@ -983,6 +984,85 @@ export async function renderSettings(root) {
         if (error) { toast('Error: ' + error.message, 'error'); return; }
         toast('Credential created! Register your device with URA next.', 'success', 5000);
         loadEfrisS2sCredentials(el);
+      });
+
+      // Import key pair generated in KeyStore Explorer (per URA guide Appendix 5)
+      el.querySelector('#s2s-import-btn')?.addEventListener('click', () => {
+        openModal(`
+          <div class="modal-title-row"><h3>📥 Import RSA Key Pair</h3></div>
+          <p class="help-text" style="margin-bottom:12px;">
+            Generated these in <b>KeyStore Explorer</b> (URA guide, Appendix 5)? Paste them here.
+            The private key is stored server-side and never leaves the edge function.
+          </p>
+          <div class="field-row">
+            <div class="field">
+              <label>TIN</label>
+              <input id="imp-tin" value="${escapeHtml(STATE.business.tin || '')}" placeholder="10-digit URA TIN" />
+            </div>
+            <div class="field">
+              <label>Device No. <span style="font-weight:400;">(optional)</span></label>
+              <input id="imp-device" placeholder="Assigned by URA after registration" />
+            </div>
+          </div>
+          <div class="field-row">
+            <div class="field">
+              <label>Mode</label>
+              <select id="imp-mode">
+                <option value="sandbox">Sandbox (test)</option>
+                <option value="live">Live (real URA)</option>
+              </select>
+            </div>
+            <div class="field"></div>
+          </div>
+          <div class="field">
+            <label>Private Key PEM (KSE: Export → Key Pair → PKCS #8)</label>
+            <textarea id="imp-priv" rows="6" spellcheck="false" placeholder="-----BEGIN PRIVATE KEY-----&#10;...&#10;-----END PRIVATE KEY-----"></textarea>
+          </div>
+          <div class="field">
+            <label>Public Key PEM <span style="font-weight:400;">(KSE: Export → Public Key)</span> <b>or</b> Certificate PEM</label>
+            <textarea id="imp-pub" rows="5" spellcheck="false" placeholder="-----BEGIN PUBLIC KEY----- / -----BEGIN CERTIFICATE-----&#10;...&#10;-----END ...-----"></textarea>
+          </div>
+          <div class="flex gap" style="margin-top:14px;">
+            <button class="btn btn-secondary btn-block" data-close-modal>Cancel</button>
+            <button class="btn btn-primary btn-block" id="imp-save">Import & Create Credential</button>
+          </div>
+          <p id="imp-error" class="help-text" style="color:var(--danger);display:none;margin-top:10px"></p>
+        `, { onMount: () => {
+          const saveBtn = $('imp-save');
+          const errEl = $('imp-error');
+          saveBtn.addEventListener('click', async () => {
+            errEl.style.display = 'none';
+            const tin = $('imp-tin').value.trim();
+            const priv = $('imp-priv').value.trim();
+            const pub = $('imp-pub').value.trim();
+            if (!tin) { errEl.textContent = 'TIN is required'; errEl.style.display = 'block'; return; }
+            if (!priv) { errEl.textContent = 'Private key PEM is required'; errEl.style.display = 'block'; return; }
+            if (!pub) { errEl.textContent = 'Public key or certificate PEM is required'; errEl.style.display = 'block'; return; }
+
+            saveBtn.disabled = true;
+            saveBtn.textContent = 'Importing…';
+            const { data, error } = await supabase.functions.invoke('efris-setup', {
+              body: {
+                action: 'import',
+                tin,
+                device_number: $('imp-device').value.trim() || null,
+                efris_mode: $('imp-mode').value,
+                private_key_pem: priv,
+                public_key_pem: pub,
+              },
+            });
+            saveBtn.disabled = false;
+            saveBtn.textContent = 'Import & Create Credential';
+            if (error) {
+              errEl.textContent = error.message;
+              errEl.style.display = 'block';
+              return;
+            }
+            closeModal();
+            toast(data?.message || 'Key pair imported', 'success', 5000);
+            loadEfrisS2sCredentials(el);
+          });
+        }});
       });
 
       // Edit (set device number)

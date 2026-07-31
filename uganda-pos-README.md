@@ -305,6 +305,45 @@ supabase functions deploy efris-query-api
 | `query_invoices` | `{ payload }` | Query fiscal invoice receipts via S2S (T106) |
 | `invoice_details` | `{ invoiceNo }` | Get invoice details via S2S (T108) or local fallback |
 
+### 9.3 Direct S2S integration (URA key import)
+
+Beyond the middleware providers above, Qwickpos can integrate **directly** with
+URA's S2S web service (`efris-s2s`) — no middleman, using keys you generate
+yourself. URA's integration guide (Appendix 5) generates an RSA 2048-bit key
+pair in **KeyStore Explorer** and uploads the public key to URA's portal, so
+Qwickpos lets you import that externally-generated key pair instead of forcing
+the browser/web-key path:
+
+1. In KeyStore Explorer: **Tools → Generate Key Pair** (RSA 2048), then
+   **Export → Key Pair → PKCS #8** (private key) and **Export → Public Key**.
+   URA's portal needs the *public* key / certificate you'll also provide.
+2. In **Settings → EFRIS (URA) Configuration → Direct URA**, click
+   **📥 Import Key Pair (KeyStore Explorer)** and paste the TIN, mode, private
+   key PEM and public-key-or-certificate PEM. The function:
+   - validates the private key parses (PKCS#1 *or* PKCS#8),
+   - derives the public key from an X.509 certificate if you pasted one
+     (`certificatePemToSpkiPem`),
+   - rejects mismatched pairs by comparing RSA moduli (`publicKeyMatches`),
+   - stores everything in `efris_credentials` — the private key never leaves
+     the edge function.
+3. Register your device with URA to get the **device number** & VCN, then set
+   it via **Edit** on the credential row.
+
+The `efris-s2s` function speaks the raw URA protocol (T101–T187):
+T104 fetches the AES key, which URA encrypts with your RSA public key using
+**PKCS#1 v1.5** padding — Web Crypto's `RSA-OAEP` cannot read that, so the
+decrypt path uses `jsrsasign` (`key.decrypt`) with an OAEP fallback. Payloads
+are AES-ECB-encrypted, RSA-SHA1-signed, and responses unwrapped automatically.
+
+Deploy the two functions (they live in `supabase/functions/`):
+
+```bash
+supabase functions deploy efris-setup efris-s2s
+```
+
+No extra secrets are needed — credentials are read per-business from
+`efris_credentials` via the service-role client.
+
 ## 10. Quotations
 
 The **POS** screen has a **Sale / Quotation** toggle above the cart. In

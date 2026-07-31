@@ -16,6 +16,7 @@
 //   8. Returns result
 // =====================================================================
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { KEYUTIL } from "https://esm.sh/jsrsasign@10.9.0";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
@@ -110,18 +111,24 @@ async function importPrivateKey(pem: string): Promise<CryptoKey> {
   return crypto.subtle.importKey("pkcs8", der, { name: "RSA-SHA1", hash: "SHA-1" }, false, ["sign"]);
 }
 
-/** Import a PEM public key and return a CryptoKey for RSA decryption */
-async function importPublicKeyForDecrypt(pem: string): Promise<CryptoKey> {
-  const pemBody = pem.replace(/-----BEGIN (RSA )?PUBLIC KEY-----/, "").replace(/-----END (RSA )?PUBLIC KEY-----/, "").replace(/\s/g, "");
-  const der = Uint8Array.from(atob(pemBody), (c) => c.charCodeAt(0));
-  return crypto.subtle.importKey("spki", der, { name: "RSA-OAEP", hash: "SHA-1" }, false, ["decrypt"]);
+/**
+ * RSA/ECB/PKCS1Padding decrypt — the URA EFRIS spec. URA encrypts the T104
+ * AES key with our RSA public key using PKCS#1 v1.5 padding. Web Crypto's
+ * RSA-OAEP cannot read that, so use jsrsasign's classic RSA decrypt.
+ */
+async function rsaDecryptPKCS1(ciphertext: Uint8Array, privateKeyPem: string): Promise<Uint8Array> {
+  const key = KEYUTIL.getKey(privateKeyPem);
+  const plainBin = key.decrypt(bytesToHex(ciphertext));
+  if (plainBin == null) throw new Error("PKCS#1 v1.5 padding check failed (wrong key or padding)");
+  return Uint8Array.from(plainBin, (c) => c.charCodeAt(0));
 }
 
-/** Import a PEM private key for RSA decryption (used to decrypt AES key from T104) */
-async function importPrivateKeyForDecrypt(pem: string): Promise<CryptoKey> {
-  const pemBody = pem.replace(/-----BEGIN (RSA )?PRIVATE KEY-----/, "").replace(/-----END (RSA )?PRIVATE KEY-----/, "").replace(/\s/g, "");
-  const der = Uint8Array.from(atob(pemBody), (c) => c.charCodeAt(0));
-  return crypto.subtle.importKey("pkcs8", der, { name: "RSA-OAEP", hash: "SHA-1" }, false, ["decrypt"]);
+/** RSA-OAEP decrypt — fallback for any flow that used OAEP instead of PKCS#1 v1.5 */
+async function rsaDecryptOAEP(ciphertext: Uint8Array, privateKeyPem: string): Promise<Uint8Array> {
+  const key = KEYUTIL.getKey(privateKeyPem);
+  const plainBin = key.decryptOAEP(bytesToHex(ciphertext), "sha1");
+  if (plainBin == null) throw new Error("RSA-OAEP decrypt failed (wrong key or padding)");
+  return Uint8Array.from(plainBin, (c) => c.charCodeAt(0));
 }
 
 /** RSA-SHA1 sign — returns Base64 signature */
@@ -131,10 +138,14 @@ async function rsaSign(data: string, privateKeyPem: string): Promise<string> {
   return btoa(String.fromCharCode(...new Uint8Array(sig)));
 }
 
-/** RSA decrypt (for T104 AES key extraction) */
+/** RSA decrypt (for T104 AES key extraction) — PKCS#1 v1.5 first, OAEP fallback */
 async function rsaDecrypt(ciphertext: Uint8Array, privateKeyPem: string): Promise<Uint8Array> {
-  const key = await importPrivateKeyForDecrypt(privateKeyPem);
-  return new Uint8Array(await crypto.subtle.decrypt({ name: "RSA-OAEP" }, key, ciphertext));
+  try {
+    return await rsaDecryptPKCS1(ciphertext, privateKeyPem);
+  } catch (e: any) {
+    console.warn("PKCS#1 v1.5 decrypt failed, trying RSA-OAEP:", e?.message || e);
+    return await rsaDecryptOAEP(ciphertext, privateKeyPem);
+  }
 }
 
 // ====================================================================
