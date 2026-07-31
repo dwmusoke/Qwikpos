@@ -80,6 +80,22 @@ if ("serviceWorker" in navigator) {
   });
 }
 
+// Turns raw fetch/network errors (e.g. "Failed to fetch") into a message
+// that tells the user what to do, instead of a cryptic browser string.
+function friendlyAuthError(error) {
+  const msg = (error && (error.message || String(error))) || "";
+  const networky =
+    /failed to fetch|fetch failed|networkerror|network request failed|load failed|network/i.test(msg) ||
+    /err_internet|err_connection|timed? ?out|socket/i.test(msg) ||
+    (!navigator.onLine && msg);
+  if (networky) {
+    return navigator.onLine
+      ? "Cannot reach the server. This can be a weak connection, a VPN, firewall, or ad-blocker blocking qwickpos.com — check your network and try again."
+      : "You appear to be offline. Reconnect to the internet and try again.";
+  }
+  return msg;
+}
+
 // ---------------------------------------------------------------------
 // Routes — `feature` gates on the current plan (see uganda-pos-core.js
 // hasFeature); routes with no `feature` just need an active subscription.
@@ -793,7 +809,7 @@ $("login-form").addEventListener("submit", async (e) => {
   if (error) {
     btn.disabled = false;
     btn.textContent = "Sign In";
-    errEl.textContent = error.message;
+    errEl.textContent = friendlyAuthError(error);
     errEl.style.display = "block";
     return;
   }
@@ -876,7 +892,7 @@ $("reset-form")?.addEventListener("submit", async (e) => {
   btn.textContent = "Send Reset Link";
 
   if (error) {
-    errEl.textContent = error.message;
+    errEl.textContent = friendlyAuthError(error);
     errEl.style.display = "block";
   } else {
     successEl.textContent = "Password reset link sent! Check your email inbox.";
@@ -951,7 +967,7 @@ if (hash && hash.includes("type=recovery")) {
     if (error) {
       $("recovery-submit").disabled = false;
       $("recovery-submit").textContent = "Set Password";
-      errEl.textContent = error.message;
+      errEl.textContent = friendlyAuthError(error);
       errEl.style.display = "block";
     } else {
       successEl.textContent = "Password updated! Redirecting to login…";
