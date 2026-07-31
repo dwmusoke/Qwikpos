@@ -1019,6 +1019,10 @@ export async function renderSettings(root) {
             <textarea id="imp-priv" rows="6" spellcheck="false" placeholder="-----BEGIN PRIVATE KEY-----&#10;...&#10;-----END PRIVATE KEY-----"></textarea>
           </div>
           <div class="field">
+            <label>Private Key Password <span style="font-weight:400;">(only if you set one in KeyStore Explorer)</span></label>
+            <input id="imp-priv-pass" type="password" placeholder="Leave empty if no password was used" />
+          </div>
+          <div class="field">
             <label>Public Key PEM <span style="font-weight:400;">(KSE: Export → Public Key)</span> <b>or</b> Certificate PEM</label>
             <textarea id="imp-pub" rows="5" spellcheck="false" placeholder="-----BEGIN PUBLIC KEY----- / -----BEGIN CERTIFICATE-----&#10;...&#10;-----END ...-----"></textarea>
           </div>
@@ -1048,13 +1052,14 @@ export async function renderSettings(root) {
                 device_number: $('imp-device').value.trim() || null,
                 efris_mode: $('imp-mode').value,
                 private_key_pem: priv,
+                private_key_password: $('imp-priv-pass').value || undefined,
                 public_key_pem: pub,
               },
             });
             saveBtn.disabled = false;
             saveBtn.textContent = 'Import & Create Credential';
             if (error) {
-              errEl.textContent = error.message;
+              errEl.textContent = error.context?.error || error.message;
               errEl.style.display = 'block';
               return;
             }

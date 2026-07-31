@@ -183,17 +183,21 @@ Deno.serve(async (req) => {
 
       // ── IMPORT credential (key pair generated externally, e.g. KeyStore Explorer) ──
       case "import": {
-        const { tin, device_number, brn, efris_mode, private_key_pem, public_key_pem, certificate_pem } = body;
+        const { tin, device_number, brn, efris_mode, private_key_pem, public_key_pem, certificate_pem, private_key_password } = body;
         if (!tin) return json({ success: false, error: "TIN is required" }, 400, cors);
         if (!private_key_pem) return json({ success: false, error: "Private key PEM is required" }, 400, cors);
         if (!public_key_pem && !certificate_pem) {
           return json({ success: false, error: "Public key PEM or certificate PEM is required" }, 400, cors);
         }
 
-        // Validate the private key parses (PKCS#1 or PKCS#8 PEM)
+        // Validate the private key parses (PKCS#1 or PKCS#8 PEM, optionally password-encrypted)
+        let privateKeyPem = private_key_pem.trim();
         try {
-          const key = KEYUTIL.getKey(private_key_pem);
+          const key = KEYUTIL.getKey(privateKeyPem, private_key_password || undefined);
           if (!key || !key.isPrivate) throw new Error("not a private key");
+          // Normalize to unencrypted PKCS#8 so the efris-s2s function can use it
+          // without needing a password on every call.
+          privateKeyPem = KEYUTIL.getPEM(key, "PKCS8PRIV");
         } catch (e: any) {
           return json({ success: false, error: `Invalid private key PEM: ${e?.message || e}` }, 400, cors);
         }
@@ -210,7 +214,7 @@ Deno.serve(async (req) => {
         }
 
         // Sanity check: public and private key must be the same pair
-        if (publicKeyPem && !publicKeyMatches(private_key_pem, publicKeyPem)) {
+        if (publicKeyPem && !publicKeyMatches(privateKeyPem, publicKeyPem)) {
           return json({ success: false, error: "Public and private keys do not match" }, 400, cors);
         }
 
@@ -222,7 +226,7 @@ Deno.serve(async (req) => {
             device_number: device_number || null,
             brn: brn || null,
             efris_mode: efris_mode || "sandbox",
-            private_key_pem: private_key_pem.trim(),
+            private_key_pem: privateKeyPem,
             public_key_pem: publicKeyPem,
             certificate_pem: certPem,
             status: "pending",
