@@ -696,6 +696,25 @@ Deno.serve(async (req) => {
         break;
       }
 
+      // ---- T114: Cancel an approved credit/debit note ----
+      // Payload shape (CancelCreditReq):
+      //   { oriInvoiceId, invoiceNo, reasonCode, reason, invoiceApplyCategoryCode }
+      // invoiceApplyCategoryCode: "103" = cancel debit note (workflow),
+      //                            "104" = cancel credit note (direct, no workflow).
+      // URA returns an empty content body; success is signalled by
+      // returnStateInfo.returnMessage === "SUCCESS".
+      case "credit_note_cancel": {
+        if (!payload) return json({ success: false, error: "payload required" }, 400, cors);
+        const resp = await sendToUra(cred, "T114", payload, true);
+        const returnMsg = resp.returnStateInfo?.returnMessage || "";
+        const returnCode = resp.returnStateInfo?.returnCode || "";
+        result = returnMsg === "SUCCESS"
+          ? { success: true, returnMessage: returnMsg, returnCode, raw: resp }
+          : { success: false, error: returnMsg, returnCode, raw: resp };
+        await admin.from("efris_credentials").update({ last_used_at: new Date().toISOString() }).eq("id", cred.id);
+        break;
+      }
+
       // ---- T101: Server time ----
       case "server_time": {
         const resp = await sendToUra(cred, "T101", {}, false);

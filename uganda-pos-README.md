@@ -335,6 +335,13 @@ T104 fetches the AES key, which URA encrypts with your RSA public key using
 decrypt path uses `jsrsasign` (`key.decrypt`) with an OAEP fallback. Payloads
 are AES-ECB-encrypted, RSA-SHA1-signed, and responses unwrapped automatically.
 
+**URA Appendix 4 UAT readiness:** buyer TINs are validated client-side
+(`/^\d{9}[A-Za-z]$/`) before a B2B/B2G invoice is saved, and approved credit
+notes can be cancelled with URA (`credit_note_cancel`, T114,
+`invoiceApplyCategoryCode` `104`); the cancellation is recorded on the invoice's
+`response_json` (`cancelled: true`) from the **Cancel Credit Note** button in
+the EFRIS queue.
+
 Deploy the two functions (they live in `supabase/functions/`):
 
 ```bash

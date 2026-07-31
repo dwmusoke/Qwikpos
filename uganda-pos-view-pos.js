@@ -20,6 +20,8 @@ import {
   stockFor,
   refreshProducts,
   createNotification,
+  isValidUgandaTin,
+  tinValidationError,
   printThermalReceipt,
   thermalReceiptHtml,
 } from "./uganda-pos-core.js";
@@ -481,12 +483,17 @@ async function openAddCustomerModal() {
       $("ac-save-btn").addEventListener("click", async () => {
         const name = $("ac-name").value.trim();
         if (!name) { toast("Name is required", "error"); return; }
+        const tin = $("ac-tin").value.trim() || null;
+        if (tin) {
+          const tinErr = tinValidationError(tin);
+          if (tinErr) { toast(tinErr, "error"); return; }
+        }
         const { data, error } = await supabase.from("customers").insert({
           business_id: STATE.business.id,
           name,
           phone: $("ac-phone").value.trim() || null,
           email: $("ac-email").value.trim() || null,
-          tin: $("ac-tin").value.trim() || null,
+          tin,
           credit_limit: parseFloat($("ac-credit").value) || 0,
           address: $("ac-address").value.trim() || null,
           notes: $("ac-notes").value.trim() || null,
@@ -955,6 +962,12 @@ function openCheckoutModal() {
 
           if (!payments.length) {
             toast("Enter at least one payment amount", "error");
+            return;
+          }
+
+          const cartCustomer = STATE.customers.find((c) => c.id === STATE.cartCustomerId);
+          if (cartCustomer?.tin && !isValidUgandaTin(cartCustomer.tin)) {
+            toast(`"${cartCustomer.name}" has an invalid TIN (${cartCustomer.tin}). B2B/B2G invoices require a valid Uganda TIN — fix it in Customers.`, "error", 6000);
             return;
           }
 

@@ -15,6 +15,7 @@ import {
   fmtDate,
   printHtml,
   emptyStateHtml,
+  tinValidationError,
 } from "./uganda-pos-core.js";
 import { logAuditAction } from "./uganda-pos-view-audit.js";
 
@@ -138,6 +139,13 @@ function openCustomerModal(customerId) {
             credit_limit: parseFloat($("cf-credit").value) || 0,
             address: $("cf-address").value.trim() || null,
           };
+          if (record.tin) {
+            const tinErr = tinValidationError(record.tin);
+            if (tinErr) {
+              toast(tinErr, "error");
+              return;
+            }
+          }
           const query = editing
             ? supabase.from("customers").update(record).eq("id", customerId)
             : supabase.from("customers").insert(record);

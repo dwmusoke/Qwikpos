@@ -115,11 +115,12 @@ export async function renderEfris(root) {
         <td>${escapeHtml(inv.customer_name || "Walk-in")}</td>
         <td>${fmtMoneyRaw(Number(inv.gross_amount || 0), inv.currency_code)}</td>
         <td>${fmtMoneyRaw(Number(inv.vat_amount || 0), inv.currency_code)}</td>
-        <td>${statusBadge(inv.status)}</td>
+        <td>${statusBadge(inv.status)}${inv.response_json?.cancelled ? ' <span class="badge badge-gray" style="font-size:9px;">CANCELLED</span>' : ""}</td>
         <td>${fmtDate(inv.created_at)}</td>
         <td class="flex gap">
           <button class="btn btn-secondary btn-sm" data-view="${inv.id}">Payload</button>
           ${["pending", "queued", "failed"].includes(inv.status) ? `<button class="btn btn-primary btn-sm" data-submit="${inv.id}">Submit</button>` : ""}
+          ${inv.invoice_type === "2" && inv.status === "accepted" && !inv.response_json?.cancelled ? `<button class="btn btn-secondary btn-sm" data-cancel-cn="${inv.id}">Cancel Credit Note</button>` : ""}
           ${inv.status === "accepted" ? `<button class="btn btn-secondary btn-sm" data-print="${inv.id}">🖨️ Print EFRIS</button>` : ""}
         </td>
       </tr>`,
@@ -133,6 +134,9 @@ export async function renderEfris(root) {
     );
     qsa("[data-submit]", tbody).forEach((b) =>
       b.addEventListener("click", () => submitInvoice(b.dataset.submit, root)),
+    );
+    qsa("[data-cancel-cn]", tbody).forEach((b) =>
+      b.addEventListener("click", () => cancelCreditNote(b.dataset.cancelCn, root)),
     );
     qsa("[data-print]", tbody).forEach((b) =>
       b.addEventListener("click", () => printEfrisReceipt(invoices.find((i) => i.id === b.dataset.print))),
@@ -214,6 +218,144 @@ function statusBadge(status) {
     failed: "badge-red",
   };
   return `<span class="badge ${map[status] || "badge-gray"}">${escapeHtml(status)}</span>`;
+}
+
+// T114 reason codes — URA "refundReason" dictionary (required by URA when
+// cancelling an approved credit/debit note).
+const CANCEL_REASON_CODES = [
+  { code: "101", label: "Return of products due to expiry or damage, etc." },
+  { code: "102", label: "Cancellation of the purchase" },
+  { code: "103", label: "Invoice amount wrongly stated due to miscalculation of price, tax, or discounts" },
+  { code: "104", label: "Partial or complete waiver of the product sale after the invoice was issued" },
+  { code: "105", label: "Others (please specify)" },
+];
+
+async function cancelCreditNote(invoiceId, rootEl) {
+  const { data: invoice, error: invErr } = await supabase
+    .from("efris_invoices")
+    .select("*")
+    .eq("id", invoiceId)
+    .single();
+  if (invErr) { toast(invErr.message, "error"); return; }
+  if (!invoice) { toast("Credit note not found", "error"); return; }
+  if (invoice.invoice_type !== "2") { toast("Only credit notes can be cancelled this way", "error"); return; }
+  if (invoice.status !== "accepted") { toast("Only approved credit notes can be cancelled", "error"); return; }
+  if (invoice.response_json?.cancelled) { toast("This credit note has already been cancelled", "error"); return; }
+
+  // The original invoice's URA invoice ID is required by T114 (oriInvoiceId).
+  let originalInvoice = null;
+  if (invoice.original_invoice_id) {
+    const { data } = await supabase
+      .from("efris_invoices")
+      .select("ura_invoice_id, fiscal_invoice_number")
+      .eq("id", invoice.original_invoice_id)
+      .maybeSingle();
+    originalInvoice = data;
+  }
+
+  openModal(
+    `
+    <div class="modal-title-row"><h3>Cancel Credit Note</h3></div>
+    <p class="help-text">
+      This sends a <b>T114 Cancel Credit Note</b> request to URA for approved credit note
+      <b>${escapeHtml(invoice.fiscal_invoice_number)}</b>. The cancellation cannot be undone.
+    </p>
+    <div class="field">
+      <label>Reason</label>
+      <select id="cn-reason-code">${CANCEL_REASON_CODES.map((r) => `<option value="${r.code}">${r.code} — ${escapeHtml(r.label)}</option>`).join("")}</select>
+    </div>
+    <div class="field" id="cn-reason-field" style="display:none;">
+      <label>Specify reason</label>
+      <input type="text" id="cn-reason" placeholder="Describe the reason…" maxlength="1024" />
+    </div>
+    <div class="flex gap" style="margin-top:12px;">
+      <button class="btn btn-danger" id="cn-confirm-btn" style="flex:1;">Confirm Cancellation</button>
+      <button class="btn btn-secondary" data-close-modal>Back</button>
+    </div>
+  `,
+    { large: true },
+  );
+
+  const reasonCodeSel = document.querySelector("#cn-reason-code");
+  const reasonField = document.querySelector("#cn-reason-field");
+  reasonCodeSel.addEventListener("change", () => {
+    reasonField.style.display = reasonCodeSel.value === "105" ? "" : "none";
+  });
+
+  document.querySelector("#cn-confirm-btn").addEventListener("click", async () => {
+    const reasonCode = reasonCodeSel.value;
+    const reason = document.querySelector("#cn-reason")?.value?.trim() || "";
+    if (reasonCode === "105" && !reason) {
+      toast("Please specify a reason when code 105 (Others) is selected", "error");
+      return;
+    }
+
+    const confirmBtn = document.querySelector("#cn-confirm-btn");
+    confirmBtn.disabled = true;
+    confirmBtn.textContent = "Cancelling…";
+    try {
+      let result;
+      if (!STATE.business.efris_live_enabled) {
+        // Sandbox simulation — no real URA call.
+        result = { success: true, simulated: true, returnMessage: "SUCCESS" };
+      } else if (STATE.business.efris_provider === "direct_s2s") {
+        if (!originalInvoice?.ura_invoice_id) {
+          throw new Error(
+            "The original invoice has no URA invoice ID on record, so T114 cannot be sent. " +
+            "Cancel it from the URA portal instead, or contact support.",
+          );
+        }
+        const body = {
+          action: "credit_note_cancel",
+          payload: {
+            oriInvoiceId: originalInvoice.ura_invoice_id,
+            invoiceNo: invoice.fiscal_invoice_number,
+            reasonCode,
+            reason: reason || "",
+            invoiceApplyCategoryCode: "104",
+          },
+        };
+        const { data, error } = await supabase.functions.invoke("efris-s2s", { body });
+        if (error) throw new Error(error.message || "Edge function error");
+        if (!data?.success) throw new Error(data?.error || "URA rejected the cancellation");
+        result = data;
+      } else {
+        throw new Error(
+          "Credit note cancellation via T114 requires the Direct URA S2S provider. " +
+          "Switch providers in Settings → EFRIS to use it.",
+        );
+      }
+
+      const { error: updateErr } = await supabase
+        .from("efris_invoices")
+        .update({
+          response_json: {
+            ...(invoice.response_json || {}),
+            cancelled: true,
+            cancelled_at: new Date().toISOString(),
+            cancel_reason_code: reasonCode,
+            cancel_reason: reason || "",
+            cancel_response: result.raw || result,
+          },
+        })
+        .eq("id", invoiceId);
+      if (updateErr) throw new Error(updateErr.message);
+
+      closeModal();
+      toast(
+        result.simulated
+          ? "Credit note cancellation simulated (sandbox mode)"
+          : "Credit note cancelled with URA",
+        "success",
+      );
+      renderEfris(rootEl);
+    } catch (e) {
+      console.error("cancelCreditNote error:", e);
+      confirmBtn.disabled = false;
+      confirmBtn.textContent = "Confirm Cancellation";
+      toast("Cancellation failed: " + e.message, "error", 6000);
+    }
+  });
 }
 
 function viewPayload(invoice) {

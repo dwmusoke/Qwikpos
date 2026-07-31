@@ -1126,6 +1126,21 @@ export async function flushOfflineEfrisQueue() {
 const EFRIS_TAX_CODE = { VAT: "01", STD: "01", ZERO: "02", EXEMPT: "03", DEEMED: "04" };
 const EFRIS_TAX_RATE = { VAT: "0.18", STD: "0.18", ZERO: "0", EXEMPT: "-", DEEMED: "0.18" };
 
+// Uganda TIN format: 9 digits followed by a single check letter (e.g. "1000123456X").
+export function isValidUgandaTin(tin) {
+  if (!tin) return false;
+  return /^\d{9}[A-Za-z]$/.test(String(tin).trim());
+}
+
+// Returns an error message if `tin` is provided but not a valid Uganda TIN, else "".
+export function tinValidationError(tin) {
+  const t = String(tin || "").trim();
+  if (!t) return "";
+  return isValidUgandaTin(t)
+    ? ""
+    : "TIN must be 9 digits followed by a letter (e.g. 1000123456X)";
+}
+
 const PAYMENT_MODE_CODE = {
   credit: "101",
   cash: "102",
