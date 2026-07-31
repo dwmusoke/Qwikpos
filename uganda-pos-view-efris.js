@@ -127,6 +127,7 @@ export async function renderEfris(root) {
           ${["2", "3"].includes(inv.invoice_type) && inv.status === "accepted" && !inv.response_json?.approved && !inv.response_json?.cancelled ? `<button class="btn btn-primary btn-sm" data-approve-cn="${inv.id}" title="Approve/Reject with URA (T113)">Approve</button>` : ""}
           ${["2", "3"].includes(inv.invoice_type) && inv.response_json?.approved ? '<span class="badge badge-green" style="font-size:9px;">APPROVED</span>' : ""}
           ${["2", "3"].includes(inv.invoice_type) && inv.response_json?.rejected ? '<span class="badge badge-red" style="font-size:9px;">REJECTED</span>' : ""}
+          ${["2", "3"].includes(inv.invoice_type) && (inv.response_json?.approved || inv.response_json?.rejected) ? `<button class="btn btn-secondary btn-sm" data-share-ura="${inv.id}" title="View TIN, Device No, JSON request/response for URA sharing">📋 Share for URA</button>` : ""}
           ${inv.status === "accepted" ? `<button class="btn btn-secondary btn-sm" data-print="${inv.id}">🖨️ Print EFRIS</button>` : ""}
         </td>
       </tr>`,
@@ -149,6 +150,9 @@ export async function renderEfris(root) {
     );
     qsa("[data-approve-cn]", tbody).forEach((b) =>
       b.addEventListener("click", () => approveCreditNote(b.dataset.approveCn, root)),
+    );
+    qsa("[data-share-ura]", tbody).forEach((b) =>
+      b.addEventListener("click", () => shareForUra(b.dataset.shareUra)),
     );
     qsa("[data-print]", tbody).forEach((b) =>
       b.addEventListener("click", () => printEfrisReceipt(invoices.find((i) => i.id === b.dataset.print))),
@@ -650,6 +654,15 @@ async function approveCreditNote(invoiceId, rootEl) {
             approved_at: new Date().toISOString(),
             approval_remarks: remarks || "",
             rejection_reason: approvalStatus === "2" ? rejectReason : "",
+            approval_request: {
+              action: "credit_note_approval",
+              payload: {
+                invoiceNo: invoice.fiscal_invoice_number,
+                approvalStatus,
+                ...(remarks ? { remarks } : {}),
+                ...(approvalStatus === "2" && rejectReason ? { reason: rejectReason } : {}),
+              },
+            },
             approval_response: result.raw || result,
           },
         })
@@ -670,6 +683,97 @@ async function approveCreditNote(invoiceId, rootEl) {
       confirmBtn.textContent = "Submit to URA";
       toast("Approval failed: " + e.message, "error", 6000);
     }
+  });
+}
+
+// ---- Share T113 request/response with URA (for UAT testing) ----
+async function shareForUra(invoiceId) {
+  const { data: invoice, error: invErr } = await supabase
+    .from("efris_invoices")
+    .select("*")
+    .eq("id", invoiceId)
+    .single();
+  if (invErr || !invoice) { toast("Invoice not found", "error"); return; }
+
+  const { data: cred } = await supabase
+    .from("efris_credentials")
+    .select("tin, device_number, brn")
+    .eq("business_id", STATE.business.id)
+    .eq("status", "active")
+    .limit(1)
+    .maybeSingle();
+
+  const req = invoice.response_json?.approval_request || {};
+  const res = invoice.response_json?.approval_response || {};
+  const typeLabel = invoice.invoice_type === "2" ? "Credit Note" : "Debit Note";
+  const statusLabel = invoice.response_json?.approved ? "APPROVED" : invoice.response_json?.rejected ? "REJECTED" : "UNKNOWN";
+
+  const jsonBlock = JSON.stringify({
+    credentials: {
+      tin: cred?.tin || STATE.business.tin || "NOT SET",
+      device_number: cred?.device_number || "NOT SET",
+      brn: cred?.brn || "NOT SET",
+    },
+    invoice: {
+      fiscal_invoice_number: invoice.fiscal_invoice_number,
+      ura_invoice_id: invoice.ura_invoice_id || "NOT YET ASSIGNED",
+      type: typeLabel,
+      customer_name: invoice.customer_name || "Walk-in",
+      customer_tin: invoice.customer_tin || "NOT SET",
+      gross_amount: invoice.gross_amount,
+      vat_amount: invoice.vat_amount,
+      currency_code: invoice.currency_code,
+    },
+    t113_request: req,
+    t113_response: res,
+    approval_status: statusLabel,
+    approved_at: invoice.response_json?.approved_at || "N/A",
+  }, null, 2);
+
+  openModal(`
+    <div class="modal-title-row"><h3>Share for URA — T113 ${typeLabel} Approval</h3></div>
+    <p class="help-text">Copy the JSON below and share it with URA for the 3-companies UAT testing.</p>
+
+    <div class="card" style="margin-bottom:12px;">
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; font-size:13px;">
+        <div><span style="color:var(--text-secondary);">TIN:</span> <b>${escapeHtml(cred?.tin || STATE.business.tin || "NOT SET")}</b></div>
+        <div><span style="color:var(--text-secondary);">Device No:</span> <b>${escapeHtml(cred?.device_number || "NOT SET")}</b></div>
+        <div><span style="color:var(--text-secondary);">BRN:</span> <b>${escapeHtml(cred?.brn || "NOT SET")}</b></div>
+        <div><span style="color:var(--text-secondary);">Status:</span> <b>${statusLabel}</b></div>
+      </div>
+    </div>
+
+    <div class="field">
+      <label>Full JSON (copy & share)</label>
+      <textarea id="ura-share-json" rows="16" readonly style="background:var(--surface-2); font-family:monospace; font-size:11px; padding:12px; border-radius:6px; width:100%; box-sizing:border-box;">${escapeHtml(jsonBlock)}</textarea>
+    </div>
+
+    <div class="flex gap" style="margin-top:12px;">
+      <button class="btn btn-primary" id="copy-ura-json" style="flex:1;">📋 Copy JSON</button>
+      <button class="btn btn-secondary" id="download-ura-json">💾 Download .json</button>
+      <button class="btn btn-secondary" data-close-modal>Close</button>
+    </div>
+  `, { large: true });
+
+  document.querySelector("#copy-ura-json").addEventListener("click", async () => {
+    try {
+      await navigator.clipboard.writeText(jsonBlock);
+      toast("JSON copied to clipboard", "success");
+    } catch {
+      document.querySelector("#ura-share-json").select();
+      toast("Press Ctrl+C to copy", "info");
+    }
+  });
+
+  document.querySelector("#download-ura-json").addEventListener("click", () => {
+    const blob = new Blob([jsonBlock], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `ura-t113-${invoice.fiscal_invoice_number || "approval"}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast("JSON downloaded", "success");
   });
 }
 
