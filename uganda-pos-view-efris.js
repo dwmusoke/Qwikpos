@@ -52,6 +52,8 @@ export async function renderEfris(root) {
           &nbsp;·&nbsp; Device No: ${escapeHtml(STATE.business.efris_device_no || "not registered")}</p>
       </div>
       <div class="page-header-actions">
+        <button class="btn btn-secondary" id="query-ura-invoices-btn" title="Fetch latest invoice statuses from URA (T106)">🔄 Query URA Invoices</button>
+        <button class="btn btn-secondary" id="query-ura-cn-btn" title="Fetch credit/debit notes from URA (T111)">🔍 Query Credit Notes</button>
         <button class="btn btn-secondary" id="export-efris-btn">Export CSV</button>
       </div>
     </div>
@@ -121,6 +123,9 @@ export async function renderEfris(root) {
           <button class="btn btn-secondary btn-sm" data-view="${inv.id}">Payload</button>
           ${["pending", "queued", "failed"].includes(inv.status) ? `<button class="btn btn-primary btn-sm" data-submit="${inv.id}">Submit</button>` : ""}
           ${inv.invoice_type === "2" && inv.status === "accepted" && !inv.response_json?.cancelled ? `<button class="btn btn-secondary btn-sm" data-cancel-cn="${inv.id}">Cancel Credit Note</button>` : ""}
+          ${inv.invoice_type === "2" && inv.status === "accepted" ? `<button class="btn btn-secondary btn-sm" data-cn-details="${inv.id}" title="Fetch credit note details from URA (T112)">CN Details</button>` : ""}
+          ${inv.invoice_type === "2" && inv.status === "accepted" && !inv.response_json?.approved ? `<button class="btn btn-primary btn-sm" data-approve-cn="${inv.id}" title="Approve this credit note with URA (T113)">Approve</button>` : ""}
+          ${inv.invoice_type === "2" && inv.response_json?.approved ? '<span class="badge badge-green" style="font-size:9px;">APPROVED</span>' : ""}
           ${inv.status === "accepted" ? `<button class="btn btn-secondary btn-sm" data-print="${inv.id}">🖨️ Print EFRIS</button>` : ""}
         </td>
       </tr>`,
@@ -138,6 +143,12 @@ export async function renderEfris(root) {
     qsa("[data-cancel-cn]", tbody).forEach((b) =>
       b.addEventListener("click", () => cancelCreditNote(b.dataset.cancelCn, root)),
     );
+    qsa("[data-cn-details]", tbody).forEach((b) =>
+      b.addEventListener("click", () => creditNoteDetails(b.dataset.cnDetails, root)),
+    );
+    qsa("[data-approve-cn]", tbody).forEach((b) =>
+      b.addEventListener("click", () => approveCreditNote(b.dataset.approveCn, root)),
+    );
     qsa("[data-print]", tbody).forEach((b) =>
       b.addEventListener("click", () => printEfrisReceipt(invoices.find((i) => i.id === b.dataset.print))),
     );
@@ -151,6 +162,8 @@ export async function renderEfris(root) {
     }),
   );
   $("export-efris-btn").addEventListener("click", () => exportCsv(invoices));
+  $("query-ura-invoices-btn").addEventListener("click", () => queryUraInvoices(root));
+  $("query-ura-cn-btn").addEventListener("click", () => queryUraCreditNotes(root));
 }
 
 async function submitInvoice(invoiceId, rootEl) {
@@ -354,6 +367,256 @@ async function cancelCreditNote(invoiceId, rootEl) {
       confirmBtn.disabled = false;
       confirmBtn.textContent = "Confirm Cancellation";
       toast("Cancellation failed: " + e.message, "error", 6000);
+    }
+  });
+}
+
+// ---- T106: Query URA for latest invoice statuses ----
+async function queryUraInvoices(rootEl) {
+  if (!STATE.business.efris_live_enabled) {
+    toast("URA queries require Live mode — nothing to query in sandbox", "error");
+    return;
+  }
+  if (STATE.business.efris_provider !== "direct_s2s") {
+    toast("URA invoice query (T106) requires Direct URA S2S provider", "error");
+    return;
+  }
+
+  const btn = $("query-ura-invoices-btn");
+  btn.disabled = true;
+  btn.textContent = "Querying…";
+  try {
+    const { data, error } = await supabase.functions.invoke("efris-s2s", {
+      body: {
+        action: "query_invoices",
+        payload: {
+          tin: STATE.business.tin,
+          dateFrom: new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10),
+          dateTo: new Date().toISOString().slice(0, 10),
+        },
+      },
+    });
+    if (error) throw new Error(error.message);
+    if (!data?.success) throw new Error(data?.error || "Query failed");
+
+    const items = data.data?.invoiceList || data.data || [];
+    if (!Array.isArray(items) || !items.length) {
+      toast("No invoices found on URA for the last 7 days", "info");
+      return;
+    }
+
+    let updated = 0;
+    for (const uraInv of items) {
+      const fdn = uraInv.invoiceNo || uraInv.fiscalDocumentNo;
+      if (!fdn) continue;
+      const uraStatus = (uraInv.invoiceStatus || "").toLowerCase();
+      const dbStatus = uraStatus === "approved" ? "accepted" : uraStatus === "cancelled" ? "rejected" : uraStatus === "pending" ? "queued" : null;
+      if (!dbStatus) continue;
+
+      const { error: updErr } = await supabase
+        .from("efris_invoices")
+        .update({
+          status: dbStatus,
+          ura_invoice_id: uraInv.invoiceId || uraInv.uraInvoiceId || undefined,
+          response_json: { ...(uraInv), synced_at: new Date().toISOString() },
+        })
+        .eq("fiscal_invoice_number", fdn)
+        .eq("business_id", STATE.business.id);
+      if (!updErr) updated++;
+    }
+
+    toast(`Synced ${updated} invoice(s) from URA`, "success");
+    renderEfris(rootEl);
+  } catch (e) {
+    console.error("queryUraInvoices error:", e);
+    toast("URA query failed: " + e.message, "error", 6000);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "🔄 Query URA Invoices";
+  }
+}
+
+// ---- T111: Query URA for credit/debit notes ----
+async function queryUraCreditNotes(rootEl) {
+  if (!STATE.business.efris_live_enabled) {
+    toast("URA queries require Live mode — nothing to query in sandbox", "error");
+    return;
+  }
+  if (STATE.business.efris_provider !== "direct_s2s") {
+    toast("Credit note query (T111) requires Direct URA S2S provider", "error");
+    return;
+  }
+
+  const btn = $("query-ura-cn-btn");
+  btn.disabled = true;
+  btn.textContent = "Querying…";
+  try {
+    const { data, error } = await supabase.functions.invoke("efris-s2s", {
+      body: {
+        action: "credit_note_query",
+        payload: {
+          tin: STATE.business.tin,
+          dateFrom: new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10),
+          dateTo: new Date().toISOString().slice(0, 10),
+        },
+      },
+    });
+    if (error) throw new Error(error.message);
+    if (!data?.success) throw new Error(data?.error || "Query failed");
+
+    const items = data.data?.creditNoteList || data.data?.invoiceList || data.data || [];
+    if (!Array.isArray(items) || !items.length) {
+      toast("No credit/debit notes found on URA for the last 30 days", "info");
+      return;
+    }
+
+    let updated = 0;
+    for (const uraCn of items) {
+      const fdn = uraCn.invoiceNo || uraCn.fiscalDocumentNo;
+      if (!fdn) continue;
+      const uraStatus = (uraCn.invoiceStatus || "").toLowerCase();
+      const dbStatus = uraStatus === "approved" ? "accepted" : uraStatus === "cancelled" ? "rejected" : uraStatus === "pending" ? "queued" : null;
+      if (!dbStatus) continue;
+
+      const { error: updErr } = await supabase
+        .from("efris_invoices")
+        .update({
+          status: dbStatus,
+          ura_invoice_id: uraCn.invoiceId || uraCn.uraInvoiceId || undefined,
+          response_json: { ...(uraCn), synced_at: new Date().toISOString() },
+        })
+        .eq("fiscal_invoice_number", fdn)
+        .eq("business_id", STATE.business.id);
+      if (!updErr) updated++;
+    }
+
+    toast(`Synced ${updated} credit note(s) from URA`, "success");
+    renderEfris(rootEl);
+  } catch (e) {
+    console.error("queryUraCreditNotes error:", e);
+    toast("Credit note query failed: " + e.message, "error", 6000);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "🔍 Query Credit Notes";
+  }
+}
+
+// ---- T112: Fetch credit note details from URA ----
+async function creditNoteDetails(invoiceId, rootEl) {
+  if (!STATE.business.efris_live_enabled || STATE.business.efris_provider !== "direct_s2s") {
+    toast("Credit note details (T112) requires Direct URA S2S provider in Live mode", "error");
+    return;
+  }
+
+  const { data: invoice, error: invErr } = await supabase
+    .from("efris_invoices")
+    .select("*")
+    .eq("id", invoiceId)
+    .single();
+  if (invErr || !invoice) { toast("Credit note not found", "error"); return; }
+
+  try {
+    const { data, error } = await supabase.functions.invoke("efris-s2s", {
+      body: {
+        action: "credit_note_details",
+        payload: { invoiceNo: invoice.fiscal_invoice_number },
+      },
+    });
+    if (error) throw new Error(error.message);
+    if (!data?.success) throw new Error(data?.error || "Details fetch failed");
+
+    openModal(`
+      <div class="modal-title-row"><h3>Credit Note Details — URA (T112)</h3></div>
+      <p class="help-text">Fiscal No: <b>${escapeHtml(invoice.fiscal_invoice_number)}</b></p>
+      <pre style="background:var(--surface-2); padding:14px; border-radius:8px; max-height:400px; overflow:auto; font-size:11.5px;">${escapeHtml(JSON.stringify(data.data || data.raw, null, 2))}</pre>
+      <button class="btn btn-secondary btn-block" data-close-modal style="margin-top:10px;">Close</button>
+    `, { large: true });
+  } catch (e) {
+    console.error("creditNoteDetails error:", e);
+    toast("Failed to fetch details: " + e.message, "error", 6000);
+  }
+}
+
+// ---- T113: Approve a submitted credit note with URA ----
+async function approveCreditNote(invoiceId, rootEl) {
+  if (!STATE.business.efris_live_enabled || STATE.business.efris_provider !== "direct_s2s") {
+    toast("Credit note approval (T113) requires Direct URA S2S provider in Live mode", "error");
+    return;
+  }
+
+  const { data: invoice, error: invErr } = await supabase
+    .from("efris_invoices")
+    .select("*")
+    .eq("id", invoiceId)
+    .single();
+  if (invErr || !invoice) { toast("Credit note not found", "error"); return; }
+  if (invoice.invoice_type !== "2") { toast("Only credit notes can be approved", "error"); return; }
+  if (invoice.response_json?.approved) { toast("This credit note is already approved", "error"); return; }
+
+  openModal(`
+    <div class="modal-title-row"><h3>Approve Credit Note</h3></div>
+    <p class="help-text">
+      This sends a <b>T113 Credit Note Approval</b> request to URA for
+      <b>${escapeHtml(invoice.fiscal_invoice_number)}</b>.
+      Approving confirms the credit note is valid and authorises it.
+    </p>
+    <div class="field">
+      <label>Action</label>
+      <select id="cn-approval-status">
+        <option value="1">Approve</option>
+        <option value="2">Reject</option>
+      </select>
+    </div>
+    <div class="flex gap" style="margin-top:12px;">
+      <button class="btn btn-primary" id="cn-approve-btn" style="flex:1;">Confirm</button>
+      <button class="btn btn-secondary" data-close-modal>Cancel</button>
+    </div>
+  `, { large: true });
+
+  document.querySelector("#cn-approve-btn").addEventListener("click", async () => {
+    const approvalStatus = document.querySelector("#cn-approval-status").value;
+    const confirmBtn = document.querySelector("#cn-approve-btn");
+    confirmBtn.disabled = true;
+    confirmBtn.textContent = "Submitting…";
+    try {
+      const { data, error } = await supabase.functions.invoke("efris-s2s", {
+        body: {
+          action: "credit_note_approval",
+          payload: {
+            invoiceNo: invoice.fiscal_invoice_number,
+            approvalStatus,
+          },
+        },
+      });
+      if (error) throw new Error(error.message);
+      if (!data?.success) throw new Error(data?.error || "Approval failed");
+
+      const { error: updErr } = await supabase
+        .from("efris_invoices")
+        .update({
+          response_json: {
+            ...(invoice.response_json || {}),
+            approved: approvalStatus === "1",
+            approved_at: new Date().toISOString(),
+            approval_response: data.raw || data,
+          },
+        })
+        .eq("id", invoiceId);
+      if (updErr) throw new Error(updErr.message);
+
+      closeModal();
+      toast(
+        approvalStatus === "1"
+          ? "Credit note approved with URA"
+          : "Credit note rejected with URA",
+        "success",
+      );
+      renderEfris(rootEl);
+    } catch (e) {
+      console.error("approveCreditNote error:", e);
+      confirmBtn.disabled = false;
+      confirmBtn.textContent = "Confirm";
+      toast("Approval failed: " + e.message, "error", 6000);
     }
   });
 }

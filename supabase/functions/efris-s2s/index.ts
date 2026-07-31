@@ -696,6 +696,38 @@ Deno.serve(async (req) => {
         break;
       }
 
+      // ---- T111: Query credit/debit notes ----
+      case "credit_note_query": {
+        const resp = await sendToUra(cred, "T111", payload || {}, true);
+        const content = resp.data?.content;
+        result = { success: true, data: content, raw: resp };
+        break;
+      }
+
+      // ---- T112: Credit/debit note details ----
+      case "credit_note_details": {
+        if (!payload?.invoiceNo) return json({ success: false, error: "invoiceNo required" }, 400, cors);
+        const resp = await sendToUra(cred, "T112", payload, true);
+        const content = resp.data?.content;
+        result = { success: true, data: content, raw: resp };
+        break;
+      }
+
+      // ---- T113: Approve a submitted credit/debit note ----
+      // Payload shape: { invoiceNo, approvalStatus }
+      //   approvalStatus: "1" = approve, "2" = reject
+      case "credit_note_approval": {
+        if (!payload) return json({ success: false, error: "payload required" }, 400, cors);
+        const resp = await sendToUra(cred, "T113", payload, true);
+        const returnMsg = resp.returnStateInfo?.returnMessage || "";
+        const returnCode = resp.returnStateInfo?.returnCode || "";
+        result = returnMsg === "SUCCESS"
+          ? { success: true, returnMessage: returnMsg, returnCode, raw: resp }
+          : { success: false, error: returnMsg, returnCode, raw: resp };
+        await admin.from("efris_credentials").update({ last_used_at: new Date().toISOString() }).eq("id", cred.id);
+        break;
+      }
+
       // ---- T114: Cancel an approved credit/debit note ----
       // Payload shape (CancelCreditReq):
       //   { oriInvoiceId, invoiceNo, reasonCode, reason, invoiceApplyCategoryCode }
