@@ -123,9 +123,10 @@ export async function renderEfris(root) {
           <button class="btn btn-secondary btn-sm" data-view="${inv.id}">Payload</button>
           ${["pending", "queued", "failed"].includes(inv.status) ? `<button class="btn btn-primary btn-sm" data-submit="${inv.id}">Submit</button>` : ""}
           ${inv.invoice_type === "2" && inv.status === "accepted" && !inv.response_json?.cancelled ? `<button class="btn btn-secondary btn-sm" data-cancel-cn="${inv.id}">Cancel Credit Note</button>` : ""}
-          ${inv.invoice_type === "2" && inv.status === "accepted" ? `<button class="btn btn-secondary btn-sm" data-cn-details="${inv.id}" title="Fetch credit note details from URA (T112)">CN Details</button>` : ""}
-          ${inv.invoice_type === "2" && inv.status === "accepted" && !inv.response_json?.approved ? `<button class="btn btn-primary btn-sm" data-approve-cn="${inv.id}" title="Approve this credit note with URA (T113)">Approve</button>` : ""}
-          ${inv.invoice_type === "2" && inv.response_json?.approved ? '<span class="badge badge-green" style="font-size:9px;">APPROVED</span>' : ""}
+          ${["2", "3"].includes(inv.invoice_type) && inv.status === "accepted" ? `<button class="btn btn-secondary btn-sm" data-cn-details="${inv.id}" title="Fetch note details from URA (T112)">Details</button>` : ""}
+          ${["2", "3"].includes(inv.invoice_type) && inv.status === "accepted" && !inv.response_json?.approved && !inv.response_json?.cancelled ? `<button class="btn btn-primary btn-sm" data-approve-cn="${inv.id}" title="Approve/Reject with URA (T113)">Approve</button>` : ""}
+          ${["2", "3"].includes(inv.invoice_type) && inv.response_json?.approved ? '<span class="badge badge-green" style="font-size:9px;">APPROVED</span>' : ""}
+          ${["2", "3"].includes(inv.invoice_type) && inv.response_json?.rejected ? '<span class="badge badge-red" style="font-size:9px;">REJECTED</span>' : ""}
           ${inv.status === "accepted" ? `<button class="btn btn-secondary btn-sm" data-print="${inv.id}">🖨️ Print EFRIS</button>` : ""}
         </td>
       </tr>`,
@@ -538,6 +539,11 @@ async function creditNoteDetails(invoiceId, rootEl) {
 }
 
 // ---- T113: Approve a submitted credit note with URA ----
+const APPROVAL_STATUS_CODES = [
+  { code: "1", label: "Approve" },
+  { code: "2", label: "Reject" },
+];
+
 async function approveCreditNote(invoiceId, rootEl) {
   if (!STATE.business.efris_live_enabled || STATE.business.efris_provider !== "direct_s2s") {
     toast("Credit note approval (T113) requires Direct URA S2S provider in Live mode", "error");
@@ -550,46 +556,89 @@ async function approveCreditNote(invoiceId, rootEl) {
     .eq("id", invoiceId)
     .single();
   if (invErr || !invoice) { toast("Credit note not found", "error"); return; }
-  if (invoice.invoice_type !== "2") { toast("Only credit notes can be approved", "error"); return; }
-  if (invoice.response_json?.approved) { toast("This credit note is already approved", "error"); return; }
+  if (invoice.invoice_type !== "2" && invoice.invoice_type !== "3") {
+    toast("Only credit notes and debit notes can be approved", "error"); return;
+  }
+  if (invoice.response_json?.approved) { toast("This note is already approved", "error"); return; }
+  if (invoice.response_json?.cancelled) { toast("This note has been cancelled — cannot approve", "error"); return; }
+
+  const typeLabel = invoice.invoice_type === "2" ? "Credit Note" : "Debit Note";
 
   openModal(`
-    <div class="modal-title-row"><h3>Approve Credit Note</h3></div>
+    <div class="modal-title-row"><h3>Approve ${typeLabel}</h3></div>
     <p class="help-text">
-      This sends a <b>T113 Credit Note Approval</b> request to URA for
+      This sends a <b>T113 ${typeLabel} Approval</b> request to URA for
       <b>${escapeHtml(invoice.fiscal_invoice_number)}</b>.
-      Approving confirms the credit note is valid and authorises it.
     </p>
-    <div class="field">
-      <label>Action</label>
-      <select id="cn-approval-status">
-        <option value="1">Approve</option>
-        <option value="2">Reject</option>
-      </select>
+    <div class="card" style="margin-bottom:12px;">
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; font-size:13px;">
+        <div><span style="color:var(--text-secondary);">Customer:</span> <b>${escapeHtml(invoice.customer_name || "Walk-in")}</b></div>
+        <div><span style="color:var(--text-secondary);">Amount:</span> <b>${fmtMoneyRaw(Number(invoice.gross_amount || 0), invoice.currency_code)}</b></div>
+        <div><span style="color:var(--text-secondary);">VAT:</span> <b>${fmtMoneyRaw(Number(invoice.vat_amount || 0), invoice.currency_code)}</b></div>
+        <div><span style="color:var(--text-secondary);">Type:</span> <b>${typeLabel}</b></div>
+      </div>
     </div>
-    <div class="flex gap" style="margin-top:12px;">
-      <button class="btn btn-primary" id="cn-approve-btn" style="flex:1;">Confirm</button>
+    <div class="field">
+      <label>Decision</label>
+      <select id="cn-approval-status">${APPROVAL_STATUS_CODES.map((s) => `<option value="${s.code}">${s.label}</option>`).join("")}</select>
+    </div>
+    <div class="field" id="cn-reject-reason-field" style="display:none;">
+      <label>Rejection Reason <span style="color:var(--danger);">*</span></label>
+      <textarea id="cn-reject-reason" rows="3" placeholder="Explain why this note is being rejected…" maxlength="1024"></textarea>
+    </div>
+    <div class="field">
+      <label>Remarks (optional)</label>
+      <input type="text" id="cn-approval-remarks" placeholder="Additional notes for URA…" maxlength="512" />
+    </div>
+    <div class="flex gap" style="margin-top:14px;">
+      <button class="btn btn-primary" id="cn-approve-btn" style="flex:1;">Submit to URA</button>
       <button class="btn btn-secondary" data-close-modal>Cancel</button>
     </div>
   `, { large: true });
 
+  const statusSel = document.querySelector("#cn-approval-status");
+  const rejectField = document.querySelector("#cn-reject-reason-field");
+  statusSel.addEventListener("change", () => {
+    rejectField.style.display = statusSel.value === "2" ? "" : "none";
+  });
+
   document.querySelector("#cn-approve-btn").addEventListener("click", async () => {
-    const approvalStatus = document.querySelector("#cn-approval-status").value;
+    const approvalStatus = statusSel.value;
+    const rejectReason = document.querySelector("#cn-reject-reason")?.value?.trim() || "";
+    const remarks = document.querySelector("#cn-approval-remarks")?.value?.trim() || "";
+
+    if (approvalStatus === "2" && !rejectReason) {
+      toast("Please provide a rejection reason", "error");
+      return;
+    }
+
     const confirmBtn = document.querySelector("#cn-approve-btn");
     confirmBtn.disabled = true;
     confirmBtn.textContent = "Submitting…";
     try {
-      const { data, error } = await supabase.functions.invoke("efris-s2s", {
-        body: {
-          action: "credit_note_approval",
-          payload: {
-            invoiceNo: invoice.fiscal_invoice_number,
-            approvalStatus,
-          },
-        },
-      });
-      if (error) throw new Error(error.message);
-      if (!data?.success) throw new Error(data?.error || "Approval failed");
+      let result;
+      if (!STATE.business.efris_live_enabled) {
+        result = { success: true, simulated: true, returnMessage: "SUCCESS" };
+      } else if (STATE.business.efris_provider === "direct_s2s") {
+        const payload = {
+          invoiceNo: invoice.fiscal_invoice_number,
+          approvalStatus,
+        };
+        if (remarks) payload.remarks = remarks;
+        if (approvalStatus === "2" && rejectReason) payload.reason = rejectReason;
+
+        const { data, error } = await supabase.functions.invoke("efris-s2s", {
+          body: { action: "credit_note_approval", payload },
+        });
+        if (error) throw new Error(error.message);
+        if (!data?.success) throw new Error(data?.error || "Approval failed");
+        result = data;
+      } else {
+        throw new Error(
+          "Credit note approval (T113) requires the Direct URA S2S provider. " +
+          "Switch providers in Settings → EFRIS to use it.",
+        );
+      }
 
       const { error: updErr } = await supabase
         .from("efris_invoices")
@@ -597,8 +646,11 @@ async function approveCreditNote(invoiceId, rootEl) {
           response_json: {
             ...(invoice.response_json || {}),
             approved: approvalStatus === "1",
+            rejected: approvalStatus === "2",
             approved_at: new Date().toISOString(),
-            approval_response: data.raw || data,
+            approval_remarks: remarks || "",
+            rejection_reason: approvalStatus === "2" ? rejectReason : "",
+            approval_response: result.raw || result,
           },
         })
         .eq("id", invoiceId);
@@ -606,16 +658,16 @@ async function approveCreditNote(invoiceId, rootEl) {
 
       closeModal();
       toast(
-        approvalStatus === "1"
-          ? "Credit note approved with URA"
-          : "Credit note rejected with URA",
+        result.simulated
+          ? `${typeLabel} ${approvalStatus === "1" ? "approval" : "rejection"} simulated (sandbox mode)`
+          : `${typeLabel} ${approvalStatus === "1" ? "approved" : "rejected"} with URA`,
         "success",
       );
       renderEfris(rootEl);
     } catch (e) {
       console.error("approveCreditNote error:", e);
       confirmBtn.disabled = false;
-      confirmBtn.textContent = "Confirm";
+      confirmBtn.textContent = "Submit to URA";
       toast("Approval failed: " + e.message, "error", 6000);
     }
   });
