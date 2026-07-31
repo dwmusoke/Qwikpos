@@ -1059,7 +1059,17 @@ export async function renderSettings(root) {
             saveBtn.disabled = false;
             saveBtn.textContent = 'Import & Create Credential';
             if (error) {
-              errEl.textContent = error.context?.error || error.message;
+              let msg = error.message || "Unknown error";
+              try {
+                if (typeof error.context === "string" && error.context.trim()) {
+                  const parsed = JSON.parse(error.context);
+                  if (parsed?.error) msg = parsed.error;
+                  else msg = error.context;
+                } else if (error.context?.error) {
+                  msg = error.context.error;
+                }
+              } catch { /* fall back to generic message */ }
+              errEl.textContent = msg;
               errEl.style.display = 'block';
               return;
             }
