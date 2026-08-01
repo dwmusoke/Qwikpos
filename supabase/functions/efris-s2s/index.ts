@@ -595,8 +595,19 @@ Deno.serve(async (req) => {
         await admin.from("efris_invoices").update({ status: "queued" }).eq("id", efrisInvoiceId);
         await admin.from("efris_queue").update({ status: "processing" }).eq("efris_invoice_id", efrisInvoiceId);
 
-        // Submit via T109
-        const resp = await sendToUra(cred, "T109", transformedPayload, true);
+        // Submit via T109 (network/URA failures reset the queue so it can be retried)
+        let resp: any;
+        try {
+          resp = await sendToUra(cred, "T109", transformedPayload, true);
+        } catch (e: any) {
+          await admin.from("efris_queue").update({
+            status: "pending", last_error: `Network error: ${e?.message || e}`,
+          }).eq("efris_invoice_id", efrisInvoiceId);
+          await admin.from("efris_invoices").update({
+            status: "queued", error_message: `Network error — will retry: ${e?.message || e}`,
+          }).eq("id", efrisInvoiceId);
+          return json({ success: false, error: `URA unreachable: ${e?.message || e}`, retryable: true }, 200, cors);
+        }
         const returnMsg = resp.returnStateInfo?.returnMessage || "";
         const returnCode = resp.returnStateInfo?.returnCode || "";
         const content = resp.data?.content;

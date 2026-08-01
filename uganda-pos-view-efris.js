@@ -31,7 +31,7 @@ export async function renderEfris(root) {
 
   const { data } = await supabase
     .from("efris_invoices")
-    .select("*, sales(sale_number)")
+    .select("*, sales(sale_number), efris_queue(retries, max_retries, last_error)")
     .eq("business_id", STATE.business.id)
     .order("created_at", { ascending: false })
     .limit(200);
@@ -52,6 +52,8 @@ export async function renderEfris(root) {
           &nbsp;·&nbsp; Device No: ${escapeHtml(STATE.business.efris_device_no || "not registered")}</p>
       </div>
       <div class="page-header-actions">
+        <button class="btn btn-primary" id="submit-all-btn" title="Submit every pending/queued/failed invoice to URA now">🚀 Submit All Pending</button>
+        <button class="btn btn-secondary" id="reset-stuck-btn" title="Reset efris_queue entries stuck in 'processing' back to 'pending'">🔧 Reset Stuck Queue</button>
         <button class="btn btn-secondary" id="query-ura-invoices-btn" title="Fetch latest invoice statuses from URA (T106)">🔄 Query URA Invoices</button>
         <button class="btn btn-secondary" id="query-ura-cn-btn" title="Fetch credit/debit notes from URA (T111)">🔍 Query Credit Notes</button>
         <button class="btn btn-secondary" id="export-efris-btn">Export CSV</button>
@@ -117,7 +119,7 @@ export async function renderEfris(root) {
         <td>${escapeHtml(inv.customer_name || "Walk-in")}</td>
         <td>${fmtMoneyRaw(Number(inv.gross_amount || 0), inv.currency_code)}</td>
         <td>${fmtMoneyRaw(Number(inv.vat_amount || 0), inv.currency_code)}</td>
-        <td>${statusBadge(inv.status)}${inv.response_json?.cancelled ? ' <span class="badge badge-gray" style="font-size:9px;">CANCELLED</span>' : ""}</td>
+        <td>${statusBadge(inv.status)}${inv.response_json?.cancelled ? ' <span class="badge badge-gray" style="font-size:9px;">CANCELLED</span>' : ""}${inv.error_message ? ` <span class="badge badge-red" style="font-size:9px; cursor:help;" title="${escapeHtml(inv.error_message)}">error</span>` : ""}${queueRetryBadge(inv.efris_queue)}</td>
         <td>${fmtDate(inv.created_at)}</td>
         <td class="flex gap">
           <button class="btn btn-secondary btn-sm" data-view="${inv.id}">Payload</button>
@@ -169,9 +171,11 @@ export async function renderEfris(root) {
   $("export-efris-btn").addEventListener("click", () => exportCsv(invoices));
   $("query-ura-invoices-btn").addEventListener("click", () => queryUraInvoices(root));
   $("query-ura-cn-btn").addEventListener("click", () => queryUraCreditNotes(root));
+  $("submit-all-btn").addEventListener("click", () => submitAllPending(root, invoices));
+  $("reset-stuck-btn").addEventListener("click", () => resetStuckQueue(root));
 }
 
-async function submitInvoice(invoiceId, rootEl) {
+async function submitInvoice(invoiceId, rootEl, { quiet = false } = {}) {
   try {
     const { data: invoice, error: fetchErr } = await supabase
       .from("efris_invoices")
@@ -180,9 +184,9 @@ async function submitInvoice(invoiceId, rootEl) {
       .single();
 
     if (fetchErr) throw new Error(fetchErr.message);
-    if (!invoice) { toast("Invoice not found", "error"); return; }
+    if (!invoice) { toast("Invoice not found", "error"); return false; }
     if (!["pending", "queued", "failed"].includes(invoice.status)) {
-      toast(`Invoice is already ${invoice.status}`, "error"); return;
+      toast(`Invoice is already ${invoice.status}`, "error"); return false;
     }
 
     if (!STATE.business.efris_live_enabled) {
@@ -204,27 +208,95 @@ async function submitInvoice(invoiceId, rootEl) {
 
       if (updateErr) throw new Error(updateErr.message);
 
-      toast("Invoice simulated as accepted (sandbox mode)", "success");
-      renderEfris(rootEl);
-    } else {
-      const isS2S = STATE.business.efris_provider === "direct_s2s";
-      const fnName = isS2S ? "efris-s2s" : "efris-submit-invoice";
-      const body = isS2S
-        ? { action: "fiscalise_invoice", payload: { efris_invoice_id: invoiceId } }
-        : { efrisInvoiceId: invoiceId };
+      if (!quiet) {
+        toast("Invoice simulated as accepted (sandbox mode)", "success");
+        renderEfris(rootEl);
+      }
+      return true;
+    }
 
-      const { data, error } = await supabase.functions.invoke(fnName, { body });
+    const isS2S = STATE.business.efris_provider === "direct_s2s";
+    const fnName = isS2S ? "efris-s2s" : "efris-submit-invoice";
+    const body = isS2S
+      ? { action: "fiscalise_invoice", payload: { efris_invoice_id: invoiceId } }
+      : { efrisInvoiceId: invoiceId };
 
-      if (error) throw new Error(error.message || "Edge function error");
-      if (!data?.success) throw new Error(data?.error || "Submission failed");
+    const { data, error } = await supabase.functions.invoke(fnName, { body });
 
+    if (error) throw new Error(error.message || "Edge function error");
+    if (!data?.success) throw new Error(data?.error || "Submission failed");
+
+    if (!quiet) {
       toast("Invoice submitted to URA successfully!", "success");
       renderEfris(rootEl);
     }
+    return true;
   } catch (e) {
     console.error("submitInvoice error:", e);
-    toast("Submission failed: " + e.message, "error", 5000);
+    if (!quiet) toast("Submission failed: " + e.message, "error", 5000);
+    return false;
   }
+}
+
+async function submitAllPending(rootEl, invoices) {
+  const todo = (invoices || []).filter((i) =>
+    ["pending", "queued", "failed"].includes(i.status),
+  );
+  if (!todo.length) {
+    toast("No pending/queued/failed invoices to submit.", "default");
+    return;
+  }
+  const btn = $("submit-all-btn");
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = `Submitting ${todo.length}…`;
+  }
+  let ok = 0;
+  let fail = 0;
+  for (const inv of todo) {
+    const success = await submitInvoice(inv.id, rootEl, { quiet: true });
+    if (success) ok++;
+    else fail++;
+  }
+  if (btn) {
+    btn.disabled = false;
+    btn.textContent = "🚀 Submit All Pending";
+  }
+  toast(`Submit All finished: ${ok} succeeded, ${fail} failed.`, fail ? "error" : "success", 5000);
+  renderEfris(rootEl);
+}
+
+async function resetStuckQueue(rootEl) {
+  const { data: stuck, error: qErr } = await supabase
+    .from("efris_queue")
+    .select("efris_invoice_id")
+    .eq("status", "processing");
+  if (qErr) {
+    toast("Could not query queue: " + qErr.message, "error", 5000);
+    return;
+  }
+  if (!stuck || !stuck.length) {
+    toast("No efris_queue entries stuck in 'processing'.", "default");
+    return;
+  }
+  const ids = stuck.map((s) => s.efris_invoice_id);
+  const { error: uErr } = await supabase
+    .from("efris_queue")
+    .update({ status: "pending" })
+    .eq("status", "processing");
+  if (uErr) {
+    toast("Reset failed: " + uErr.message, "error", 5000);
+    return;
+  }
+  // Make sure the linked invoices are also back in a submittable state.
+  const { error: invErr } = await supabase
+    .from("efris_invoices")
+    .update({ status: "pending" })
+    .in("id", ids)
+    .in("status", ["submitted", "queued", "failed"]);
+  if (invErr) console.warn("resetStuckQueue invoice reset:", invErr);
+  toast(`Reset ${ids.length} stuck queue entr${ids.length > 1 ? "ies" : "y"} to pending.`, "success");
+  renderEfris(rootEl);
 }
 
 function statusBadge(status) {
@@ -236,6 +308,14 @@ function statusBadge(status) {
     failed: "badge-red",
   };
   return `<span class="badge ${map[status] || "badge-gray"}">${escapeHtml(status)}</span>`;
+}
+
+function queueRetryBadge(queueRows) {
+  if (!queueRows || !queueRows.length) return "";
+  const q = Array.isArray(queueRows) ? queueRows[0] : queueRows;
+  if (!q || q.retries == null) return "";
+  const max = q.max_retries || 3;
+  return ` <span class="badge badge-gray" style="font-size:9px; cursor:help;" title="${escapeHtml(q.last_error || "")}">retry ${q.retries}/${max}</span>`;
 }
 
 // T114 reason codes — URA "refundReason" dictionary (required by URA when

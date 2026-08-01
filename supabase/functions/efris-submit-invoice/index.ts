@@ -310,18 +310,33 @@ Deno.serve(async (req) => {
       .update({ status: "processing" })
       .eq("efris_invoice_id", efrisInvoiceId);
 
-    const invRes = await fetch(
-      `${providerBase}/${business.tin}/generate-fiscal-invoice`,
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${creds.api_key}`,
-          "Content-Type": "application/json",
+    // Network/provider failures reset the queue so it can be retried later.
+    let invRes: Response;
+    let invData: any;
+    try {
+      invRes = await fetch(
+        `${providerBase}/${business.tin}/generate-fiscal-invoice`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${creds.api_key}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(invoice.payload_json),
         },
-        body: JSON.stringify(invoice.payload_json),
-      },
-    );
-    const invData = await invRes.json();
+      );
+      invData = await invRes.json();
+    } catch (e: any) {
+      await admin
+        .from("efris_queue")
+        .update({ status: "pending", last_error: `Network error: ${e?.message || e}` })
+        .eq("efris_invoice_id", efrisInvoiceId);
+      await admin
+        .from("efris_invoices")
+        .update({ status: "queued", error_message: `Network error — will retry: ${e?.message || e}` })
+        .eq("id", efrisInvoiceId);
+      return json({ success: false, error: `Provider unreachable: ${e?.message || e}`, retryable: true }, 200, corsHeaders);
+    }
 
     if (invData?.response !== "OK") {
       const errorMessage = invData?.message || "EFRIS rejected the invoice";

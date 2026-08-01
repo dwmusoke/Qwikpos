@@ -1071,34 +1071,51 @@ export function offlineEfrisQueueCount() {
 }
 
 export async function flushOfflineEfrisQueue() {
-  const list = JSON.parse(localStorage.getItem(EFRIS_OFFLINE_KEY) || "[]");
-  if (!list.length) return;
-  const remaining = [];
+  // Offline entries ({ efrisPayload, salePayload }) are only a "work pending"
+  // flag. When the connection returns, flushOfflineQueue() → submitSaleToSupabase()
+  // re-stages each synced sale as a fresh `pending` efris_invoices row (see
+  // uganda-pos-view-pos.js), so the source of truth to submit is the DB queue.
+  const hadOffline = offlineEfrisQueueCount() > 0;
+  localStorage.setItem(EFRIS_OFFLINE_KEY, "[]");
+  if (!hadOffline) return;
+
+  // Sandbox mode has nothing to submit — invoices stay pending for the manual
+  // "Submit" (which simulates locally). Only auto-submit in live mode.
+  if (!STATE.business?.efris_live_enabled) return;
+
+  const isS2S = STATE.business.efris_provider === "direct_s2s";
+  const fnName = isS2S ? "efris-s2s" : "efris-submit-invoice";
+
+  const { data: staged, error: queryErr } = await supabase
+    .from("efris_invoices")
+    .select("id")
+    .eq("business_id", STATE.business.id)
+    .in("status", ["pending", "queued", "failed"]);
+  if (queryErr) {
+    console.warn("flushOfflineEfrisQueue query failed:", queryErr);
+    return;
+  }
+
   let synced = 0;
-  const isS2S = STATE.business?.efris_provider === 'direct_s2s';
-  for (const entry of list) {
+  const failed = [];
+  for (const inv of staged || []) {
+    const body = isS2S
+      ? { action: "fiscalise_invoice", payload: { efris_invoice_id: inv.id } }
+      : { efrisInvoiceId: inv.id };
     try {
-      const fnName = isS2S ? "efris-s2s" : "efris-submit-invoice";
-      const body = isS2S
-        ? { action: "fiscalise_invoice", payload: { efris_invoice_id: entry.efrisInvoiceId } }
-        : { efrisInvoiceId: entry.efrisInvoiceId };
       const { data, error } = await supabase.functions.invoke(fnName, { body });
-      if (error || !data?.success) {
-        remaining.push(entry);
-      } else {
-        synced++;
-      }
+      if (error || !data?.success) failed.push(inv.id);
+      else synced++;
     } catch (e) {
-      remaining.push(entry);
+      failed.push(inv.id);
     }
   }
-  localStorage.setItem(EFRIS_OFFLINE_KEY, JSON.stringify(remaining));
-  if (remaining.length === 0 && synced > 0) {
+  if (synced > 0 && failed.length === 0) {
     toast(`Offline EFRIS invoices submitted (${synced}).`, "success");
-  } else if (remaining.length > 0 && synced > 0) {
-    toast(`${synced} of ${list.length} offline EFRIS invoices submitted. ${remaining.length} will retry.`, "default", 5000);
-  } else if (remaining.length > 0) {
-    toast(`Could not submit ${remaining.length} offline EFRIS invoice(s) — will retry when online.`, "error", 5000);
+  } else if (synced > 0) {
+    toast(`${synced} submitted. ${failed.length} remain in the queue and will be retried.`, "default", 5000);
+  } else if (failed.length > 0) {
+    toast(`Could not submit ${failed.length} EFRIS invoice(s) — they remain in the queue.`, "error", 5000);
   }
 }
 

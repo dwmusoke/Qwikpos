@@ -4,3 +4,13 @@ package.json
 package-lock.json
 .ts-check/
 docs/~$*.docx
+
+# URA EFRIS keys / certificates — never commit these
+*.p8
+*.p8.pem
+*.pfx
+*.pubkey.pem
+*.privkey.pem
+*.key
+*.jks
+*.keystore
