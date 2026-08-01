@@ -282,7 +282,11 @@ async function fetchAesKey(cred: any): Promise<string> {
   const returnMsg = respJson.returnStateInfo?.returnMessage || "";
   if (returnMsg !== "SUCCESS") {
     const msg = respJson.returnStateInfo?.returnMessage || "T104 failed";
-    throw new Error(`T104 failed: ${msg}`);
+    const code = respJson.returnStateInfo?.returnCode || "";
+    const detail = (respJson.data?.content && typeof respJson.data.content === "string")
+      ? (() => { try { return atob(respJson.data.content); } catch { return ""; } })()
+      : "";
+    throw new Error(`T104 failed: ${msg} (code: ${code})${detail ? ` — ${detail}` : ""}`);
   }
 
   // Extract AES key: base64-decode content → parse JSON → get RSA-encrypted AES key
