@@ -962,6 +962,7 @@ export async function renderSettings(root) {
                 <td><span class="badge ${c.status === 'active' ? 'badge-green' : c.status === 'pending' ? 'badge-yellow' : 'badge-red'}">${c.status}</span></td>
                 <td style="font-size:12px;">${c.last_used_at ? new Date(c.last_used_at).toLocaleDateString() : 'Never'}</td>
                 <td>
+                  <button class="btn ${c.status === 'active' ? 'btn-ghost' : 'btn-primary'} btn-sm" data-s2s-validate="${c.id}">${c.status === 'active' ? 'Test Connection' : 'Validate & Activate'}</button>
                   <button class="btn btn-secondary btn-sm" data-s2s-edit="${c.id}" data-device="${c.device_number || ''}">Edit</button>
                   <button class="btn btn-ghost btn-sm" data-s2s-delete="${c.id}">Delete</button>
                 </td>
@@ -1089,6 +1090,45 @@ export async function renderSettings(root) {
           });
         }});
       });
+
+      // Validate & Activate (runs T104 get AES key; on success marks credential active)
+      el.querySelectorAll('[data-s2s-validate]').forEach(btn => btn.addEventListener('click', async () => {
+        const id = btn.dataset.s2sValidate;
+        btn.disabled = true;
+        btn.textContent = 'Testing connection…';
+        try {
+          const { data, error } = await supabase.functions.invoke('efris-s2s', {
+            body: { action: 'get_aes_key', credential_id: id },
+          });
+          if (error || !data?.aes_key_fetched) {
+            let msg = error?.message || (data?.error) || 'T104 validation failed';
+            try {
+              if (error?.context && typeof error.context.text === "function") {
+                const text = await error.context.text();
+                if (text && text.trim()) {
+                  try { msg = JSON.parse(text)?.error || msg; } catch { msg = text; }
+                }
+              } else if (typeof error?.context === "string" && error.context.trim()) {
+                try { msg = JSON.parse(error.context)?.error || msg; } catch { msg = error.context; }
+              }
+            } catch { /* keep default msg */ }
+            toast('Validation failed: ' + msg, 'error', 6000);
+            return;
+          }
+          // Connection works — activate the credential
+          const { error: actErr } = await supabase.functions.invoke('efris-setup', {
+            body: { action: 'update', credential_id: id, status: 'active' },
+          });
+          if (actErr) { toast('Connected but could not activate: ' + actErr.message, 'error', 6000); return; }
+          toast(`Connected to URA (${data.key_length}). Credential activated!`, 'success', 5000);
+        } catch (e) {
+          toast('Validation failed: ' + (e?.message || e), 'error', 6000);
+        } finally {
+          btn.disabled = false;
+          btn.textContent = 'Test Connection';
+          loadEfrisS2sCredentials(el);
+        }
+      }));
 
       // Edit (set device number)
       el.querySelectorAll('[data-s2s-edit]').forEach(btn => btn.addEventListener('click', async () => {
