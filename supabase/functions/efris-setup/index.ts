@@ -29,6 +29,19 @@ function json(body: unknown, status = 200, headers: Record<string, string> = {})
   return new Response(JSON.stringify(body), { status, headers: { ...headers, "Content-Type": "application/json" } });
 }
 
+/** SHA-256 hex digest — used to hash connector API keys before storage. */
+async function sha256Hex(value: string): Promise<string> {
+  const data = new TextEncoder().encode(value);
+  const hash = await crypto.subtle.digest("SHA-256", data);
+  return Array.from(new Uint8Array(hash)).map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+/** Generate a random long-lived connector API key (shown once, stored hashed). */
+function randomApiKey(): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(32));
+  return "qwk_" + Array.from(bytes).map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
 // ====================================================================
 // RSA KEY GENERATION (Web Crypto API)
 // ====================================================================
@@ -543,8 +556,7 @@ Deno.serve(async (req) => {
       }
 
       // ── RE-ENCRYPT: encrypt any legacy plaintext private keys at rest ──
-      case "reencrypt_keys": {
-        const { data: creds } = await admin
+      case "reencrypt_keys": {        const { data: creds } = await admin
           .from("efris_credentials")
           .select("id, private_key_pem")
           .eq("business_id", appUser.business_id);
@@ -567,6 +579,45 @@ Deno.serve(async (req) => {
         }
 
         return json({ success: true, reencrypted: updated, alreadyEncrypted: skipped }, 200, cors);
+      }
+
+      // ── CONNECTOR API KEYS: long-lived keys for the SunSystems/ERP bridge.
+      // Keys are shown once at creation and stored as SHA-256 hashes only. ──
+      case "create_client_key": {
+        const { label } = body;
+        const apiKey = randomApiKey();
+        const { data, error } = await admin
+          .from("efris_client_keys")
+          .insert({
+            business_id: appUser.business_id,
+            label: label || "EFRIS connector",
+            api_key_hash: await sha256Hex(apiKey),
+          })
+          .select("id")
+          .single();
+        if (error) return json({ success: false, error: error.message }, 400, cors);
+        return json({ success: true, key_id: data.id, api_key: apiKey }, 200, cors);
+      }
+
+      case "list_client_keys": {
+        const { data } = await admin
+          .from("efris_client_keys")
+          .select("id, label, tier, active, created_at, last_used_at, revoked_at")
+          .eq("business_id", appUser.business_id)
+          .order("created_at", { ascending: false });
+        return json({ success: true, keys: data || [] }, 200, cors);
+      }
+
+      case "revoke_client_key": {
+        const { key_id } = body;
+        if (!key_id) return json({ success: false, error: "key_id required" }, 400, cors);
+        const { error } = await admin
+          .from("efris_client_keys")
+          .update({ active: false, revoked_at: new Date().toISOString() })
+          .eq("id", key_id)
+          .eq("business_id", appUser.business_id);
+        if (error) return json({ success: false, error: error.message }, 400, cors);
+        return json({ success: true }, 200, cors);
       }
 
       default:

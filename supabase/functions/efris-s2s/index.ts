@@ -27,6 +27,10 @@ const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 const URA_SANDBOX = "https://efristest.ura.go.ug/efrisws/ws/taapp/getInformation";
 const URA_PROD = "https://efrisws.ura.go.ug/ws/taapp/getInformation";
 
+// Currencies URA accepts natively on e-invoices (from the T115 dictionary).
+// Anything else (e.g. RWF, SSP) must be converted to UGX before submitting.
+const URA_SUPPORTED_CURRENCIES = new Set(["UGX", "USD", "EUR", "GBP", "KES", "TZS"]);
+
 // -------------------------------------------------------------------
 // CORS
 // -------------------------------------------------------------------
@@ -43,6 +47,13 @@ function corsHeaders(req?: Request): Record<string, string> {
 
 function json(body: unknown, status = 200, headers: Record<string, string> = {}) {
   return new Response(JSON.stringify(body), { status, headers: { ...headers, "Content-Type": "application/json" } });
+}
+
+/** SHA-256 hex digest — used to hash connector API keys before storage/lookup. */
+async function sha256Hex(value: string): Promise<string> {
+  const data = new TextEncoder().encode(value);
+  const hash = await crypto.subtle.digest("SHA-256", data);
+  return Array.from(new Uint8Array(hash)).map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
 // ====================================================================
@@ -377,6 +388,125 @@ async function sendToUra(cred: any, interfaceCode: string, content: any, encrypt
 }
 
 // ====================================================================
+// MULTI-CURRENCY: exchange rates (T121) + UGX conversion
+//
+// URA accepts UGX, USD, EUR, GBP, KES and TZS natively on e-invoices.
+// For any other currency (RWF, SSP, ...) the invoice must be converted
+// to UGX using URA's official daily rate (T121) before fiscalisation.
+// ====================================================================
+
+function toUraDate(yyyyMmDd: string): string {
+  const parts = yyyyMmDd.split("-");
+  if (parts.length !== 3) return yyyyMmDd;
+  return `${parts[2]}/${parts[1]}/${parts[0]}`;
+}
+
+/** Extract a numeric rate from a T121 response payload (defensive). */
+function extractRate(content: any): number | null {
+  if (!content || typeof content !== "object") return null;
+  const lists = [content.rates, content.exchangeRates, content.rateList, content.exchangeRateList];
+  const entries: any[] = [];
+  for (const l of lists) {
+    if (Array.isArray(l)) entries.push(...l);
+    else if (l && typeof l === "object") entries.push(l);
+  }
+  if (!entries.length) entries.push(content);
+
+  let best: number | null = null;
+  for (const e of entries) {
+    if (e == null) continue;
+    if (typeof e === "number" && e > 0) { best = e; continue; }
+    const r = e.rate ?? e.exchangeRate ?? e.exchange_rate ?? e.rateValue ?? e.rate_value ?? e.RATE;
+    if (r == null) continue;
+    const n = Number(r);
+    if (isFinite(n) && n > 0) best = n;
+  }
+  return best;
+}
+
+/** Fetch URA's official exchange rate (T121) for a currency on a given day. */
+async function fetchExchangeRate(cred: any, currency: string, date?: string): Promise<number | null> {
+  const day = toUraDate(date || ugandaTimestamp().split(" ")[0]);
+  const payload = { taxpayerTin: cred.tin, currency, startDate: day, endDate: day };
+  const resp = await sendToUra(cred, "T121", payload, true);
+  return extractRate(resp.data?.content);
+}
+
+/** Round a value × rate to 2 decimals (URA requires max 2 decimals). */
+function mul2(value: any, rate: number): number {
+  const n = Number(value);
+  if (!isFinite(n)) return 0;
+  return Math.round(n * rate * 100) / 100;
+}
+
+function fmt(n: number): string {
+  return String(n);
+}
+
+/**
+ * Convert every monetary field of an invoice to UGX using the given rate.
+ * Gross amounts are derived as net + tax so URA's consistency rules
+ * (returnCodes 1342/1344) hold after rounding.
+ */
+function convertInvoiceToUgx(invoice: any, rate: number): void {
+  for (const g of invoice.goodsDetails || []) {
+    const net = g.netAmount != null ? mul2(g.netAmount, rate) : (g.total != null ? mul2(g.total, rate) : 0);
+    const tax = g.taxAmount != null ? mul2(g.taxAmount, rate) : 0;
+    if (g.unitPrice != null) g.unitPrice = fmt(mul2(g.unitPrice, rate));
+    if (g.netAmount != null) g.netAmount = fmt(net);
+    if (g.total != null) g.total = fmt(Math.round((net + tax) * 100) / 100);
+    if (g.taxAmount != null) g.taxAmount = fmt(tax);
+    if (g.grossAmount != null) g.grossAmount = fmt(Math.round((net + tax) * 100) / 100);
+  }
+
+  for (const t of invoice.taxDetails || []) {
+    const netField = t.taxableAmount != null ? "taxableAmount" : "netAmount";
+    const net = t[netField] != null ? mul2(t[netField], rate) : 0;
+    const tax = t.taxAmount != null ? mul2(t.taxAmount, rate) : 0;
+    if (t[netField] != null) t[netField] = fmt(net);
+    if (t.taxAmount != null) t.taxAmount = fmt(tax);
+    if (t.grossAmount != null) t.grossAmount = fmt(Math.round((net + tax) * 100) / 100);
+  }
+
+  const summary = invoice.summary || {};
+  const sNet = summary.netAmount != null ? mul2(summary.netAmount, rate) : 0;
+  const sTax = summary.taxAmount != null ? mul2(summary.taxAmount, rate) : 0;
+  if (summary.netAmount != null) summary.netAmount = fmt(sNet);
+  if (summary.taxAmount != null) summary.taxAmount = fmt(sTax);
+  if (summary.grossAmount != null) summary.grossAmount = fmt(Math.round((sNet + sTax) * 100) / 100);
+
+  for (const p of invoice.paymentDetails || []) {
+    if (p.amount != null) p.amount = fmt(mul2(p.amount, rate));
+  }
+  for (const p of invoice.payWay || []) {
+    if (p.paymentAmount != null) p.paymentAmount = fmt(mul2(p.paymentAmount, rate));
+  }
+
+  invoice.basicInformation = invoice.basicInformation || {};
+  invoice.basicInformation.currency = "UGX";
+  invoice.exchangeRate = fmt(rate);
+}
+
+/**
+ * If the invoice is in a currency URA doesn't accept natively, convert it
+ * to UGX using URA's official rate (T121). Native currencies pass through.
+ * Returns the effective currency + whether conversion happened.
+ */
+async function normalizeInvoiceCurrency(cred: any, invoice: any): Promise<{ currency: string; converted: boolean; rate?: number }> {
+  if (!invoice?.basicInformation) return { currency: "UGX", converted: false };
+  const currency = String(invoice.basicInformation.currency || "UGX").toUpperCase();
+  if (currency === "UGX" || URA_SUPPORTED_CURRENCIES.has(currency)) {
+    return { currency, converted: false };
+  }
+  const rate = await fetchExchangeRate(cred, currency);
+  if (!rate || rate <= 0) {
+    throw new Error(`No URA exchange rate available for ${currency} — set one in the invoice's 'exchangeRate' or convert to UGX before submitting.`);
+  }
+  convertInvoiceToUgx(invoice, rate);
+  return { currency, converted: true, rate };
+}
+
+// ====================================================================
 // PAYLOAD TRANSFORMATION: EFRIS Simplified → URA Direct T109
 // ====================================================================
 
@@ -485,14 +615,35 @@ Deno.serve(async (req) => {
 
   try {
     const authHeader = req.headers.get("Authorization") ?? "";
+    const bearer = authHeader.replace(/^Bearer\s+/i, "").trim();
+    let appUser: any;
+
+    // Path 1: normal app-user JWT
     const userClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
       global: { headers: { Authorization: authHeader } },
     });
     const { data: userData, error: userErr } = await userClient.auth.getUser();
-    if (userErr || !userData?.user) return json({ success: false, error: "Not authenticated" }, 401, cors);
+    if (!userErr && userData?.user) {
+      const { data } = await admin.from("app_users").select("business_id, role").eq("id", userData.user.id).single();
+      appUser = data;
+    }
 
-    const { data: appUser } = await admin.from("app_users").select("business_id, role").eq("id", userData.user.id).single();
-    if (!appUser?.business_id) return json({ success: false, error: "No business linked" }, 400, cors);
+    // Path 2: long-lived per-business connector API key (e.g. the SunSystems bridge)
+    if (!appUser?.business_id && bearer) {
+      const keyHash = await sha256Hex(bearer);
+      const { data: clientKey } = await admin
+        .from("efris_client_keys")
+        .select("id, business_id, tier")
+        .eq("api_key_hash", keyHash)
+        .eq("active", true)
+        .maybeSingle();
+      if (clientKey) {
+        appUser = { id: clientKey.id, business_id: clientKey.business_id, role: "connector" };
+        await admin.from("efris_client_keys").update({ last_used_at: new Date().toISOString() }).eq("id", clientKey.id);
+      }
+    }
+
+    if (!appUser?.business_id) return json({ success: false, error: "Not authenticated" }, 401, cors);
 
     const body = await req.json();
     const { action, credential_id, payload } = body;
@@ -527,9 +678,22 @@ Deno.serve(async (req) => {
         break;
       }
 
+      // ---- T121: Get URA's official exchange rate for a currency ----
+      // payload: { currency: "USD", date?: "yyyy-MM-dd" }
+      case "get_exchange_rate": {
+        const { currency, date } = payload || {};
+        if (!currency) return json({ success: false, error: "currency required" }, 400, cors);
+        const rate = await fetchExchangeRate(cred, currency, date);
+        result = { success: true, currency: String(currency).toUpperCase(), rate, date: date || ugandaTimestamp().split(" ")[0] };
+        break;
+      }
+
       // ---- T109: Submit invoice (raw payload) ----
       case "submit_invoice": {
         if (!payload) return json({ success: false, error: "payload required" }, 400, cors);
+        // Convert non-native currencies (RWF, SSP, ...) to UGX before submitting
+        const submitInvoice = payload?.invoice || payload;
+        await normalizeInvoiceCurrency(cred, submitInvoice);
         const resp = await sendToUra(cred, "T109", payload, true);
         const returnMsg = resp.returnStateInfo?.returnMessage || "";
         const returnCode = resp.returnStateInfo?.returnCode || "";
@@ -598,6 +762,9 @@ Deno.serve(async (req) => {
         // Transform the EFRIS Simplified payload to direct URA T109 format
         const srcPayload = invoice.payload_json?.invoice || invoice.payload_json;
         const transformedPayload = transformToUraFormat(srcPayload, biz, cred);
+
+        // Convert non-native currencies (RWF, SSP, ...) to UGX before submitting
+        await normalizeInvoiceCurrency(cred, transformedPayload.invoice);
 
         // Mark as queued
         await admin.from("efris_invoices").update({ status: "queued" }).eq("id", efrisInvoiceId);

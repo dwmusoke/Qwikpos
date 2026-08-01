@@ -971,7 +971,10 @@ export async function renderSettings(root) {
           </table>
         </div>
         <p class="help-text" style="margin-top:8px;">RSA 2048-bit keys are generated server-side. The private key never leaves the edge function.</p>
-        <p style="margin-top:6px;"><button class="btn btn-ghost btn-sm" id="s2s-reencrypt-btn">Re-encrypt stored keys (AES-256-GCM at rest)</button></p>
+        <p style="margin-top:6px;">
+          <button class="btn btn-ghost btn-sm" id="s2s-reencrypt-btn">Re-encrypt stored keys (AES-256-GCM at rest)</button>
+          <button class="btn btn-ghost btn-sm" id="s2s-connector-key-btn">Connector API key</button>
+        </p>
         ` : '<div class="empty-state" style="padding:16px;">No direct URA credentials yet. Click the button above to get started.</div>'}
       `;
 
@@ -1200,6 +1203,55 @@ export async function renderSettings(root) {
         toast('Credential deleted', 'success');
         loadEfrisS2sCredentials(el);
       }));
+
+      // Manage the long-lived connector API key (for the SunSystems/ERP bridge)
+      el.querySelector('#s2s-connector-key-btn')?.addEventListener('click', async () => {
+        const { data, error } = await supabase.functions.invoke('efris-setup', { body: { action: 'list_client_keys' } });
+        if (error) { toast('Error: ' + error.message, 'error'); return; }
+        const rows = (data?.keys || []).map(k => `
+          <tr>
+            <td><code>${escapeHtml(k.label || 'EFRIS connector')}</code></td>
+            <td><span class="badge ${k.active ? 'badge-green' : 'badge-red'}">${k.active ? 'Active' : 'Revoked'}</span></td>
+            <td style="font-size:12px;">${k.last_used_at ? new Date(k.last_used_at).toLocaleString() : 'Never'}</td>
+            <td>${k.active ? `<button class="btn btn-ghost btn-sm" data-revoke-key="${k.id}">Revoke</button>` : ''}</td>
+          </tr>`).join('');
+        openModal(`
+          <div class="modal-title-row"><h3>🔑 Connector API Key</h3></div>
+          <p class="help-text" style="margin-bottom:12px;">
+            Use this key as <code>EFRIS_SANDBOX_KEY</code> in the SunSystems connector and point it at
+            <code>.../functions/v1/efris-s2s</code> for live invoicing. Keys are stored hashed and shown only once.
+          </p>
+          <div style="margin-bottom:12px;">
+            <button class="btn btn-primary btn-sm" id="ck-generate">Generate new key</button>
+            <span id="ck-newkey" style="margin-left:8px;"></span>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Label</th><th>Status</th><th>Last used</th><th></th></tr></thead>
+              <tbody>${rows || '<tr><td colspan="4">No connector keys yet.</td></tr>'}</tbody>
+            </table>
+          </div>
+        `, { onMount: () => {
+          $('ck-generate').addEventListener('click', async () => {
+            const { data, error } = await supabase.functions.invoke('efris-setup', { body: { action: 'create_client_key', label: 'SunSystems connector' } });
+            if (error) { toast('Error: ' + error.message, 'error'); return; }
+            const box = $('ck-newkey');
+            box.innerHTML = `<code style="user-select:all;">${escapeHtml(data.api_key)}</code> <button class="btn btn-secondary btn-sm" id="ck-copy">Copy</button>`;
+            $('ck-copy').addEventListener('click', async () => {
+              try { await navigator.clipboard.writeText(data.api_key); toast('Key copied', 'success'); }
+              catch { toast('Copy failed — select the key manually', 'error'); }
+            });
+            toast('Key generated — copy it now, it is shown only once.', 'success', 6000);
+          });
+          document.querySelectorAll('[data-revoke-key]').forEach(b => b.addEventListener('click', async () => {
+            if (!confirm('Revoke this connector key?')) return;
+            const { error } = await supabase.functions.invoke('efris-setup', { body: { action: 'revoke_client_key', key_id: b.dataset.revokeKey } });
+            if (error) { toast('Error: ' + error.message, 'error'); return; }
+            toast('Key revoked', 'success');
+            closeModal();
+          }));
+        }});
+      });
 
       // Re-encrypt legacy plaintext private keys at rest (AES-256-GCM)
       el.querySelector('#s2s-reencrypt-btn')?.addEventListener('click', async (e) => {

@@ -336,6 +336,18 @@ SunSystems stores currency as ISO 4217 codes, which maps directly to EFRIS:
 
 > **Note:** EFRIS requires amounts in the local currency. If SunSystems stores USD, you'll need to apply the exchange rate before submitting.
 
+### Multi-currency rules (important)
+
+URA accepts **six currencies natively** on e-invoices — `UGX`, `USD`, `EUR`, `GBP`, `KES`, `TZS`. For those, submit the invoice in the original currency; URA converts to UGX at its own official daily rate for tax purposes.
+
+For **any other currency** (e.g. `RWF`, `SSP`) the invoice **must be converted to UGX before submitting**. Qwickpos does this automatically in production (`efris-s2s`):
+
+1. Fetch URA's official rate via **T121** (`get_exchange_rate` action)
+2. Convert net/tax/gross amounts to UGX (gross derived as net + tax so URA's consistency checks pass)
+3. Set `currency` to `UGX` and record the rate on the invoice
+
+The connector now uses **each invoice's own `currency_code`** from SunSystems (falling back to `CURRENCY`), so a client billing in UGX, USD, KES, RWF, SSP or TZS is handled per-invoice.
+
 ### Tax Code Mapping
 
 | SunSystems Tax Code | EFRIS taxCode |
@@ -441,6 +453,8 @@ CONFIG["sandbox_base_url"] = "https://ixntllvgntshbfocwuur.supabase.co/functions
 ```
 
 The payload format is identical — the edge function handles the URA transformation internally.
+
+> **Production auth:** `efris-s2s` authenticates with a **per-business connector API key**, not the sandbox key. Generate one in **Qwickpos → Settings → EFRIS → Connector API key** and set it as `EFRIS_SANDBOX_KEY`. Keys are stored as SHA-256 hashes and can be revoked any time.
 
 ### Getting a URA EFRIS Account
 

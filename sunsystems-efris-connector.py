@@ -360,7 +360,9 @@ def transform_invoice(sun_invoice: dict, items: list[dict]) -> dict:
     """
     seller_tin = CONFIG["seller_tin"]
     seller_name = CONFIG["seller_name"]
-    currency = CONFIG["currency"]
+    # Use the invoice's own currency when SunSystems provides it
+    # (e.g. UGX / USD / KES / RWF / SSP / TZS), else the configured default.
+    currency = str(sun_invoice.get("currency_code") or CONFIG["currency"]).upper()
 
     # Buyer info
     buyer_tin = sun_invoice.get("customer_tin") or ""
