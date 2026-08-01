@@ -12,6 +12,7 @@
 // =====================================================================
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { KEYUTIL, KJUR } from "https://esm.sh/jsrsasign@10.9.0";
+import { encryptPrivateKeyPem, isEncryptedStoredKey } from "../_shared/keys.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
@@ -396,6 +397,9 @@ Deno.serve(async (req) => {
         // Generate RSA key pair
         const { privateKeyPem, publicKeyPem } = await generateRSAKeyPair();
 
+        // Encrypt the private key at rest (AES-256-GCM via KEY_ENCRYPTION_KEY)
+        const encryptedPriv = await encryptPrivateKeyPem(privateKeyPem);
+
         const { data: cred, error } = await admin
           .from("efris_credentials")
           .insert({
@@ -404,7 +408,7 @@ Deno.serve(async (req) => {
             device_number: device_number || null,
             brn: brn || null,
             efris_mode: efris_mode || "sandbox",
-            private_key_pem: privateKeyPem,
+            private_key_pem: encryptedPriv,
             public_key_pem: publicKeyPem,
             status: "pending",
           })
@@ -465,6 +469,9 @@ Deno.serve(async (req) => {
           return json({ success: false, error: "Public and private keys do not match" }, 400, cors);
         }
 
+        // Encrypt the private key at rest (AES-256-GCM via KEY_ENCRYPTION_KEY)
+        const encryptedPriv = await encryptPrivateKeyPem(privateKeyPem);
+
         const { data: cred, error } = await admin
           .from("efris_credentials")
           .insert({
@@ -473,7 +480,7 @@ Deno.serve(async (req) => {
             device_number: device_number || null,
             brn: brn || null,
             efris_mode: efris_mode || "sandbox",
-            private_key_pem: privateKeyPem,
+            private_key_pem: encryptedPriv,
             public_key_pem: publicKeyPem,
             certificate_pem: certPem,
             status: "pending",
@@ -533,6 +540,33 @@ Deno.serve(async (req) => {
           .order("created_at", { ascending: false });
 
         return json({ success: true, credentials: creds || [] }, 200, cors);
+      }
+
+      // ── RE-ENCRYPT: encrypt any legacy plaintext private keys at rest ──
+      case "reencrypt_keys": {
+        const { data: creds } = await admin
+          .from("efris_credentials")
+          .select("id, private_key_pem")
+          .eq("business_id", appUser.business_id);
+
+        let updated = 0;
+        let skipped = 0;
+        for (const c of creds || []) {
+          if (!c.private_key_pem || isEncryptedStoredKey(c.private_key_pem)) {
+            skipped += 1;
+            continue;
+          }
+          const encrypted = await encryptPrivateKeyPem(c.private_key_pem);
+          const { error } = await admin
+            .from("efris_credentials")
+            .update({ private_key_pem: encrypted, updated_at: new Date().toISOString() })
+            .eq("id", c.id)
+            .eq("business_id", appUser.business_id);
+          if (error) return json({ success: false, error: error.message }, 400, cors);
+          updated += 1;
+        }
+
+        return json({ success: true, reencrypted: updated, alreadyEncrypted: skipped }, 200, cors);
       }
 
       default:

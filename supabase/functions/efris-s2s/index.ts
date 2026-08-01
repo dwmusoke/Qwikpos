@@ -17,6 +17,7 @@
 // =====================================================================
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { KEYUTIL } from "https://esm.sh/jsrsasign@10.9.0";
+import { decryptStoredPrivateKey } from "../_shared/keys.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
@@ -511,6 +512,9 @@ Deno.serve(async (req) => {
     if (cred.business_id !== appUser.business_id && !["admin", "superadmin"].includes(appUser.role)) {
       return json({ success: false, error: "Credential does not belong to your business" }, 403, cors);
     }
+
+    // Decrypt the private key at rest (legacy plaintext PEM passes through as-is).
+    cred.private_key_pem = await decryptStoredPrivateKey(cred.private_key_pem);
 
     let result: any;
 

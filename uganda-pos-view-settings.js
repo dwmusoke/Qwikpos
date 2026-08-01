@@ -971,6 +971,7 @@ export async function renderSettings(root) {
           </table>
         </div>
         <p class="help-text" style="margin-top:8px;">RSA 2048-bit keys are generated server-side. The private key never leaves the edge function.</p>
+        <p style="margin-top:6px;"><button class="btn btn-ghost btn-sm" id="s2s-reencrypt-btn">Re-encrypt stored keys (AES-256-GCM at rest)</button></p>
         ` : '<div class="empty-state" style="padding:16px;">No direct URA credentials yet. Click the button above to get started.</div>'}
       `;
 
@@ -1199,6 +1200,36 @@ export async function renderSettings(root) {
         toast('Credential deleted', 'success');
         loadEfrisS2sCredentials(el);
       }));
+
+      // Re-encrypt legacy plaintext private keys at rest (AES-256-GCM)
+      el.querySelector('#s2s-reencrypt-btn')?.addEventListener('click', async (e) => {
+        const btn = e.currentTarget;
+        btn.disabled = true;
+        const old = btn.textContent;
+        btn.textContent = 'Re-encrypting…';
+        try {
+          const { data, error } = await supabase.functions.invoke('efris-setup', {
+            body: { action: 'reencrypt_keys' },
+          });
+          if (error) {
+            let msg = error.message || 'Re-encryption failed';
+            try {
+              if (error.context && typeof error.context.text === "function") {
+                const text = await error.context.text();
+                if (text && text.trim()) { try { msg = JSON.parse(text)?.error || msg; } catch { msg = text; } }
+              }
+            } catch { /* keep default msg */ }
+            toast('Re-encryption failed: ' + msg, 'error', 6000);
+            return;
+          }
+          toast(`Re-encrypted ${data?.reencrypted ?? 0} key(s); ${data?.alreadyEncrypted ?? 0} already encrypted.`, 'success', 5000);
+        } catch (e) {
+          toast('Re-encryption failed: ' + (e?.message || e), 'error', 6000);
+        } finally {
+          btn.disabled = false;
+          btn.textContent = old;
+        }
+      });
     } catch (e) {
       el.innerHTML = `<div class="empty-state" style="padding:20px;">S2S integration requires the edge functions to be deployed. See README.</div>`;
     }
