@@ -444,7 +444,7 @@ Deno.serve(async (req) => {
           if (!key || !key.isPrivate) throw new Error("not a private key");
           // Normalize to unencrypted PKCS#8 so the efris-s2s function can use it
           // without needing a password on every call.
-          privateKeyPem = KEYUTIL.getPEM(key, "PKCS8PRIV");
+          privateKeyPem = KEYUTIL.getPEM(key, "PKCS8PRV");
         } catch (e: any) {
           return json({ success: false, error: `Invalid private key PEM or wrong password: ${e?.message || e}` }, 400, cors);
         }
