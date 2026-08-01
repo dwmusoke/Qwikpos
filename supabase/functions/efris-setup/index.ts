@@ -487,11 +487,13 @@ Deno.serve(async (req) => {
 
       // ── UPDATE credential ──
       case "update": {
-        const { credential_id, device_number, certificate_pem, efris_mode, status } = body;
+        const { credential_id, tin, device_number, brn, certificate_pem, efris_mode, status } = body;
         if (!credential_id) return json({ success: false, error: "credential_id required" }, 400, cors);
 
         const update: any = {};
+        if (tin !== undefined) update.tin = tin;
         if (device_number !== undefined) update.device_number = device_number;
+        if (brn !== undefined) update.brn = brn;
         if (certificate_pem !== undefined) update.certificate_pem = certificate_pem;
         if (efris_mode !== undefined) update.efris_mode = efris_mode;
         if (status !== undefined) update.status = status;

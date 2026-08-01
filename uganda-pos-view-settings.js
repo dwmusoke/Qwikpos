@@ -963,7 +963,7 @@ export async function renderSettings(root) {
                 <td style="font-size:12px;">${c.last_used_at ? new Date(c.last_used_at).toLocaleDateString() : 'Never'}</td>
                 <td>
                   <button class="btn ${c.status === 'active' ? 'btn-ghost' : 'btn-primary'} btn-sm" data-s2s-validate="${c.id}">${c.status === 'active' ? 'Test Connection' : 'Validate & Activate'}</button>
-                  <button class="btn btn-secondary btn-sm" data-s2s-edit="${c.id}" data-device="${c.device_number || ''}">Edit</button>
+                  <button class="btn btn-secondary btn-sm" data-s2s-edit="${c.id}" data-tin="${c.tin || ''}" data-device="${c.device_number || ''}" data-brn="${c.brn || ''}" data-mode="${c.efris_mode || 'sandbox'}">Edit</button>
                   <button class="btn btn-ghost btn-sm" data-s2s-delete="${c.id}">Delete</button>
                 </td>
               </tr>`).join('')}
@@ -1130,18 +1130,63 @@ export async function renderSettings(root) {
         }
       }));
 
-      // Edit (set device number)
-      el.querySelectorAll('[data-s2s-edit]').forEach(btn => btn.addEventListener('click', async () => {
+      // Edit credential (TIN, device number, BRN, mode)
+      el.querySelectorAll('[data-s2s-edit]').forEach(btn => btn.addEventListener('click', () => {
         const id = btn.dataset.s2sEdit;
-        const currentDevice = btn.dataset.device || '';
-        const deviceNo = prompt('Device Number (assigned by URA after device registration):', currentDevice);
-        if (deviceNo === null) return;
-        const { error } = await supabase.functions.invoke('efris-setup', {
-          body: { action: 'update', credential_id: id, device_number: deviceNo.trim() || null },
-        });
-        if (error) { toast('Error: ' + error.message, 'error'); return; }
-        toast('Device number saved', 'success');
-        loadEfrisS2sCredentials(el);
+        const curTin = btn.dataset.tin || '';
+        const curDevice = btn.dataset.device || '';
+        const curBrn = btn.dataset.brn || '';
+        const curMode = btn.dataset.mode || 'sandbox';
+        openModal(`
+          <div class="modal-title-row"><h3>✏️ Edit URA Credential</h3></div>
+          <p class="help-text" style="margin-bottom:12px;">
+            Use the <b>test TIN / device number</b> URA assigned you for the sandbox. Your real production
+            TIN is only valid in <b>live</b> mode.
+          </p>
+          <div class="field-row">
+            <div class="field">
+              <label>TIN</label>
+              <input id="ed-tin" value="${escapeHtml(curTin)}" placeholder="10-digit URA TIN" />
+            </div>
+            <div class="field">
+              <label>Device No.</label>
+              <input id="ed-device" value="${escapeHtml(curDevice)}" placeholder="Assigned by URA" />
+            </div>
+          </div>
+          <div class="field-row">
+            <div class="field">
+              <label>BRN <span style="font-weight:400;">(optional)</span></label>
+              <input id="ed-brn" value="${escapeHtml(curBrn)}" placeholder="Business Registration Number" />
+            </div>
+            <div class="field">
+              <label>Mode</label>
+              <select id="ed-mode">
+                <option value="sandbox" ${curMode === 'sandbox' ? 'selected' : ''}>Sandbox (test)</option>
+                <option value="live" ${curMode === 'live' ? 'selected' : ''}>Live (real URA)</option>
+              </select>
+            </div>
+          </div>
+          <div class="flex gap" style="margin-top:14px;">
+            <button class="btn btn-secondary btn-block" data-close-modal>Cancel</button>
+            <button class="btn btn-primary btn-block" id="ed-save">Save</button>
+          </div>
+        `, { onMount: () => {
+          $('ed-save').addEventListener('click', async () => {
+            const { error } = await supabase.functions.invoke('efris-setup', {
+              body: {
+                action: 'update', credential_id: id,
+                tin: $('ed-tin').value.trim() || null,
+                device_number: $('ed-device').value.trim() || null,
+                brn: $('ed-brn').value.trim() || null,
+                efris_mode: $('ed-mode').value,
+              },
+            });
+            if (error) { toast('Error: ' + error.message, 'error'); return; }
+            closeModal();
+            toast('Credential updated. Re-run Validate & Activate.', 'success', 5000);
+            loadEfrisS2sCredentials(el);
+          });
+        }});
       }));
 
       // Delete
