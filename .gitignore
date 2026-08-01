@@ -14,3 +14,4 @@ docs/~$*.docx
 *.key
 *.jks
 *.keystore
+supabase/.temp/
