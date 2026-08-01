@@ -1061,10 +1061,20 @@ export async function renderSettings(root) {
             if (error) {
               let msg = error.message || "Unknown error";
               try {
-                if (typeof error.context === "string" && error.context.trim()) {
-                  const parsed = JSON.parse(error.context);
-                  if (parsed?.error) msg = parsed.error;
-                  else msg = error.context;
+                // supabase-js v2 puts the raw Response in error.context; read its body.
+                if (error.context && typeof error.context.text === "function") {
+                  const text = await error.context.text();
+                  if (text && text.trim()) {
+                    try {
+                      const parsed = JSON.parse(text);
+                      msg = parsed?.error || parsed?.message || text;
+                    } catch { msg = text; }
+                  }
+                } else if (typeof error.context === "string" && error.context.trim()) {
+                  try {
+                    const parsed = JSON.parse(error.context);
+                    msg = parsed?.error || parsed?.message || error.context;
+                  } catch { msg = error.context; }
                 } else if (error.context?.error) {
                   msg = error.context.error;
                 }

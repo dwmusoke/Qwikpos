@@ -11,7 +11,7 @@
 // private key never leaves the edge function environment.
 // =====================================================================
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { KEYUTIL } from "https://esm.sh/jsrsasign@10.9.0";
+import { KEYUTIL, KJUR } from "https://esm.sh/jsrsasign@10.9.0";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
@@ -131,6 +131,240 @@ function publicKeyMatches(privateKeyPem: string, publicKeyPem: string): boolean 
 }
 
 // ====================================================================
+// PKCS#12 PBE DECRYPTION (KeyStore Explorer / OpenSSL "-v1" keys)
+//
+// jsrsasign's KEYUTIL.getKey() only understands PBES2 (PBKDF2)
+// encrypted PKCS#8 keys. Keys exported from KeyStore Explorer or
+// OpenSSL with `openssl pkcs8 -topk8 -v1 PBE-SHA1-3DES` / `-v2
+// PBE-SHA1-RC4-128` use the older PKCS#12 PBE scheme:
+//
+//   pbeWithSHAAnd128BitRC4           1.2.840.113549.1.12.1.1  (RC4-128)
+//   pbeWithSHAAnd40BitRC4            1.2.840.113549.1.12.1.2  (RC4-40)
+//   pbeWithSHAAnd3-KeyTripleDES-CBC  1.2.840.113549.1.12.1.3  (3DES)
+//   pbeWithSHAAnd2-KeyTripleDES-CBC  1.2.840.113549.1.12.1.4  (2-key 3DES)
+//
+// We implement the RFC 7292 Appendix B key derivation ourselves and
+// decrypt with RC4 (hand-rolled — unavailable in WebCrypto/jsrsasign)
+// or 3DES-CBC (jsrsasign KJUR.crypto.Cipher).
+// ====================================================================
+
+const OID_PKCS12_RC4_128 = "1.2.840.113549.1.12.1.1";
+const OID_PKCS12_RC4_40 = "1.2.840.113549.1.12.1.2";
+const OID_PKCS12_3DES = "1.2.840.113549.1.12.1.3";
+const OID_PKCS12_3DES_2KEY = "1.2.840.113549.1.12.1.4";
+
+/** Decode a DER OBJECT IDENTIFIER value (without tag/length) to dotted string. */
+function oidBytesToString(bytes: Uint8Array): string {
+  let out = "";
+  let value = 0;
+  let first = true;
+  for (let i = 0; i < bytes.length; i++) {
+    if (first) {
+      out += Math.floor(bytes[i] / 40) + "." + (bytes[i] % 40);
+      first = false;
+    } else {
+      value = value * 128 + (bytes[i] & 0x7f);
+      if ((bytes[i] & 0x80) === 0) {
+        out += "." + value;
+        value = 0;
+      }
+    }
+  }
+  return out;
+}
+
+/** Parse an `EncryptedPrivateKeyInfo` PEM into its PBE params and ciphertext. */
+function parseEncryptedPrivateKeyPem(
+  pem: string
+): { oid: string; salt: Uint8Array; iterations: number; ciphertext: Uint8Array } {
+  const body = pem
+    .replace(/-----BEGIN ENCRYPTED PRIVATE KEY-----/, "")
+    .replace(/-----END ENCRYPTED PRIVATE KEY-----/, "")
+    .replace(/\s+/g, "");
+  if (!body) throw new Error("empty encrypted private key PEM");
+  const der = Uint8Array.from(atob(body), (c) => c.charCodeAt(0));
+
+  // EncryptedPrivateKeyInfo ::= SEQUENCE { encryptionAlgorithm, encryptedData }
+  const outer = derReadTlv(der, 0);
+  if (outer.tag !== 0x30) throw new Error("encrypted private key is not DER");
+  const algStart = outer.valueStart;
+  const algSeq = derReadTlv(der, algStart);
+  const dataTlv = derReadTlv(der, algSeq.end);
+
+  // AlgorithmIdentifier ::= SEQUENCE { algorithm OID, parameters }
+  const oidTlv = derReadTlv(der, algSeq.valueStart);
+  if (oidTlv.tag !== 0x06) throw new Error("algorithm identifier missing");
+  const oid = oidBytesToString(der.slice(oidTlv.valueStart, oidTlv.end));
+
+  // pkcs-12PbeParams ::= SEQUENCE { salt OCTET STRING, iterations INTEGER }
+  const paramsSeq = derReadTlv(der, oidTlv.end);
+  const saltTlv = derReadTlv(der, paramsSeq.valueStart);
+  const salt = der.slice(saltTlv.valueStart, saltTlv.end);
+  const iterTlv = derReadTlv(der, saltTlv.end);
+  let iterations = 0;
+  for (let i = iterTlv.valueStart; i < iterTlv.end; i++) iterations = iterations * 256 + der[i];
+
+  return { oid, salt, iterations, ciphertext: der.slice(dataTlv.valueStart, dataTlv.end) };
+}
+
+/** True when this PEM is a PKCS#12 PBE-encrypted private key we can decrypt. */
+function isPkcs12EncryptedPem(pem: string): boolean {
+  try {
+    const { oid } = parseEncryptedPrivateKeyPem(pem);
+    return oid === OID_PKCS12_RC4_128 || oid === OID_PKCS12_RC4_40 ||
+      oid === OID_PKCS12_3DES || oid === OID_PKCS12_3DES_2KEY;
+  } catch {
+    return false;
+  }
+}
+
+function bytesConcat(...arrays: Uint8Array[]): Uint8Array {
+  const total = arrays.reduce((s, a) => s + a.length, 0);
+  const out = new Uint8Array(total);
+  let p = 0;
+  for (const a of arrays) { out.set(a, p); p += a.length; }
+  return out;
+}
+
+/** Repeat `input` to exactly `len` bytes (RFC 7292 B.2 S/P construction). */
+function repeatToLen(input: Uint8Array, len: number): Uint8Array {
+  const out = new Uint8Array(len);
+  for (let i = 0; i < len; i++) out[i] = input[i % input.length];
+  return out;
+}
+
+/** RFC 7292 B.2 step 6C: I_j = (I_j + B + 1) mod 2^v for each v-bit block j. */
+function pkcs12UpdateI(I: Uint8Array, B: Uint8Array, v: number): Uint8Array {
+  const out = new Uint8Array(I);
+  const blocks = I.length / v;
+  for (let j = 0; j < blocks; j++) {
+    let carry = 1;
+    for (let i = v - 1; i >= 0; i--) {
+      const idx = j * v + i;
+      const s = out[idx] + B[i] + carry;
+      out[idx] = s & 0xff;
+      carry = s >> 8;
+    }
+  }
+  return out;
+}
+
+async function sha1Digest(data: Uint8Array): Promise<Uint8Array> {
+  return new Uint8Array(await crypto.subtle.digest("SHA-1", data as unknown as BufferSource));
+}
+
+/**
+ * PKCS#12 key derivation (RFC 7292 Appendix B.2).
+ * Password is treated as a BMPString: UTF-16BE + a 0x0000 terminator.
+ * @param id 1 = key material, 2 = IV
+ * @param n  desired output length in bytes
+ */
+async function pkcs12Kdf(
+  password: string,
+  salt: Uint8Array,
+  iterations: number,
+  id: number,
+  n: number
+): Promise<Uint8Array> {
+  const u = 20; // SHA-1 output size
+  const v = 64; // SHA-1 block size
+
+  // D = v bytes of ID
+  const D = new Uint8Array(v).fill(id);
+  // S = salt repeated to a multiple of v
+  const S = repeatToLen(salt, v);
+  // P = BMPString password repeated to a multiple of v
+  const pwBytes: number[] = [];
+  for (let i = 0; i < password.length; i++) {
+    const c = password.charCodeAt(i);
+    pwBytes.push((c >> 8) & 0xff, c & 0xff);
+  }
+  pwBytes.push(0, 0);
+  const P = repeatToLen(new Uint8Array(pwBytes), v);
+
+  let I = bytesConcat(S, P);
+  const c = Math.ceil(n / u);
+  let out: Uint8Array = new Uint8Array(0);
+
+  for (let i = 0; i < c; i++) {
+    let block = bytesConcat(D, I);
+    for (let j = 0; j < iterations; j++) block = await sha1Digest(block);
+    const A = block;
+    // B = A repeated to v bytes
+    const B = repeatToLen(A, v);
+    I = pkcs12UpdateI(I, B, v);
+    out = bytesConcat(out, A);
+  }
+  return out.slice(0, n);
+}
+
+/** RC4 keystream XOR (symmetric; also used to decrypt). */
+function rc4Crypt(key: Uint8Array, data: Uint8Array): Uint8Array {
+  const S = new Uint8Array(256);
+  for (let i = 0; i < 256; i++) S[i] = i;
+  let j = 0;
+  for (let i = 0; i < 256; i++) {
+    j = (j + S[i] + key[i % key.length]) & 0xff;
+    const t = S[i]; S[i] = S[j]; S[j] = t;
+  }
+  const out = new Uint8Array(data.length);
+  let i = 0;
+  j = 0;
+  for (let k = 0; k < data.length; k++) {
+    i = (i + 1) & 0xff;
+    j = (j + S[i]) & 0xff;
+    const t = S[i]; S[i] = S[j]; S[j] = t;
+    out[k] = data[k] ^ S[(S[i] + S[j]) & 0xff];
+  }
+  return out;
+}
+
+function bytesToHex(bytes: Uint8Array): string {
+  let hex = "";
+  for (const b of bytes) hex += b.toString(16).padStart(2, "0");
+  return hex;
+}
+
+function hexToBytes(hex: string): Uint8Array {
+  const clean = hex.replace(/^0x/i, "");
+  const out = new Uint8Array(clean.length / 2);
+  for (let i = 0; i < out.length; i++) out[i] = parseInt(clean.slice(i * 2, i * 2 + 2), 16);
+  return out;
+}
+
+/** 3DES-CBC decrypt using jsrsasign's bundled CryptoJS (des-EDE3-CBC). */
+function des3CbcDecrypt(key: Uint8Array, iv: Uint8Array, data: Uint8Array): Uint8Array {
+  const hexOut = KJUR.crypto.Cipher.decrypt(bytesToHex(data), bytesToHex(key), "des-EDE3-CBC", {
+    iv: bytesToHex(iv),
+  });
+  return hexToBytes(hexOut);
+}
+
+/**
+ * Decrypt a PKCS#12 PBE `EncryptedPrivateKeyInfo` PEM with the given
+ * password, returning the unencrypted PKCS#8 `PrivateKeyInfo` DER.
+ */
+async function pkcs12DecryptPem(pem: string, password: string): Promise<Uint8Array> {
+  const { oid, salt, iterations, ciphertext } = parseEncryptedPrivateKeyPem(pem);
+  if (oid === OID_PKCS12_RC4_128 || oid === OID_PKCS12_RC4_40) {
+    const keyLen = oid === OID_PKCS12_RC4_128 ? 16 : 5;
+    const key = await pkcs12Kdf(password, salt, iterations, 1, keyLen);
+    return rc4Crypt(key, ciphertext);
+  } else if (oid === OID_PKCS12_3DES || oid === OID_PKCS12_3DES_2KEY) {
+    const key = await pkcs12Kdf(password, salt, iterations, 1, 24);
+    const iv = await pkcs12Kdf(password, salt, iterations, 2, 8);
+    return des3CbcDecrypt(key, iv, ciphertext);
+  }
+  throw new Error(`unsupported PKCS#12 PBE algorithm: ${oid}`);
+}
+
+function derToPem(der: Uint8Array, label: string): string {
+  const b64 = btoa(String.fromCharCode(...der));
+  const lines = b64.match(/.{1,64}/g) || [];
+  return `-----BEGIN ${label}-----\n${lines.join("\n")}\n-----END ${label}-----`;
+}
+
+// ====================================================================
 // HANDLER
 // ====================================================================
 
@@ -193,13 +427,26 @@ Deno.serve(async (req) => {
         // Validate the private key parses (PKCS#1 or PKCS#8 PEM, optionally password-encrypted)
         let privateKeyPem = private_key_pem.trim();
         try {
-          const key = KEYUTIL.getKey(privateKeyPem, private_key_password || undefined);
+          let key;
+          if (isPkcs12EncryptedPem(privateKeyPem)) {
+            // KeyStore Explorer / OpenSSL "-v1" PKCS#12 PBE key: decrypt it ourselves,
+            // then hand the unencrypted PKCS#8 to jsrsasign.
+            const der = await pkcs12DecryptPem(privateKeyPem, private_key_password || "");
+            if (der.length === 0 || der[0] !== 0x30) {
+              throw new Error("decrypted data is not a DER SEQUENCE (wrong password?)");
+            }
+            privateKeyPem = derToPem(der, "PRIVATE KEY");
+            key = KEYUTIL.getKey(privateKeyPem);
+          } else {
+            // Plain PKCS#1/PKCS#8, or PBES2 (PBKDF2) encrypted — jsrsasign handles these.
+            key = KEYUTIL.getKey(privateKeyPem, private_key_password || undefined);
+          }
           if (!key || !key.isPrivate) throw new Error("not a private key");
           // Normalize to unencrypted PKCS#8 so the efris-s2s function can use it
           // without needing a password on every call.
           privateKeyPem = KEYUTIL.getPEM(key, "PKCS8PRIV");
         } catch (e: any) {
-          return json({ success: false, error: `Invalid private key PEM: ${e?.message || e}` }, 400, cors);
+          return json({ success: false, error: `Invalid private key PEM or wrong password: ${e?.message || e}` }, 400, cors);
         }
 
         // Derive the SPKI public key if the user pasted an X.509 certificate instead
