@@ -7,6 +7,10 @@
 //     T104  get_aes_key      → RSA/AES key exchange (the activation gate)
 //     T115  system_dictionary→ prints URA dictionaries (informational)
 //     T121  get_exchange_rate→ prints USD rate (informational)
+//     T119  query_taxpayer   → buyer TIN validation (B2B, informational)
+//     T137  check_taxpayer_type→ exempt/deemed taxpayer check (informational)
+//     T123  commodity_categories→ URA commodity categories (informational)
+//     T126  all_exchange_rates→ prints all URA rates (informational)
 //     T130  upload_goods     → register a test product
 //     T109  submit_invoice   → fiscalise a real test invoice
 //
@@ -153,6 +157,56 @@ async function testExchangeRate() {
   return true;
 }
 
+// ── T126: all exchange rates (informational) ─────────────────────────
+async function testAllExchangeRates() {
+  line("═══ T126  All Exchange Rates (informational) ═══");
+  const { status, data } = await call("all_exchange_rates");
+  if (data?.success) {
+    const content = data.data?.content || {};
+    const list = content.rates || content.exchangeRateList || content.exchangeRates || [];
+    info(`exchange rates → ${Array.isArray(list) ? list.length : "?"} entries`);
+    if (Array.isArray(list) && list.length) info(`sample → ${JSON.stringify(list.slice(0, 3))}`);
+  } else { info(`T126 skipped (${describe(data) || `HTTP ${status}`})`); }
+  return true;
+}
+
+// ── T119: query taxpayer (informational, B2B) ────────────────────────
+async function testQueryTaxpayer() {
+  line("═══ T119  Query Taxpayer (informational) ═══");
+  const { status, data } = await call("query_taxpayer", { taxpayerTin: SELLER.tin });
+  if (data?.success) {
+    const content = data.data?.content || {};
+    const name = content.buyerName || content.legalName || content.taxpayerName || "";
+    info(`taxpayer ${SELLER.tin} → ${name || "found"}`);
+  } else { info(`T119 skipped (${describe(data) || `HTTP ${status}`})`); }
+  return true;
+}
+
+// ── T137: check exempt/deemed taxpayer (informational) ───────────────
+async function testCheckTaxpayerType() {
+  line("═══ T137  Check Exempt/Deemed Taxpayer (informational) ═══");
+  const { status, data } = await call("check_taxpayer_type", { taxpayerTin: SELLER.tin });
+  if (data?.success) {
+    const content = data.data?.content || {};
+    const exempt = content.exemptFlag ?? content.isExempt ?? content.exempt;
+    info(`taxpayer ${SELLER.tin} → exempt=${exempt ?? "unknown"} ${JSON.stringify(content).slice(0, 200)}`);
+  } else { info(`T137 skipped (${describe(data) || `HTTP ${status}`})`); }
+  return true;
+}
+
+// ── T123: commodity categories (informational) ───────────────────────
+async function testCommodityCategories() {
+  line("═══ T123  Commodity Categories (informational) ═══");
+  const { status, data } = await call("commodity_categories", { pageNo: 1, pageSize: 5 });
+  if (data?.success) {
+    const content = data.data?.content || {};
+    const list = content.commodityCategoryList || content.categoryList || content.list || [];
+    info(`commodity categories → ${Array.isArray(list) ? list.length : "?"} entries`);
+    if (Array.isArray(list) && list.length) info(`sample → ${JSON.stringify(list.slice(0, 2))}`);
+  } else { info(`T123 skipped (${describe(data) || `HTTP ${status}`})`); }
+  return true;
+}
+
 // ── T130: register goods ─────────────────────────────────────────────
 async function testUploadGoods() {
   line("═══ T130  Upload Goods ═══");
@@ -275,6 +329,10 @@ async function main() {
   if (!(await testGetAesKey())) { summary(); process.exit(1); }
   await testDictionary();
   await testExchangeRate();
+  await testAllExchangeRates();
+  await testQueryTaxpayer();
+  await testCheckTaxpayerType();
+  await testCommodityCategories();
   if (!(await testUploadGoods())) { summary(); process.exit(1); }
   if (!(await testSubmitInvoice())) { summary(); process.exit(1); }
 

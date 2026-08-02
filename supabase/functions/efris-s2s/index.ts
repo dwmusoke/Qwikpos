@@ -598,11 +598,15 @@ const IFACE: Record<string, string> = {
   invoice_details: "T108", invoice_reconcile: "T117",
   credit_application: "T110", credit_note_query: "T111",
   credit_note_details: "T112", credit_note_approval: "T113",
-  credit_note_cancel: "T114",
+  credit_note_cancel: "T114", credit_note_void: "T120",
+  credit_note_apply_query: "T118", credit_note_cancel_query: "T122",
+  z_report: "T116",
   goods_upload: "T130", goods_inquiry: "T127",
   query_stock: "T128", stock_maintain: "T131",
   query_taxpayer: "T119", check_taxpayer_type: "T137",
   get_branches: "T138", exchange_rate: "T121",
+  commodity_categories: "T123", commodity_pagination: "T124",
+  all_exchange_rates: "T126",
 };
 
 // ====================================================================
@@ -861,6 +865,15 @@ Deno.serve(async (req) => {
         break;
       }
 
+      // ---- T107: Query normal invoices (credit/debit note eligibility) ----
+      // payload: { referenceNo?, startDate?, endDate?, queryType?, pageNo, pageSize }
+      case "invoice_normal_query": {
+        const resp = await sendToUra(cred, "T107", payload || {}, true);
+        const content = resp.data?.content;
+        result = { success: true, data: content, raw: resp };
+        break;
+      }
+
       // ---- T108: Invoice details ----
       case "invoice_details": {
         if (!payload?.invoiceNo) return json({ success: false, error: "invoiceNo required" }, 400, cors);
@@ -930,6 +943,117 @@ Deno.serve(async (req) => {
           ? { success: true, returnMessage: returnMsg, returnCode, raw: resp }
           : { success: false, error: returnMsg, returnCode, raw: resp };
         await admin.from("efris_credentials").update({ last_used_at: new Date().toISOString() }).eq("id", cred.id);
+        break;
+      }
+
+      // ---- T118: Query credit/debit note application details ----
+      // payload: { referenceNo?, startDate?, endDate?, queryType?, pageNo, pageSize }
+      case "credit_note_apply_query": {
+        const resp = await sendToUra(cred, "T118", payload || {}, true);
+        const content = resp.data?.content;
+        result = { success: true, data: content, raw: resp };
+        break;
+      }
+
+      // ---- T120: Void a credit/debit note not yet approved ----
+      // payload: { invoiceNo, reasonCode?, reason?, invoiceApplyCategoryCode? }
+      // URA returns an empty content body; success is signalled by
+      // returnStateInfo.returnMessage === "SUCCESS".
+      case "credit_note_void": {
+        if (!payload?.invoiceNo) return json({ success: false, error: "invoiceNo required" }, 400, cors);
+        const resp = await sendToUra(cred, "T120", payload, true);
+        const returnMsg = resp.returnStateInfo?.returnMessage || "";
+        const returnCode = resp.returnStateInfo?.returnCode || "";
+        result = returnMsg === "SUCCESS"
+          ? { success: true, returnMessage: returnMsg, returnCode, raw: resp }
+          : { success: false, error: returnMsg, returnCode, raw: resp };
+        await admin.from("efris_credentials").update({ last_used_at: new Date().toISOString() }).eq("id", cred.id);
+        break;
+      }
+
+      // ---- T122: Query cancelled credit/debit note details ----
+      // payload: { startDate?, endDate?, pageNo, pageSize }
+      case "credit_note_cancel_query": {
+        const resp = await sendToUra(cred, "T122", payload || {}, true);
+        const content = resp.data?.content;
+        result = { success: true, data: content, raw: resp };
+        break;
+      }
+
+      // ---- T119: Query taxpayer by TIN (B2B buyer validation) ----
+      case "query_taxpayer": {
+        if (!payload?.taxpayerTin) return json({ success: false, error: "taxpayerTin required" }, 400, cors);
+        const resp = await sendToUra(cred, "T119", payload, true);
+        const content = resp.data?.content;
+        result = { success: true, data: content, raw: resp };
+        break;
+      }
+
+      // ---- T137: Check exempt/deemed taxpayer ----
+      case "check_taxpayer_type": {
+        if (!payload?.taxpayerTin) return json({ success: false, error: "taxpayerTin required" }, 400, cors);
+        const resp = await sendToUra(cred, "T137", payload, true);
+        const content = resp.data?.content;
+        result = { success: true, data: content, raw: resp };
+        break;
+      }
+
+      // ---- T116: Daily Z-report upload ----
+      // payload: { invoiceNo, invoiceKind, invoiceType, deviceNo, isCounter,
+      //            grossAmount, taxAmount, netAmount, ... }
+      case "z_report": {
+        if (!payload) return json({ success: false, error: "payload required" }, 400, cors);
+        const resp = await sendToUra(cred, "T116", payload, true);
+        const returnMsg = resp.returnStateInfo?.returnMessage || "";
+        const returnCode = resp.returnStateInfo?.returnCode || "";
+        result = returnMsg === "SUCCESS"
+          ? { success: true, returnMessage: returnMsg, returnCode, raw: resp }
+          : { success: false, error: returnMsg, returnCode, raw: resp };
+        await admin.from("efris_credentials").update({ last_used_at: new Date().toISOString() }).eq("id", cred.id);
+        break;
+      }
+
+      // ---- T117: Invoice reconciliation ----
+      // payload: { referenceNo, queryType?, pageNo, pageSize }
+      case "invoice_reconcile": {
+        const resp = await sendToUra(cred, "T117", payload || {}, true);
+        const content = resp.data?.content;
+        result = { success: true, data: content, raw: resp };
+        break;
+      }
+
+      // ---- T123: Query commodity categories ----
+      // payload: { categoryId?, name?, pageNo, pageSize }
+      case "commodity_categories": {
+        const resp = await sendToUra(cred, "T123", payload || {}, true);
+        const content = resp.data?.content;
+        result = { success: true, data: content, raw: resp };
+        break;
+      }
+
+      // ---- T124: Query commodity category pagination ----
+      // payload: { name?, pageNo, pageSize }
+      case "commodity_pagination": {
+        const resp = await sendToUra(cred, "T124", payload || {}, true);
+        const content = resp.data?.content;
+        result = { success: true, data: content, raw: resp };
+        break;
+      }
+
+      // ---- T126: Get all exchange rates ----
+      // payload: { currency?, startDate?, endDate? }
+      case "all_exchange_rates": {
+        const resp = await sendToUra(cred, "T126", payload || {}, true);
+        const content = resp.data?.content;
+        result = { success: true, data: content, raw: resp };
+        break;
+      }
+
+      // ---- T138: Get all branches ----
+      case "get_branches": {
+        const resp = await sendToUra(cred, "T138", payload || {}, true);
+        const content = resp.data?.content;
+        result = { success: true, data: content, raw: resp };
         break;
       }
 
