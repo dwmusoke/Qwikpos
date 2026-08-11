@@ -671,6 +671,16 @@ Deno.serve(async (req) => {
     // Decrypt the private key at rest (legacy plaintext PEM passes through as-is).
     cred.private_key_pem = await decryptStoredPrivateKey(cred.private_key_pem);
 
+    // Live-mode guard: live S2S submissions require the business to have
+    // explicitly enabled live EFRIS (mirrors efris-submit-invoice / efris-register-product).
+    if (cred.efris_mode === "live") {
+      const { data: biz } = await admin
+        .from("businesses").select("efris_live_enabled").eq("id", appUser.business_id).single();
+      if (!biz?.efris_live_enabled) {
+        return json({ success: false, error: "Live EFRIS is not enabled for this business — tick 'Enable live EFRIS submission' in Settings." }, 400, cors);
+      }
+    }
+
     let result: any;
 
     switch (action) {
