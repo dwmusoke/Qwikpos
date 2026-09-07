@@ -136,7 +136,7 @@ Deno.serve(async (req) => {
         corsHeaders,
       );
     // Only admin/manager can submit EFRIS invoices
-    if (!["admin", "manager"].includes(appUser.role) && !appUser.business_id) {
+    if (!["admin", "manager"].includes(appUser.role)) {
       return json(
         { success: false, error: "Insufficient permissions" },
         403,

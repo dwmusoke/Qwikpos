@@ -288,14 +288,14 @@ async function resetStuckQueue(rootEl) {
     toast("Reset failed: " + uErr.message, "error", 5000);
     return;
   }
-  // Make sure the linked invoices are also back in a submittable state.
-  const { error: invErr } = await supabase
-    .from("efris_invoices")
-    .update({ status: "pending" })
-    .in("id", ids)
-    .in("status", ["submitted", "queued", "failed"]);
-  if (invErr) console.warn("resetStuckQueue invoice reset:", invErr);
-  toast(`Reset ${ids.length} stuck queue entr${ids.length > 1 ? "ies" : "y"} to pending.`, "success");
+    // Make sure the linked invoices are also back in a submittable state.
+    const { error: invErr } = await supabase
+      .from("efris_invoices")
+      .update({ status: "pending" })
+      .in("id", ids)
+      .in("status", ["pending", "queued", "failed"]);
+    if (invErr) console.warn("resetStuckQueue invoice reset:", invErr);
+    toast(`Reset ${ids.length} stuck queue entr${ids.length > 1 ? "ies" : "y"} to pending.`, "success");
   renderEfris(rootEl);
 }
 

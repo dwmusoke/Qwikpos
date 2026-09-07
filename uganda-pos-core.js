@@ -52,6 +52,7 @@ export const STATE = {
   isSuperadmin: false,
   notifications: [],
   unreadCount: 0,
+  _impersonate: null, // set by impersonation in admin view
 };
 
 // ---------------------------------------------------------------------
@@ -541,10 +542,8 @@ export async function loadBootstrapData() {
     ]);
   } catch (e) {
     console.error("Bootstrap query failed:", e);
-    // If .single() threw PGRST116 (no rows), the business was deleted.
-    // Allow proceeding — STATE.business stays null and navigateTo
-    // will show "No Business Context" with an impersonate prompt.
-    if (e?.code === "PGRST116") { business = null; }
+    const errCode = e?.code || e?.postgres?.code;
+    if (errCode === "PGRST116" || errCode === "PGRST100") { business = null; }
     else { toast("Failed to load business data — please refresh.", "error", 8000); return false; }
   }
 
@@ -625,6 +624,10 @@ export async function loadSubscription() {
 // or has an active paid period that hasn't lapsed yet.
 export function applyTheme() {
   const color = STATE.business?.theme_color || localStorage.getItem("ugpos_theme_color") || "#0f6b4a";
+  if (!/^#[0-9a-fA-F]{6}$/.test(color)) {
+    console.warn("Invalid theme color:", color, "— using default");
+    return;
+  }
   const root = document.documentElement;
   root.style.setProperty("--brand", color);
   root.style.setProperty("--brand-dark", shadeColor(color, -20));
