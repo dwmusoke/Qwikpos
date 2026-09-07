@@ -461,11 +461,81 @@ create policy business_isolation_payments on payments
   for all using (sale_id in (select id from sales where business_id = auth_business_id()))
   with check (sale_id in (select id from sales where business_id = auth_business_id()));
 
--- NOTE: branches, currencies, exchange_rates, categories, suppliers,
--- product_stock, stock_movements, purchase_orders/_items, supplier_payments
--- and tax_categories do not have RLS enabled yet —
--- they're reachable by any authenticated user for now. Add business-scoped
--- policies (same pattern as above) before storing real multi-tenant data.
+-- Enable RLS on remaining business-scoped tables
+alter table branches enable row level security;
+alter table categories enable row level security;
+alter table suppliers enable row level security;
+alter table product_stock enable row level security;
+alter table stock_movements enable row level security;
+alter table purchase_orders enable row level security;
+alter table purchase_order_items enable row level security;
+alter table supplier_payments enable row level security;
+alter table exchange_rates enable row level security;
+
+-- branches: business-scoped
+drop policy if exists business_isolation_branches on branches;
+create policy business_isolation_branches on branches
+  for all using (business_id = auth_business_id())
+  with check (business_id = auth_business_id());
+
+-- categories: business-scoped
+drop policy if exists business_isolation_categories on categories;
+create policy business_isolation_categories on categories
+  for all using (business_id = auth_business_id())
+  with check (business_id = auth_business_id());
+
+-- suppliers: business-scoped
+drop policy if exists business_isolation_suppliers on suppliers;
+create policy business_isolation_suppliers on suppliers
+  for all using (business_id = auth_business_id())
+  with check (business_id = auth_business_id());
+
+-- product_stock: join through products to business
+drop policy if exists business_isolation_product_stock on product_stock;
+create policy business_isolation_product_stock on product_stock
+  for all using (product_id in (select id from products where business_id = auth_business_id()))
+  with check (product_id in (select id from products where business_id = auth_business_id()));
+
+-- stock_movements: business-scoped
+drop policy if exists business_isolation_stock_movements on stock_movements;
+create policy business_isolation_stock_movements on stock_movements
+  for all using (business_id = auth_business_id())
+  with check (business_id = auth_business_id());
+
+-- purchase_orders: business-scoped
+drop policy if exists business_isolation_purchase_orders on purchase_orders;
+create policy business_isolation_purchase_orders on purchase_orders
+  for all using (business_id = auth_business_id())
+  with check (business_id = auth_business_id());
+
+-- purchase_order_items: join through purchase_orders to business
+drop policy if exists business_isolation_purchase_order_items on purchase_order_items;
+create policy business_isolation_purchase_order_items on purchase_order_items
+  for all using (po_id in (select id from purchase_orders where business_id = auth_business_id()))
+  with check (po_id in (select id from purchase_orders where business_id = auth_business_id()));
+
+-- supplier_payments: join through suppliers to business
+drop policy if exists business_isolation_supplier_payments on supplier_payments;
+create policy business_isolation_supplier_payments on supplier_payments
+  for all using (supplier_id in (select id from suppliers where business_id = auth_business_id()))
+  with check (supplier_id in (select id from suppliers where business_id = auth_business_id()));
+
+-- exchange_rates: join through app_users (created_by) to business
+drop policy if exists business_isolation_exchange_rates on exchange_rates;
+create policy business_isolation_exchange_rates on exchange_rates
+  for all using (created_by in (select id from app_users where business_id = auth_business_id()))
+  with check (created_by in (select id from app_users where business_id = auth_business_id()));
+
+-- Shared reference tables (currencies, tax_categories) allow all authenticated users
+-- since they are not business-specific.
+alter table currencies enable row level security;
+alter table tax_categories enable row level security;
+drop policy if exists public_read_currencies on currencies;
+create policy public_read_currencies on currencies for select using (auth.uid() is not null);
+drop policy if exists public_read_tax_categories on tax_categories;
+create policy public_read_tax_categories on tax_categories for select using (auth.uid() is not null);
+
+-- =====================================================================
 -- =====================================================================
 -- END OF SCHEMA — next run uganda-pos-seed.sql to load starter data
 -- =====================================================================

@@ -21,7 +21,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const ALLOWED_ORIGINS = [
   Deno.env.get("APP_ORIGIN") || "http://localhost:3000",
-  Deno.env.get("APP_ORIGIN_2") || "",
+  Deno.env.get("APP_ORIGIN_2") || "http://localhost:3001",
 ].filter(Boolean);
 
 function getCorsHeaders(req?: Request): Record<string, string> {

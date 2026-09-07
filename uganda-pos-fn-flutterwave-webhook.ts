@@ -48,14 +48,58 @@ Deno.serve(async (req) => {
 
   try {
     const payload = await req.json();
+    const event = payload.event;
+    const data = payload.data;
+
+    // Handle charge.failed — cancel the subscription and record the failure
+    if (event === "charge.failed") {
+      const { tx_ref: txRef } = data || {};
+      if (txRef) {
+        const now = new Date();
+        const parts = String(txRef).split("_");
+        const businessId = parts[1];
+        await admin.from("subscription_payments").upsert({
+          business_id: businessId,
+          flw_tx_ref: txRef,
+          status: "failed",
+          flw_transaction_id: String(data.id || ""),
+          paid_at: now.toISOString(),
+        }, { onConflict: "flw_tx_ref" });
+      }
+      return new Response("ignored", { status: 200 });
+    }
+
+    // Handle refunds — set subscription to cancelled and record payment
+    if (event === "refund" || event === "charge.refunded") {
+      const { tx_ref: txRef, data: refundData } = data || {};
+      if (txRef) {
+        const now = new Date();
+        const parts = String(txRef).split("_");
+        const businessId = parts[1];
+        await admin.from("subscription_payments").upsert({
+          business_id: businessId,
+          flw_tx_ref: txRef,
+          status: "refunded",
+          flw_transaction_id: String(refundData?.id || data.id || ""),
+          paid_at: now.toISOString(),
+        }, { onConflict: "flw_tx_ref" });
+        // Cancel the subscription
+        await admin.from("subscriptions").update({
+          status: "cancelled",
+          cancelled_at: now.toISOString(),
+        }).eq("business_id", businessId);
+      }
+      return new Response("ignored", { status: 200 });
+    }
+
     if (
-      payload.event !== "charge.completed" ||
-      payload.data?.status !== "successful"
+      event !== "charge.completed" ||
+      data?.status !== "successful"
     ) {
       return new Response("ignored", { status: 200 }); // ack non-payment events so Flutterwave stops retrying
     }
 
-    const { id: transactionId, tx_ref: txRef } = payload.data;
+    const { id: transactionId, tx_ref: txRef } = data;
 
     // 2. Never trust the webhook body alone — re-verify with Flutterwave directly.
     const flwRes = await fetch(

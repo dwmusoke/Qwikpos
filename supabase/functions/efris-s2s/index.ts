@@ -35,8 +35,8 @@ const URA_SUPPORTED_CURRENCIES = new Set(["UGX", "USD", "EUR", "GBP", "KES", "TZ
 // CORS
 // -------------------------------------------------------------------
 const ALLOWED_ORIGINS = [
-  Deno.env.get("APP_ORIGIN") || "",
-  Deno.env.get("APP_ORIGIN_2") || "",
+  Deno.env.get("APP_ORIGIN") || "http://localhost:3000",
+  Deno.env.get("APP_ORIGIN_2") || "http://localhost:3001",
 ].filter(Boolean);
 
 function corsHeaders(req?: Request): Record<string, string> {
