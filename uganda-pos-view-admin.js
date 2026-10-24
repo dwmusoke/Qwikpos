@@ -13,6 +13,8 @@ import {
   closeModal,
   fmtDate,
   hasRole,
+  getActiveSessions,
+  endAllUserSessions,
 } from "./uganda-pos-core.js";
 import { renderSandboxAdmin } from "./uganda-pos-view-sandbox-admin.js";
 
@@ -99,6 +101,7 @@ export async function renderAdmin(root) {
       <button class="admin-tab ${_activeTab === "settings" ? "active" : ""}" data-tab="settings">Settings</button>
       <button class="admin-tab ${_activeTab === "roles" ? "active" : ""}" data-tab="roles">Roles & Permissions</button>
       <button class="admin-tab ${_activeTab === "sandbox" ? "active" : ""}" data-tab="sandbox">Sandbox API</button>
+      <button class="admin-tab ${_activeTab === "sessions" ? "active" : ""}" data-tab="sessions">Active Sessions</button>
     </div>
 
     <div id="admin-tab-content"></div>
@@ -144,6 +147,7 @@ export async function renderAdmin(root) {
       renderPlatformSettings(el, { platformSettings });
     else if (_activeTab === "roles") renderRoles(el);
     else if (_activeTab === "sandbox") renderSandboxAdmin(el);
+    else if (_activeTab === "sessions") renderActiveSessions(el);
   }
 
   renderTabContent();
@@ -1488,5 +1492,103 @@ async function renderRoles(el) {
 
   $("role-refresh-btn")?.addEventListener("click", () => {
     document.querySelector('[data-route="admin"]')?.click();
+  });
+}
+
+// ---------------------------------------------------------------------
+// ACTIVE SESSIONS TAB — who is logged in, from what device / IP
+// ---------------------------------------------------------------------
+async function renderActiveSessions(el) {
+  el.innerHTML = `<div class="empty-state">Loading active sessions…</div>`;
+
+  let sessions = [];
+  try {
+    const { data, error } = await supabase.rpc("get_active_sessions");
+    if (error) throw error;
+    sessions = data || [];
+  } catch (e) {
+    console.error("Active sessions error:", e);
+    el.innerHTML = `<div class="empty-state" style="padding:40px 24px;">
+      <h3 style="margin:0 0 8px;font-size:17px;font-weight:700;">Unable to load sessions</h3>
+      <p style="color:var(--text-muted);max-width:500px;margin:0;">Run <b>uganda-pos-schema-v11-sessions.sql</b> in Supabase SQL Editor to enable session tracking.</p>
+    </div>`;
+    return;
+  }
+
+  const now = new Date();
+  const activeCount = sessions.filter((s) => s.is_active).length;
+
+  el.innerHTML = `
+    <div class="card">
+      <div class="card-title">
+        <span>Active Sessions (${activeCount})</span>
+        <button class="btn btn-secondary btn-sm" id="sessions-refresh">↻ Refresh</button>
+      </div>
+      <div class="table-wrap" style="max-height:600px;overflow-y:auto">
+        <table style="min-width:1000px">
+          <thead><tr>
+            <th>User</th><th>Business</th><th>Role</th><th>Device</th><th>IP Address</th><th>Logged In</th><th>Last Seen</th><th>Status</th><th></th>
+          </tr></thead>
+          <tbody>
+            ${sessions.length
+              .map(
+                (s) => {
+                  const loggedIn = s.logged_in_at ? fmtDate(s.logged_in_at) : "—";
+                  const lastSeen = s.last_seen_at ? fmtDate(s.last_seen_at) : "—";
+                  const minsIdle = s.last_seen_at
+                    ? Math.round((now - new Date(s.last_seen_at)) / 60000)
+                    : 0;
+                  const isIdle = minsIdle > 5;
+                  return `
+              <tr>
+                <td><b>${escapeHtml(s.user_name || "Unknown")}</b></td>
+                <td>${escapeHtml(s.business_name || "—")}</td>
+                <td><span class="badge badge-blue" style="font-size:10px">${escapeHtml(s.user_role || "—")}</span></td>
+                <td>
+                  <span style="font-size:11px">${s.device_type === "mobile" ? "📱 Mobile" : s.device_type === "tablet" ? "📲 Tablet" : "🖥️ Desktop"}</span>
+                </td>
+                <td style="font-size:11px;font-family:monospace">${escapeHtml(s.ip_address || "—")}</td>
+                <td style="font-size:11px;white-space:nowrap">${loggedIn}</td>
+                <td style="font-size:11px;white-space:nowrap">${lastSeen}</td>
+                <td>
+                  <span class="badge ${isIdle ? "badge-yellow" : "badge-green"}" style="font-size:10px">
+                    ${isIdle ? "Idle " + minsIdle + "m" : "Active"}
+                  </span>
+                </td>
+                <td style="display:flex;gap:4px">
+                  <button class="btn btn-sm btn-danger" data-kill-session="${s.session_id}" title="Force logout">🚪 Kill</button>
+                </td>
+              </tr>
+            `;
+              }
+              .join("") ||
+              '<tr><td colspan="9"><div class="empty-state">No active sessions</div></td></tr>'
+            }
+          </tbody>
+        </table>
+      </div>
+      <p class="help-text" style="margin-top:8px;font-size:11px">
+        Idle = no heartbeat for over 5 minutes. Use "Kill" to force-logout a session from this device.
+      </p>
+    </div>
+  `;
+
+  $("sessions-refresh")?.addEventListener("click", () => {
+    renderActiveSessions(el);
+  });
+
+  qsa("[data-kill-session]", el).forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const sessionId = btn.dataset.killSession;
+      if (!confirm("Force logout this session? The user will be signed out on their device.")) return;
+      try {
+        const { error } = await supabase.rpc("end_user_session", { p_session_id: sessionId });
+        if (error) throw error;
+        toast("Session ended", "success");
+        renderActiveSessions(el);
+      } catch (e) {
+        toast("Failed: " + e.message, "error");
+      }
+    });
   });
 }

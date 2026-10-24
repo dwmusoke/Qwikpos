@@ -9,7 +9,7 @@
 | Field | Details |
 |-------|---------|
 | **Company Name** | Qwickpos Ltd |
-| **Registration No.** | [Insert公司注册号] |
+| **Registration No.** | [Insert Registration No.] |
 | **TIN** | [Insert TIN] |
 | **Physical Address** | [Insert address, Kampala, Uganda] |
 | **Telephone** | [Insert phone] |
@@ -75,7 +75,6 @@ Qwickpos is a cloud-based Point-of-Sale (POS) and inventory management system de
 | Code | Description | Status |
 |------|-------------|--------|
 | **T101** | Get Server Time | ✅ Implemented |
-| **T103** | Login (TIN + username + password) | ✅ Implemented |
 | **T104** | Get AES Encryption Key | ✅ Implemented |
 | **T109** | Upload Fiscal Invoice | ✅ Implemented |
 | **T110** | Credit/Debit Note | ✅ Implemented |

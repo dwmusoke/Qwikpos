@@ -989,6 +989,7 @@ body.sidebar-expanded .main {
 }
 
 .btn-sm { height: 36px; padding: 6px 14px; font-size: 12.5px; }
+.btn-xs { height: 28px; padding: 2px 10px; font-size: 11px; }
 .btn-block { width: 100%; }
 
 @media (max-width: 640px) {

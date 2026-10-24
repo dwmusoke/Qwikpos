@@ -16,6 +16,7 @@ import {
   refreshProducts,
   stockFor,
   hasFeature,
+  bizFlags,
   createNotification,
   resizeImage,
 } from "./uganda-pos-core.js";
@@ -28,6 +29,20 @@ let invSearch = "";
 let invTab = "products";
 
 export async function renderInventory(root) {
+  const _f = bizFlags();
+  const _allowTab = {
+    products: true,
+    batches: _f.batches || _f.expiry,
+    transfers: !_f.service,
+    stockcount: !_f.service,
+    counthistory: !_f.service,
+    movements: !_f.service,
+    purchase: !_f.service,
+    production: _f.production,
+    valuation: !_f.service,
+  };
+  if (!_allowTab[invTab]) invTab = "products";
+
   root.innerHTML = `
     <div class="page-header">
       <div class="page-header-info">
@@ -37,15 +52,22 @@ export async function renderInventory(root) {
     </div>
 
     <div class="admin-tabs" id="inv-tabs">
-      <button class="admin-tab ${invTab === "products" ? "active" : ""}" data-tab="products">Products</button>
-      <button class="admin-tab ${invTab === "batches" ? "active" : ""}" data-tab="batches">Batches</button>
-      <button class="admin-tab ${invTab === "transfers" ? "active" : ""}" data-tab="transfers">Transfers</button>
-      <button class="admin-tab ${invTab === "stockcount" ? "active" : ""}" data-tab="stockcount">Stock Count</button>
-      <button class="admin-tab ${invTab === "counthistory" ? "active" : ""}" data-tab="counthistory">Count History</button>
-      <button class="admin-tab ${invTab === "movements" ? "active" : ""}" data-tab="movements">History</button>
-      <button class="admin-tab ${invTab === "purchase" ? "active" : ""}" data-tab="purchase">Purchase Orders</button>
-      <button class="admin-tab ${invTab === "production" ? "active" : ""}" data-tab="production">Production</button>
-      <button class="admin-tab ${invTab === "valuation" ? "active" : ""}" data-tab="valuation">Valuation</button>
+      ${([
+        ["products", "Products"],
+        ["batches", "Batches"],
+        ["transfers", "Transfers"],
+        ["stockcount", "Stock Count"],
+        ["counthistory", "Count History"],
+        ["movements", "History"],
+        ["purchase", "Purchase Orders"],
+        ["production", "Production"],
+        ["valuation", "Valuation"],
+      ].filter(([k]) => _allowTab[k]))
+        .map(
+          ([k, l]) =>
+            `<button class="admin-tab ${invTab === k ? "active" : ""}" data-tab="${k}">${l}</button>`,
+        )
+        .join("")}
     </div>
 
     <div id="inv-tab-content"></div>
@@ -53,6 +75,7 @@ export async function renderInventory(root) {
 
   qsa(".admin-tab", root).forEach((tab) => {
     tab.addEventListener("click", () => {
+      if (!_allowTab[tab.dataset.tab]) return;
       invTab = tab.dataset.tab;
       qsa(".admin-tab", root).forEach((t) =>
         t.classList.toggle("active", t.dataset.tab === invTab),

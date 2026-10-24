@@ -91,6 +91,10 @@ Once deployed over HTTPS, anyone can open the link and click **"Start your
 14-day free trial"** to create their own business — no manual database work
 needed per vendor anymore.
 
+> **For end users:** a non-technical onboarding guide for business owners and
+> cashiers lives in `docs/qwickpos-user-onboarding-guide.md` — signup, first
+> sale, EFRIS setup, team & billing.
+
 ## 4. How multi-vendor signup works
 
 1. A visitor picks a plan on the signup screen (reads live from the public

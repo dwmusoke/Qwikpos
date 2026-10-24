@@ -13,13 +13,17 @@ import {
   closeModal,
   fmtDate,
   sanitizeCsvValue,
+  registerPushSubscription,
 } from "./uganda-pos-core.js";
 import { logAuditAction } from "./uganda-pos-view-audit.js";
 
 let activeTab = "templates";
+let _notifPrefs = {};
 
 export async function renderNotificationsCenter(root) {
   root.innerHTML = `<div class="empty-state">Loading notifications…</div>`;
+
+  loadNotifPrefs();
 
   const [{ data: templates }, { data: log }] = await Promise.all([
     supabase
@@ -53,6 +57,7 @@ export async function renderNotificationsCenter(root) {
         ["templates", "📧 Templates"],
         ["log", "📋 Send Log"],
         ["send", "✉️ Send Now"],
+        ["prefs", "⚙️ Preferences"],
       ]
         .map(
           ([k, l]) =>
@@ -85,6 +90,7 @@ function renderNcTab(templates, log) {
   if (activeTab === "templates") renderTemplates(templates, body);
   else if (activeTab === "log") renderSendLog(log, body);
   else if (activeTab === "send") renderSendNow(templates, body);
+  else if (activeTab === "prefs") renderPrefs(body);
 }
 
 function renderTemplates(templates, body) {
@@ -298,6 +304,17 @@ function showTemplateModal(existing, templates) {
       <label>Body Template</label>
       <textarea id="tmpl-body" rows="6">${escapeHtml(existing?.body_template || "")}</textarea>
       <p class="help-text">Use {{customer_name}}, {{amount}}, {{invoice_number}}, etc. as placeholders.</p>
+      <div class="flex gap" style="margin-top:6px">
+        <button class="btn btn-secondary btn-sm" id="tmpl-ai-generate">✨ AI Generate from description</button>
+      </div>
+      <div id="tmpl-ai-prompt" style="display:none;margin-top:8px">
+        <div class="field">
+          <label>Describe the notification you want</label>
+          <textarea id="tmpl-ai-desc" rows="3" placeholder="e.g. Send a low-stock alert to the owner when a product falls below reorder level…"></textarea>
+        </div>
+        <button class="btn btn-primary btn-sm" id="tmpl-ai-do">Generate</button>
+        <button class="btn btn-secondary btn-sm" id="tmpl-ai-cancel">Cancel</button>
+      </div>
     </div>
     <button class="btn btn-primary btn-block" id="tmpl-save">${isEdit ? "Update" : "Create"} Template</button>
     <button class="btn btn-secondary btn-block" data-close-modal style="margin-top:8px;">Cancel</button>
@@ -354,5 +371,146 @@ function showTemplateModal(existing, templates) {
     }
     toast(`Template ${isEdit ? "updated" : "created"}`, "success");
     closeModal();
+  });
+
+  // ── AI template generation ────────────────────────────────────────
+  $("tmpl-ai-generate")?.addEventListener("click", () => {
+    const box = $("tmpl-ai-prompt");
+    box.style.display = box.style.display === "block" ? "none" : "block";
+    $("tmpl-ai-desc")?.focus();
+  });
+
+  $("tmpl-ai-cancel")?.addEventListener("click", () => {
+    $("tmpl-ai-prompt").style.display = "none";
+  });
+
+  $("tmpl-ai-do")?.addEventListener("click", async () => {
+    const desc = $("tmpl-ai-desc")?.value.trim();
+    const channel = $("tmpl-channel")?.value || "email";
+    const name = $("tmpl-name")?.value.trim() || "AI Generated";
+    if (!desc) { toast("Please describe the notification", "error"); return; }
+
+    const btn = $("tmpl-ai-do");
+    const orig = btn.textContent;
+    btn.textContent = "Generating…";
+    btn.disabled = true;
+
+    try {
+      const { error, data } = await supabase.functions.invoke("ai-notifications", {
+        body: { action: "generate_template", description: desc, channel, name },
+      });
+      if (error) throw new Error(error.message || String(error));
+
+      if (data?.subject) $("tmpl-subject").value = data.subject;
+      if (data?.body_template) $("tmpl-body").value = data.body_template;
+      toast(`Template generated (${data.source || "ai"})`, "success");
+      $("tmpl-ai-prompt").style.display = "none";
+    } catch (e) {
+      toast("AI generation failed: " + e.message, "error");
+    } finally {
+      btn.textContent = orig;
+      btn.disabled = false;
+    }
+  });
+}
+
+// ---------------------------------------------------------------------
+// NOTIFICATION PREFERENCES (push + per-type toggles, stored in localStorage)
+// ---------------------------------------------------------------------
+const NOTIF_PREFS_KEY = "qwikpos_notif_prefs";
+
+function loadNotifPrefs() {
+  try {
+    _notifPrefs = JSON.parse(localStorage.getItem(NOTIF_PREFS_KEY) || "{}");
+  } catch { _notifPrefs = {}; }
+  return _notifPrefs;
+}
+
+function saveNotifPrefs() {
+  localStorage.setItem(NOTIF_PREFS_KEY, JSON.stringify(_notifPrefs));
+}
+
+function prefEnabled(type) {
+  if (_notifPrefs[type] === undefined) return true; // default on
+  return _notifPrefs[type];
+}
+
+function renderPrefs(body) {
+  const pushSupported =
+    "serviceWorker" in navigator && "PushManager" in window;
+  const isSubscribed = !!_notifPrefs.push_enabled;
+
+  body.innerHTML = `
+    <div class="card">
+      <h3 style="margin-bottom:16px;">Notification Preferences</h3>
+
+      <div class="field" style="margin-bottom:16px">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+          <input type="checkbox" id="pref-push" ${isSubscribed ? "checked" : ""}
+            ${!pushSupported ? "disabled" : ""} />
+          <span>Enable browser push notifications (receive alerts even when tab is closed)</span>
+        </label>
+        ${!pushSupported ? '<span style="font-size:11px;color:var(--text-muted)">Push not supported in this browser</span>' : ""}
+      </div>
+
+      <div class="field" style="margin-bottom:16px">
+        <label style="font-weight:600">Notification types</label>
+        <div style="display:flex;flex-wrap:wrap;gap:12px;margin-top:8px">
+          ${[
+            ["sale", "🧾 Sales"],
+            ["stock", "📦 Stock"],
+            ["subscription", "💳 Billing"],
+            ["chat", "💬 Chat"],
+            ["error", "❌ Errors"],
+            ["warning", "⚠️ Warnings"],
+            ["success", "✅ Success"],
+            ["info", "ℹ️ Info"],
+          ]
+            .map(
+              ([t, label]) => `
+            <label style="display:flex;align-items:center;gap:6px;cursor:pointer;min-width:110px">
+              <input type="checkbox" data-pref-type="${t}" ${prefEnabled(t) ? "checked" : ""} />
+              <span>${escapeHtml(label)}</span>
+            </label>
+          `,
+            )
+            .join("")}
+        </div>
+      </div>
+
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-primary" id="pref-save">Save Preferences</button>
+        <button class="btn btn-secondary" id="pref-reset">Reset to defaults</button>
+      </div>
+    </div>
+  `;
+
+  $("pref-save")?.addEventListener("click", async () => {
+    const push = $("pref-push")?.checked || false;
+    _notifPrefs.push_enabled = push;
+
+    qsa("[data-pref-type]").forEach((cb) => {
+      _notifPrefs[cb.dataset.prefType] = cb.checked;
+    });
+    saveNotifPrefs();
+
+    if (push && pushSupported) {
+      try {
+        await registerPushSubscription();
+        _notifPrefs.push_subscribed = true;
+        saveNotifPrefs();
+        toast("Push notifications enabled", "success");
+      } catch (e) {
+        toast("Push subscription failed — check browser permissions", "error");
+      }
+    }
+    toast("Preferences saved", "success");
+  });
+
+  $("pref-reset")?.addEventListener("click", () => {
+    _notifPrefs = {};
+    saveNotifPrefs();
+    renderPrefs(body);
+    toast("Preferences reset", "success");
   });
 }

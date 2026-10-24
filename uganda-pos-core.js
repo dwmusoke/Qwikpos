@@ -72,6 +72,99 @@ export function escapeHtml(str) {
     .replace(/'/g, "&#39;");
 }
 
+// ---------------------------------------------------------------------
+// DEVICE DETECTION — classify browser into mobile / tablet / desktop
+// ---------------------------------------------------------------------
+export function detectDeviceType(userAgent = navigator.userAgent) {
+  const ua = userAgent.toLowerCase();
+  if (/tablet|ipad|playbook|silk/i.test(ua)) return "tablet";
+  if (/mobile|android|iphone|ipod|blackberry|iemobile|opera mini/i.test(ua)) return "mobile";
+  return "desktop";
+}
+
+// Best-effort client IP lookup (never blocks login if it fails).
+let _clientIpCache = null;
+let _clientIpPromise = null;
+export async function getClientIP() {
+  if (_clientIpCache) return _clientIpCache;
+  if (_clientIpPromise) return _clientIpPromise;
+  _clientIpPromise = (async () => {
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 3000);
+      const res = await fetch("https://api.ipify.org?format=json", {
+        signal: controller.signal,
+        cache: "no-store",
+      });
+      clearTimeout(timeout);
+      if (res.ok) {
+        const data = await res.json();
+        _clientIpCache = data.ip || null;
+      }
+    } catch (_) {
+      _clientIpCache = null;
+    }
+    return _clientIpCache;
+  })();
+  return _clientIpPromise;
+}
+
+// ---------------------------------------------------------------------
+// SESSION TRACKING — who is logged in, from what device / IP
+// ---------------------------------------------------------------------
+export async function trackSession() {
+  if (!STATE.session || !STATE.appUser) return;
+  try {
+    const deviceType = detectDeviceType();
+    const userAgent = navigator.userAgent;
+    const ip = await getClientIP();
+
+    await supabase.rpc("upsert_user_session", {
+      p_session_id: STATE.session.access_token?.slice(0, 64) || STATE.session.user.id,
+      p_user_id: STATE.session.user.id,
+      p_app_user_id: STATE.appUser.id,
+      p_business_id: STATE.business?.id || null,
+      p_device_type: deviceType,
+      p_ip_address: ip,
+      p_user_agent: userAgent,
+    });
+  } catch (e) {
+    console.warn("Session tracking failed:", e);
+  }
+}
+
+export async function heartbeatSession() {
+  if (!STATE.session || !STATE.appUser) return;
+  try {
+    const deviceType = detectDeviceType();
+    const userAgent = navigator.userAgent;
+    const ip = await getClientIP();
+
+    await supabase.rpc("upsert_user_session", {
+      p_session_id: STATE.session.access_token?.slice(0, 64) || STATE.session.user.id,
+      p_user_id: STATE.session.user.id,
+      p_app_user_id: STATE.appUser.id,
+      p_business_id: STATE.business?.id || null,
+      p_device_type: deviceType,
+      p_ip_address: ip,
+      p_user_agent: userAgent,
+    });
+  } catch (e) {
+    console.warn("Session heartbeat failed:", e);
+  }
+}
+
+export async function endSession() {
+  if (!STATE.session) return;
+  try {
+    await supabase.rpc("end_user_session", {
+      p_session_id: STATE.session.access_token?.slice(0, 64) || STATE.session.user.id,
+    });
+  } catch (e) {
+    console.warn("Session end failed:", e);
+  }
+}
+
 export function uid() {
   return crypto.randomUUID
     ? crypto.randomUUID()
@@ -689,6 +782,59 @@ export function hasFeature(key) {
   return !!(STATE.plan?.features && STATE.plan.features[key]);
 }
 
+// ---------------------------------------------------------------------
+// BUSINESS MODEL FLAGS — a pharmacy, manufacturer, retailer and service
+// firm get different module setups. Flags live on `businesses`; legacy
+// businesses that never had them fall back to what their type implies.
+// ---------------------------------------------------------------------
+const BIZ_TYPE_DEFAULTS = {
+  retail: {},
+  food: { batches: true, expiry: true },
+  pharmacy: { batches: true, expiry: true },
+  wholesale: { wholesale: true },
+  services: { service: true },
+  manufacturing: { production: true, batches: true },
+};
+
+export function bizFlags() {
+  const b = STATE.business || {};
+  const d = BIZ_TYPE_DEFAULTS[b.business_type] || {};
+  return {
+    type: b.business_type || "retail",
+    service: b.is_service_business ?? d.service ?? false,
+    production: b.enable_production ?? d.production ?? false,
+    batches: b.enable_batch_tracking ?? d.batches ?? false,
+    expiry: b.enable_expiry_tracking ?? d.expiry ?? false,
+    wholesale: b.enable_wholesale_pricing ?? d.wholesale ?? false,
+  };
+}
+
+export function bizAllowsRoute(route) {
+  const f = bizFlags();
+  if (f.service && ["purchases", "suppliers", "inventory", "deliveries", "quotations"].includes(route)) return false;
+  return true;
+}
+
+// Show/hide sidebar items + whole modules to match the business model.
+export function applyBusinessModelNav() {
+  if (!STATE.business) return;
+  const f = bizFlags();
+  const hidden = new Set();
+  if (f.service)
+    ["purchases", "suppliers", "inventory", "deliveries", "quotations"].forEach((r) => hidden.add(r));
+
+  document.querySelectorAll(".nav-link[data-route]").forEach((btn) => {
+    btn.classList.toggle("hidden", hidden.has(btn.dataset.route));
+  });
+
+  document.querySelectorAll(".nav-module").forEach((mod) => {
+    const visible = mod.querySelectorAll(".nav-children .nav-link:not(.hidden)").length;
+    const parent = mod.querySelector(".nav-parent");
+    if (parent && !parent.dataset.route) mod.classList.toggle("hidden", visible === 0);
+    else mod.classList.remove("hidden");
+  });
+}
+
 export async function refreshProducts() {
   if (!STATE.business) return;
   const { data: products } = await supabase
@@ -856,12 +1002,24 @@ export async function markAllNotificationsRead() {
   STATE.unreadCount = 0;
 }
 
+export async function snoozeNotification(id, minutes) {
+  if (!STATE.business) return;
+  const until = new Date(Date.now() + minutes * 60000).toISOString();
+  await supabase
+    .from("notifications")
+    .update({ snooze_until: until })
+    .eq("id", id);
+  const n = STATE.notifications.find((x) => x.id === id);
+  if (n) n.snooze_until = until;
+}
+
 export async function createNotification({
   title,
   body,
   type = "info",
   route = null,
   userId = null,
+  aiPriority = "low",
 }) {
   if (!STATE.business) return;
   await supabase.rpc("insert_notification", {
@@ -871,6 +1029,7 @@ export async function createNotification({
     p_body: body,
     p_type: type,
     p_route: route,
+    p_ai_priority: aiPriority,
   });
 }
 

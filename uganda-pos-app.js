@@ -27,6 +27,17 @@ import {
   loadBootstrapData,
   isSubscriptionActive,
   applyTheme,
+  trackSession,
+  heartbeatSession,
+  endSession,
+  endSession,
+  trackSession,
+  heartbeatSession,
+  detectDeviceType,
+  registerPushSubscription,
+  bizFlags,
+  bizAllowsRoute,
+  applyBusinessModelNav,
 } from "./uganda-pos-core.js";
 import { renderNotifications } from "./uganda-pos-view-notifications.js";
 import { renderAuditLogs } from "./uganda-pos-view-audit.js";
@@ -90,7 +101,7 @@ function friendlyAuthError(error) {
     (!navigator.onLine && msg);
   if (networky) {
     return navigator.onLine
-      ? "Cannot reach the server. This can be a weak connection, a VPN, firewall, or ad-blocker blocking qwickpos.com — check your network and try again."
+      ? "Cannot reach the server. This can be a weak connection, a VPN, firewall, or ad-blocker blocking qwikpos.org — check your network and try again."
       : "You appear to be offline. Reconnect to the internet and try again.";
   }
   return msg;
@@ -156,6 +167,12 @@ async function navigateTo(route) {
   // Everyone else needs an active trial/subscription for anything but Billing.
   if (!STATE.isSuperadmin && route !== "billing" && !isSubscriptionActive()) {
     route = "billing";
+  }
+
+  // Business-model gates: services don't sell stock, etc.
+  if (STATE.business && !bizAllowsRoute(route)) {
+    toast(`${ROUTES[route].title} is not used for a ${bizFlags().type} business.`, "default", 3500);
+    route = "dashboard";
   }
 
   // Feature-gated routes redirect to Billing with an upsell nudge.
@@ -255,6 +272,9 @@ function wireShell() {
     link.addEventListener("click", () => navigateTo(route));
   });
 
+  // ── Business model: hide modules that don't apply ──
+  applyBusinessModelNav();
+
   // ── Nav parent module toggles ──
   qsa(".nav-parent").forEach((parent) => {
     parent.addEventListener("click", () => {
@@ -298,6 +318,15 @@ function wireShell() {
   $("theme-toggle").textContent = STATE.theme === "dark" ? "☀️" : "🌙";
 
   $("logout-btn").addEventListener("click", async () => {
+    await endSession();
+    try {
+      const { logAuditAction } = await import("./uganda-pos-view-audit.js");
+      await logAuditAction({
+        action: "logout",
+        entityType: "session",
+        entityName: STATE.appUser?.full_name || "User",
+      });
+    } catch (e) { console.error("logout audit:", e); }
     await supabase.auth.signOut();
     window.location.reload();
   });
@@ -756,6 +785,11 @@ async function boot() {
     console.error("wireShell failed:", e);
   }
   try {
+    await registerPushSubscription();
+  } catch (e) {
+    console.warn("registerPushSubscription:", e.message);
+  }
+  try {
     translatePage();
   } catch (e) {
     console.error("translatePage failed:", e);
@@ -786,6 +820,34 @@ async function boot() {
   } catch (e) {
     console.error("wireImpersonation failed:", e);
   }
+
+  // Record this device/session as active for admin visibility
+  try { await trackSession(); } catch (e) { console.error("trackSession:", e); }
+
+  // Audit log the login
+  try {
+    const { logAuditAction } = await import("./uganda-pos-view-audit.js");
+    await logAuditAction({
+      action: "login",
+      entityType: "session",
+      entityName: STATE.appUser.full_name,
+      metadata: { device: detectDeviceType?.() || "unknown" },
+    });
+  } catch (e) { console.error("login audit:", e); }
+
+  // Heartbeat the session every 2 minutes while the tab is open
+  let _hbTimer = null;
+  const startHeartbeat = () => {
+    if (_hbTimer) clearInterval(_hbTimer);
+    _hbTimer = setInterval(() => {
+      heartbeatSession().catch(() => {});
+    }, 120000);
+  };
+  startHeartbeat();
+  window.addEventListener("beforeunload", () => {
+    if (_hbTimer) clearInterval(_hbTimer);
+    endSession().catch(() => {});
+  });
 
   if (STATE.isSuperadmin && !STATE.business) {
     navigateTo("admin");
@@ -885,7 +947,7 @@ $("reset-form")?.addEventListener("submit", async (e) => {
   btn.textContent = "Sending…";
 
   const { error } = await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: window.location.origin,
+    redirectTo: window.location.origin + "/app.html",
   });
 
   btn.disabled = false;

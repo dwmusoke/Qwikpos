@@ -407,6 +407,8 @@ export async function logAuditAction({
   oldValue = null,
   newValue = null,
   metadata = null,
+  ipAddress = null,
+  userAgent = null,
 }) {
   if (!STATE.business || !STATE.appUser) return;
   try {
@@ -422,6 +424,8 @@ export async function logAuditAction({
       p_entity_name: entityName,
       p_old_value: oldValue ? JSON.stringify(oldValue) : null,
       p_new_value: newValue ? JSON.stringify(newValue) : null,
+      p_ip_address: ipAddress ?? null,
+      p_user_agent: userAgent ?? navigator.userAgent,
       p_metadata: metadata ? JSON.stringify(metadata) : null,
     });
   } catch (e) {

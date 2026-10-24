@@ -6,6 +6,22 @@
     <title>Qwickpos — Modern POS & ERP for Uganda</title>
     <meta name="description" content="All-in-one point of sale, inventory, accounting, HRM, and EFRIS e-invoicing for Ugandan businesses. Start your 14-day free trial." />
     <meta name="theme-color" content="#0f6b4a" />
+    <script>
+      // Returning users go straight to the app (same Supabase DB as qwikpos.com).
+      // Supabase stores auth tokens under "sb-<project-ref>-auth-token".
+      try {
+        var hasSession = false;
+        for (var i = 0; i < localStorage.length; i++) {
+          var k = localStorage.key(i);
+          if (k && k.indexOf("sb-") === 0 && k.indexOf("auth-token") !== -1 && (localStorage.getItem(k) || "").indexOf("access_token") !== -1) {
+            hasSession = true; break;
+          }
+        }
+        if (hasSession) {
+          window.location.replace("./app.html" + (window.location.hash || "#login"));
+        }
+      } catch (e) { /* ignore */ }
+    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />

@@ -1,7 +1,8 @@
 // =====================================================================
 // QWICKPOS — SETTINGS VIEW
 // =====================================================================
-import { supabase, STATE, $, qsa, escapeHtml, toast, hasRole, applyTheme, openModal, closeModal } from './uganda-pos-core.js';
+import { supabase, STATE, $, qsa, escapeHtml, toast, hasRole, applyTheme, openModal, closeModal, bizFlags, applyBusinessModelNav } from './uganda-pos-core.js';
+import { BUSINESS_TYPES, seedDefaultsForType } from './uganda-pos-view-onboarding.js';
 
 export async function renderSettings(root) {
   // Fetch users with emails from auth.users via edge function
@@ -39,6 +40,32 @@ export async function renderSettings(root) {
       </div>
       <div class="field"><label>Address</label><input id="st-address" value="${escapeHtml(STATE.business.address || '')}" /></div>
       <button class="btn btn-primary" id="save-profile-btn">Save Profile</button>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Business Model</div>
+      <p class="help-text" style="margin-bottom:12px;">Your setup adapts to how you operate — a pharmacy gets batches
+        &amp; expiry, a manufacturer gets production, a service firm hides stock modules. Changing the type re-seeds
+        default categories (existing data is untouched).</p>
+      <div class="field-row">
+        <div class="field"><label>Business Type</label>
+          <select id="st-biz-type">
+            ${BUSINESS_TYPES.map((t) =>
+              `<option value="${t.id}" ${bizFlags().type === t.id ? "selected" : ""}>${t.icon} ${escapeHtml(t.label)}</option>`,
+            ).join("")}
+          </select>
+        </div>
+        <div class="field"><label>Capability overrides</label>
+          <div style="display:grid;gap:6px;margin-top:4px">
+            <label style="display:flex;gap:6px;align-items:center"><input type="checkbox" id="st-f-batches" ${bizFlags().batches ? "checked" : ""} /> Track batches</label>
+            <label style="display:flex;gap:6px;align-items:center"><input type="checkbox" id="st-f-expiry" ${bizFlags().expiry ? "checked" : ""} /> Track expiry dates</label>
+            <label style="display:flex;gap:6px;align-items:center"><input type="checkbox" id="st-f-production" ${bizFlags().production ? "checked" : ""} /> Production / BOM</label>
+            <label style="display:flex;gap:6px;align-items:center"><input type="checkbox" id="st-f-wholesale" ${bizFlags().wholesale ? "checked" : ""} /> Wholesale pricing</label>
+            <label style="display:flex;gap:6px;align-items:center"><input type="checkbox" id="st-f-service" ${bizFlags().service ? "checked" : ""} /> Service business (no stock)</label>
+          </div>
+        </div>
+      </div>
+      <button class="btn btn-primary" id="save-biz-model-btn">Save Business Model</button>
     </div>
 
     <div class="card">
@@ -183,6 +210,27 @@ export async function renderSettings(root) {
       <p class="help-text" style="margin-top:10px;">
         Click <b>+ Add User</b> to create a new team member with their login credentials.
         They'll receive full access based on the role you assign.
+      </p>
+    </div>
+
+    <!-- Active Sessions (tenant-scoped via RLS) -->
+    <div class="card">
+      <div class="card-title" style="display:flex;justify-content:space-between;align-items:center;">
+        <span>🖥️ Active Sessions</span>
+        <button class="btn btn-secondary btn-sm" id="st-sessions-refresh">↻ Refresh</button>
+      </div>
+      <div class="table-wrap" style="max-height:400px;overflow-y:auto">
+        <table style="min-width:700px">
+          <thead><tr>
+            <th>User</th><th>Role</th><th>Device</th><th>IP Address</th><th>Logged In</th><th>Last Seen</th><th>Status</th><th></th>
+          </tr></thead>
+          <tbody id="st-sessions-body">
+            <tr><td colspan="8"><div class="empty-state">Loading sessions…</div></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="help-text" style="margin-top:8px;font-size:11px">
+        Idle = no heartbeat for over 5 minutes. Only sessions for <b>${escapeHtml(STATE.business?.name || 'this business')}</b> are shown. Use 🚪 to force-logout a session.
       </p>
     </div>
 
@@ -402,6 +450,28 @@ export async function renderSettings(root) {
     STATE.displayCurrency = newCurrency;
     $('topbar-business-name').textContent = STATE.business.name;
     toast('Profile saved', 'success');
+  });
+
+  $('save-biz-model-btn').addEventListener('click', async () => {
+    const typeChanged = $('st-biz-type').value !== bizFlags().type;
+    const updates = {
+      business_type: $('st-biz-type').value,
+      enable_batch_tracking: $('st-f-batches').checked,
+      enable_expiry_tracking: $('st-f-expiry').checked,
+      enable_production: $('st-f-production').checked,
+      enable_wholesale_pricing: $('st-f-wholesale').checked,
+      is_service_business: $('st-f-service').checked,
+    };
+    const { error } = await supabase.from('businesses').update(updates).eq('id', STATE.business.id);
+    if (error) { toast('Save failed: ' + error.message, 'error'); return; }
+    Object.assign(STATE.business, updates);
+    applyBusinessModelNav();
+    if (typeChanged) {
+      await seedDefaultsForType(STATE.business.id, updates.business_type, STATE.branch?.id || null);
+      toast('Business model saved — sidebar and defaults updated', 'success');
+    } else {
+      toast('Business model saved', 'success');
+    }
   });
 
   $('save-efris-btn').addEventListener('click', async () => {
@@ -1371,4 +1441,58 @@ export async function renderSettings(root) {
       });
     }});
   }
+
+  // ── Active Sessions loader (tenant-scoped via RLS on get_active_sessions) ──
+  async function loadActiveSessions() {
+    const body = $('st-sessions-body');
+    if (!body) return;
+    body.innerHTML = `<tr><td colspan="8"><div class="empty-state">Loading sessions…</div></td></tr>`;
+    try {
+      const { data, error } = await supabase.rpc('get_active_sessions');
+      if (error) throw error;
+      const sessions = data || [];
+      const now = new Date();
+      const rows = sessions.map((s) => {
+        const loggedIn = s.logged_in_at ? new Date(s.logged_in_at).toLocaleString() : '—';
+        const lastSeen = s.last_seen_at ? new Date(s.last_seen_at).toLocaleString() : '—';
+        const minsIdle = s.last_seen_at ? Math.round((now - new Date(s.last_seen_at)) / 60000) : 0;
+        const isIdle = minsIdle > 5;
+        const devLabel = s.device_type === 'mobile' ? '📱 Mobile' : s.device_type === 'tablet' ? '📲 Tablet' : '🖥️ Desktop';
+        return `
+          <tr>
+            <td><b>${escapeHtml(s.user_name || 'Unknown')}</b></td>
+            <td style="font-size:11px"><span class="badge badge-blue">${escapeHtml(s.user_role || '—')}</span></td>
+            <td style="font-size:11px">${devLabel}</td>
+            <td style="font-size:11px;font-family:monospace">${escapeHtml(s.ip_address || '—')}</td>
+            <td style="font-size:11px;white-space:nowrap">${loggedIn}</td>
+            <td style="font-size:11px;white-space:nowrap">${lastSeen}</td>
+            <td><span class="badge ${isIdle ? 'badge-yellow' : 'badge-green'}" style="font-size:10px">${isIdle ? 'Idle ' + minsIdle + 'm' : 'Active'}</span></td>
+            <td style="display:flex;gap:4px"><button class="btn btn-sm btn-danger" data-kill-session="${s.session_id}" title="Force logout">🚪</button></td>
+          </tr>
+        `;
+      }).join('') || '<tr><td colspan="8"><div class="empty-state">No active sessions</div></td></tr>';
+      body.innerHTML = rows;
+
+      qsa('[data-kill-session]', body).forEach((btn) => {
+        btn.addEventListener('click', async () => {
+          const sessionId = btn.dataset.killSession;
+          if (!confirm('Force logout this session? The user will be signed out on their device.')) return;
+          try {
+            const { error } = await supabase.rpc('end_user_session', { p_session_id: sessionId });
+            if (error) throw error;
+            toast('Session ended', 'success');
+            loadActiveSessions();
+          } catch (e) {
+            toast('Failed: ' + e.message, 'error');
+          }
+        });
+      });
+    } catch (e) {
+      console.error('Active sessions error:', e);
+      body.innerHTML = `<tr><td colspan="8"><div class="empty-state">Unable to load sessions — run uganda-pos-schema-v11-sessions.sql in Supabase.</div></td></tr>`;
+    }
+  }
+
+  $('st-sessions-refresh')?.addEventListener('click', () => loadActiveSessions());
+  loadActiveSessions();
 }

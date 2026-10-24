@@ -75,12 +75,13 @@ begin
 
   -- Also create auth identity so login works
   insert into auth.identities (
-    id, user_id, identity_data, provider, last_sign_in_at, created_at, updated_at
+    id, user_id, identity_data, provider, provider_id, last_sign_in_at, created_at, updated_at
   ) values (
     v_user_id,
     v_user_id,
     jsonb_build_object('sub', v_user_id::text, 'email', trim(lower(p_admin_email))),
     'email',
+    trim(lower(p_admin_email)),
     now(),
     now(),
     now()
