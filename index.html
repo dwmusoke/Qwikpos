@@ -10,6 +10,10 @@
       // Returning users go straight to the app (same Supabase DB as qwikpos.com).
       // Supabase stores auth tokens under "sb-<project-ref>-auth-token".
       try {
+        var h = window.location.hash || "";
+        if (h.indexOf("error=") !== -1) {
+          window.location.replace("./app.html" + h);
+        }
         var hasSession = false;
         for (var i = 0; i < localStorage.length; i++) {
           var k = localStorage.key(i);

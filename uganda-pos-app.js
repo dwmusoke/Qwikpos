@@ -605,6 +605,13 @@ function showLoginScreen() {
   $("app-shell").classList.add("hidden");
 }
 
+function setLoginError(message) {
+  const errEl = $("login-error");
+  if (!errEl) return;
+  errEl.textContent = message;
+  errEl.style.display = "block";
+}
+
 function showSignupScreen() {
   $("signup-screen").classList.remove("hidden");
   $("login-screen").classList.add("hidden");
@@ -968,7 +975,18 @@ $("reset-form")?.addEventListener("submit", async (e) => {
 // ---------------------------------------------------------------------
 // Handle Supabase password recovery redirect (hash contains access_token & type=recovery)
 const hash = window.location.hash;
-if (hash && hash.includes("type=recovery")) {
+if (hash && hash.includes("error=")) {
+  // Expired / invalid email link (e.g. otp_expired) — show a friendly message
+  // on the login screen instead of silently dropping the hash.
+  const params = new URLSearchParams(hash.replace(/^#/, ""));
+  const errCode = params.get("error_code") || "";
+  const errMsg = /otp_expired|expired/i.test(errCode)
+    ? "This reset link has expired. Please start the password reset again to get a fresh link."
+    : params.get("error_description") || "Email link is invalid or has expired. Please try again.";
+  showLoginScreen();
+  setLoginError(errMsg);
+  window.history.replaceState(null, "", window.location.pathname + window.location.search);
+} else if (hash && hash.includes("type=recovery")) {
   // Supabase client processes the hash automatically.
   // Show a simple prompt for the new password.
   $("login-screen").classList.add("hidden");
