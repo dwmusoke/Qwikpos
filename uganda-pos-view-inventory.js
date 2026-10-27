@@ -401,8 +401,8 @@ function openProductModal(productId) {
           if (!editing && STATE.branch) {
             const initStock = parseFloat($("pf-stock").value) || 0;
             if (initStock > 0 && saved?.id) {
-              await supabase.rpc("upsert_product_stock", { p_product_id: saved.id, p_branch_id: STATE.branch.id, p_quantity: initStock });
-              await supabase.rpc("insert_stock_movement", { p_business_id: STATE.business.id, p_branch_id: STATE.branch.id, p_product_id: saved.id, p_type: "in", p_quantity: initStock, p_notes: "Initial stock", p_created_by: STATE.appUser.id });
+              await supabase.rpc("upsert_product_stock", { p_product_id: saved.id, p_branch_id: STATE.branch?.id || STATE.branches[0]?.id, p_quantity: initStock });
+              await supabase.rpc("insert_stock_movement", { p_business_id: STATE.business.id, p_branch_id: STATE.branch?.id || STATE.branches[0]?.id, p_product_id: saved.id, p_type: "in", p_quantity: initStock, p_notes: "Initial stock", p_created_by: STATE.appUser.id });
             }
           }
 
@@ -420,7 +420,7 @@ function openProductModal(productId) {
 // STOCK IN / OUT / ADJUSTMENT
 // ---------------------------------------------------------------------
 function openStockModal(productId) {
-  if (!STATE.branch && !STATE.branches.length) {
+  if (!STATE.branches.length) {
     toast("No branches found. Go to Settings > Warehouses to create one first.", "error", 5000);
     return;
   }
@@ -430,11 +430,11 @@ function openStockModal(productId) {
   openModal(
     `
     <div class="modal-title-row"><h3>Adjust Stock — ${escapeHtml(p.name)}</h3></div>
-    ${STATE.branches.length > 1 ? `
+    ${STATE.branches.length >= 1 ? `
     <div class="field">
       <label>Branch</label>
       <select id="sm-branch">
-        ${STATE.branches.map((b) => `<option value="${b.id}" ${b.id === STATE.branch?.id ? "selected" : ""}>${escapeHtml(b.name)}</option>`).join("")}
+        ${STATE.branches.map((b) => `<option value="${b.id}" ${b.id === (STATE.branch?.id || STATE.branches[0]?.id || STATE.branches[0].id) ? "selected" : ""}>${escapeHtml(b.name)}</option>`).join("")}
       </select>
     </div>` : ""}
     <p class="help-text" id="sm-stock-info">Current stock: <b>${currentStock} ${escapeHtml(p.unit || "pc")}</b></p>
@@ -472,7 +472,7 @@ function openStockModal(productId) {
         async function loadBatchesForProduct() {
           const batchSel = $("sm-batch");
           if (!batchSel) return;
-          const branchId = $("sm-branch")?.value || STATE.branch?.id;
+          const branchId = $("sm-branch")?.value || STATE.branch?.id || STATE.branches[0]?.id;
           if (!branchId) return;
           const { data: batches } = await supabase
             .from("stock_batches")
@@ -517,7 +517,7 @@ function openStockModal(productId) {
             return;
           }
 
-          const branchId = $("sm-branch")?.value || STATE.branch?.id;
+          const branchId = $("sm-branch")?.value || STATE.branch?.id || STATE.branches[0]?.id;
           if (!branchId) {
             toast("No branch selected. Create a branch in Settings first.", "error");
             return;
@@ -625,7 +625,7 @@ function openStockModal(productId) {
 // BATCHES TAB — per-batch stock tracking with expiry dates
 // ---------------------------------------------------------------------
 async function renderBatchesTab(el) {
-  const branchId = STATE.branch?.id;
+  const branchId = STATE.branch?.id || STATE.branches[0]?.id;
   el.innerHTML = `
     <div class="flex gap" style="margin-bottom:14px;flex-wrap:wrap">
       <div class="pos-search-row" style="flex:1;min-width:200px;max-width:380px">
@@ -766,7 +766,7 @@ function openBatchModal(batchId) {
         }
         const { error } = await supabase.rpc("adjust_stock_batch", {
           p_product_id: productId,
-          p_branch_id: STATE.branch?.id,
+          p_branch_id: STATE.branch?.id || STATE.branches[0]?.id,
           p_batch_number: batchNum,
           p_quantity: qty,
           p_expiry_date: expiry,
@@ -779,7 +779,7 @@ function openBatchModal(batchId) {
         }
         await supabase.rpc("insert_stock_movement", {
           p_business_id: STATE.business.id,
-          p_branch_id: STATE.branch?.id,
+          p_branch_id: STATE.branch?.id || STATE.branches[0]?.id,
           p_product_id: productId,
           p_type: qty > 0 ? "in" : "adjustment",
           p_quantity: qty,
@@ -936,8 +936,8 @@ function openImportModal() {
 
                 const stockQty = parseFloat(cleanNumber(row.stock)) || 0;
                 if (stockQty > 0 && STATE.branch) {
-                  await supabase.rpc("upsert_product_stock", { p_product_id: existingProduct.id, p_branch_id: STATE.branch.id, p_quantity: stockQty });
-                  await supabase.rpc("insert_stock_movement", { p_business_id: STATE.business.id, p_branch_id: STATE.branch.id, p_product_id: existingProduct.id, p_type: "in", p_quantity: stockQty, p_notes: "CSV import (update)", p_created_by: STATE.appUser.id });
+                  await supabase.rpc("upsert_product_stock", { p_product_id: existingProduct.id, p_branch_id: STATE.branch?.id || STATE.branches[0]?.id, p_quantity: stockQty });
+                  await supabase.rpc("insert_stock_movement", { p_business_id: STATE.business.id, p_branch_id: STATE.branch?.id || STATE.branches[0]?.id, p_product_id: existingProduct.id, p_type: "in", p_quantity: stockQty, p_notes: "CSV import (update)", p_created_by: STATE.appUser.id });
                 }
                 return { ok: true };
               }
@@ -973,8 +973,8 @@ function openImportModal() {
 
               const stockQty = parseFloat(cleanNumber(row.stock)) || 0;
               if (stockQty > 0 && STATE.branch) {
-                await supabase.rpc("upsert_product_stock", { p_product_id: product.id, p_branch_id: STATE.branch.id, p_quantity: stockQty });
-                await supabase.rpc("insert_stock_movement", { p_business_id: STATE.business.id, p_branch_id: STATE.branch.id, p_product_id: product.id, p_type: "in", p_quantity: stockQty, p_notes: "CSV import", p_created_by: STATE.appUser.id });
+                await supabase.rpc("upsert_product_stock", { p_product_id: product.id, p_branch_id: STATE.branch?.id || STATE.branches[0]?.id, p_quantity: stockQty });
+                await supabase.rpc("insert_stock_movement", { p_business_id: STATE.business.id, p_branch_id: STATE.branch?.id || STATE.branches[0]?.id, p_product_id: product.id, p_type: "in", p_quantity: stockQty, p_notes: "CSV import", p_created_by: STATE.appUser.id });
               }
               return { ok: true };
             }));
@@ -1243,10 +1243,10 @@ function openTransferModal() {
     </div>
     <div class="field-row">
       <div class="field"><label>From Branch</label>
-        <select id="tf-from">${STATE.branches.map((b) => `<option value="${b.id}" ${b.id === STATE.branch?.id ? "selected" : ""}>${escapeHtml(b.name)}</option>`).join("")}</select>
+        <select id="tf-from">${STATE.branches.map((b) => `<option value="${b.id}" ${b.id === STATE.branch?.id || STATE.branches[0]?.id ? "selected" : ""}>${escapeHtml(b.name)}</option>`).join("")}</select>
       </div>
       <div class="field"><label>To Branch</label>
-        <select id="tf-to">${STATE.branches.map((b) => `<option value="${b.id}" ${b.id !== STATE.branch?.id ? "selected" : ""}>${escapeHtml(b.name)}</option>`).join("")}</select>
+        <select id="tf-to">${STATE.branches.map((b) => `<option value="${b.id}" ${b.id !== STATE.branch?.id || STATE.branches[0]?.id ? "selected" : ""}>${escapeHtml(b.name)}</option>`).join("")}</select>
       </div>
     </div>
     <div class="field"><label>Quantity to Transfer</label><input type="number" step="0.01" id="tf-qty" min="1" value="1" /></div>
@@ -1428,7 +1428,7 @@ function renderStockCountTab(el) {
       .from("stock_counts")
       .insert({
         business_id: STATE.business.id,
-        branch_id: STATE.branch.id,
+        branch_id: STATE.branch?.id || STATE.branches[0]?.id,
         count_date: new Date().toISOString().slice(0, 10),
         status: "completed",
         notes: `Manual count — ${changedProducts.length} products adjusted`,
@@ -1466,13 +1466,13 @@ function renderStockCountTab(el) {
 
       await supabase.rpc("upsert_product_stock", {
         p_product_id: p.id,
-        p_branch_id: STATE.branch.id,
+        p_branch_id: STATE.branch?.id || STATE.branches[0]?.id,
         p_quantity: counted,
       });
 
       await supabase.rpc("insert_stock_movement", {
         p_business_id: STATE.business.id,
-        p_branch_id: STATE.branch.id,
+        p_branch_id: STATE.branch?.id || STATE.branches[0]?.id,
         p_product_id: p.id,
         p_type: "adjustment",
         p_quantity: delta,
@@ -1511,7 +1511,7 @@ async function renderCountHistoryTab(el) {
     .eq("business_id", STATE.business.id)
     .order("created_at", { ascending: false })
     .limit(50);
-  if (STATE.branch) q = q.eq("branch_id", STATE.branch.id);
+  if (STATE.branch) q = q.eq("branch_id", STATE.branch?.id || STATE.branches[0]?.id);
   const { data: sessions } = await q;
 
   if (!sessions?.length) {
@@ -1879,7 +1879,7 @@ function openPOModal() {
             .from("purchase_orders")
             .insert({
               business_id: STATE.business.id,
-              branch_id: STATE.branch?.id || null,
+              branch_id: STATE.branch?.id || STATE.branches[0]?.id || null,
               supplier_id: supplierId,
               po_number: poNumber,
               status: "draft",
@@ -2446,19 +2446,19 @@ async function assembleProduct(bomId) {
   for (const item of bom.items) {
     const needed = item.quantity * assembleQty;
     const current = stockFor(item.component_product_id);
-    await supabase.rpc("upsert_product_stock", { p_product_id: item.component_product_id, p_branch_id: STATE.branch.id, p_quantity: current - needed });
-    await supabase.rpc("insert_stock_movement", { p_business_id: STATE.business.id, p_branch_id: STATE.branch.id, p_product_id: item.component_product_id, p_type: "out", p_quantity: needed, p_notes: `Production: assembled ${assembleQty}x ${bom.name || bom.finished_product_id}`, p_created_by: STATE.appUser.id });
+    await supabase.rpc("upsert_product_stock", { p_product_id: item.component_product_id, p_branch_id: STATE.branch?.id || STATE.branches[0]?.id, p_quantity: current - needed });
+    await supabase.rpc("insert_stock_movement", { p_business_id: STATE.business.id, p_branch_id: STATE.branch?.id || STATE.branches[0]?.id, p_product_id: item.component_product_id, p_type: "out", p_quantity: needed, p_notes: `Production: assembled ${assembleQty}x ${bom.name || bom.finished_product_id}`, p_created_by: STATE.appUser.id });
   }
 
   // Add finished product
   const finishedQty = assembleQty * (bom.yield_qty || 1);
   const finCurrent = stockFor(bom.finished_product_id);
-  await supabase.rpc("upsert_product_stock", { p_product_id: bom.finished_product_id, p_branch_id: STATE.branch.id, p_quantity: finCurrent + finishedQty });
-  await supabase.rpc("insert_stock_movement", { p_business_id: STATE.business.id, p_branch_id: STATE.branch.id, p_product_id: bom.finished_product_id, p_type: "in", p_quantity: finishedQty, p_notes: `Production: assembled ${assembleQty}x from ${bom.name || "recipe"}`, p_created_by: STATE.appUser.id });
+  await supabase.rpc("upsert_product_stock", { p_product_id: bom.finished_product_id, p_branch_id: STATE.branch?.id || STATE.branches[0]?.id, p_quantity: finCurrent + finishedQty });
+  await supabase.rpc("insert_stock_movement", { p_business_id: STATE.business.id, p_branch_id: STATE.branch?.id || STATE.branches[0]?.id, p_product_id: bom.finished_product_id, p_type: "in", p_quantity: finishedQty, p_notes: `Production: assembled ${assembleQty}x from ${bom.name || "recipe"}`, p_created_by: STATE.appUser.id });
 
   await supabase.from("production_logs").insert({
     business_id: STATE.business.id,
-    branch_id: STATE.branch.id,
+    branch_id: STATE.branch?.id || STATE.branches[0]?.id,
     bom_id: bom.id,
     finished_product_id: bom.finished_product_id,
     action: "assemble",
@@ -2499,20 +2499,20 @@ async function disassembleProduct(bomId) {
   }
 
   // Deduct finished product
-  await supabase.rpc("upsert_product_stock", { p_product_id: bom.finished_product_id, p_branch_id: STATE.branch.id, p_quantity: finishedStock - disassembleQty });
-  await supabase.rpc("insert_stock_movement", { p_business_id: STATE.business.id, p_branch_id: STATE.branch.id, p_product_id: bom.finished_product_id, p_type: "out", p_quantity: disassembleQty, p_notes: `Disassembled ${disassembleQty}x ${bom.name || "recipe"}`, p_created_by: STATE.appUser.id });
+  await supabase.rpc("upsert_product_stock", { p_product_id: bom.finished_product_id, p_branch_id: STATE.branch?.id || STATE.branches[0]?.id, p_quantity: finishedStock - disassembleQty });
+  await supabase.rpc("insert_stock_movement", { p_business_id: STATE.business.id, p_branch_id: STATE.branch?.id || STATE.branches[0]?.id, p_product_id: bom.finished_product_id, p_type: "out", p_quantity: disassembleQty, p_notes: `Disassembled ${disassembleQty}x ${bom.name || "recipe"}`, p_created_by: STATE.appUser.id });
 
   // Return components
   for (const item of bom.items) {
     const returned = item.quantity * disassembleQty;
     const current = stockFor(item.component_product_id);
-    await supabase.rpc("upsert_product_stock", { p_product_id: item.component_product_id, p_branch_id: STATE.branch.id, p_quantity: current + returned });
-    await supabase.rpc("insert_stock_movement", { p_business_id: STATE.business.id, p_branch_id: STATE.branch.id, p_product_id: item.component_product_id, p_type: "in", p_quantity: returned, p_notes: `Disassembled ${disassembleQty}x ${bom.name || "recipe"}`, p_created_by: STATE.appUser.id });
+    await supabase.rpc("upsert_product_stock", { p_product_id: item.component_product_id, p_branch_id: STATE.branch?.id || STATE.branches[0]?.id, p_quantity: current + returned });
+    await supabase.rpc("insert_stock_movement", { p_business_id: STATE.business.id, p_branch_id: STATE.branch?.id || STATE.branches[0]?.id, p_product_id: item.component_product_id, p_type: "in", p_quantity: returned, p_notes: `Disassembled ${disassembleQty}x ${bom.name || "recipe"}`, p_created_by: STATE.appUser.id });
   }
 
   await supabase.from("production_logs").insert({
     business_id: STATE.business.id,
-    branch_id: STATE.branch.id,
+    branch_id: STATE.branch?.id || STATE.branches[0]?.id,
     bom_id: bom.id,
     finished_product_id: bom.finished_product_id,
     action: "disassemble",
