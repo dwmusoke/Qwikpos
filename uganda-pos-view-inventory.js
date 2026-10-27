@@ -572,13 +572,11 @@ function openStockModal(productId) {
               toast("Batch update failed: " + batchErr.message, "error");
               return;
             }
-            // Also update product_stock total
-            await supabase.rpc("upsert_product_stock", {
-              p_product_id: productId,
-              p_branch_id: branchId,
-              p_quantity: newQty,
-            });
-          } else {
+            // Also update product_stock total — adjust_stock_batch already re-syncs
+            // the total from the sum of batches, so don't overwrite it here (that
+            // would clobber the batch-derived total and desync the two tables).
+            // No-op for the batch path.
+            } else {
             // Simple stock update (no batch)
             const { error: stockErr } = await supabase.rpc("upsert_product_stock", {
               p_product_id: productId,
@@ -1266,6 +1264,9 @@ function openTransferModal() {
           const toId = $("tf-to").value;
           const qty = parseFloat($("tf-qty").value);
           const notes = $("tf-notes").value.trim();
+          const productName = STATE.products.find((p) => p.id === productId)?.name || "Product";
+          const fromName = STATE.branches.find((b) => b.id === fromId)?.name || "Branch";
+          const toName = STATE.branches.find((b) => b.id === toId)?.name || "Branch";
 
           if (!productId) {
             toast("Select a product", "error");
@@ -1302,26 +1303,32 @@ function openTransferModal() {
             return;
           }
 
-          // Deduct from source
-          await supabase.rpc("upsert_product_stock", { p_product_id: productId, p_branch_id: fromId, p_quantity: fromStockQty - qty });
-          // Add to destination
-          await supabase.rpc("upsert_product_stock", { p_product_id: productId, p_branch_id: toId, p_quantity: toStockQty + qty });
+          let usedRpc = false;
+          const { error: rpcErr } = await supabase.rpc("transfer_stock", {
+            p_business_id: STATE.business.id,
+            p_product_id: productId,
+            p_from_branch: fromId,
+            p_to_branch: toId,
+            p_quantity: qty,
+            p_notes: notes || null,
+            p_user_id: STATE.appUser?.id || null,
+          });
+          if (!rpcErr) usedRpc = true;
+          else if (!/transfer_stock/i.test(rpcErr.message || '')) { toast("Transfer failed: " + rpcErr.message, "error"); return; }
 
-          // Record movements
-          await supabase.rpc("insert_stock_movement", { p_business_id: STATE.business.id, p_branch_id: fromId, p_product_id: productId, p_type: "transfer", p_quantity: -qty, p_notes: "Transfer to " + (STATE.branches.find(b => b.id === toId)?.name || "branch") + (notes ? ": " + notes : ""), p_created_by: STATE.appUser.id });
-          await supabase.rpc("insert_stock_movement", { p_business_id: STATE.business.id, p_branch_id: toId, p_product_id: productId, p_type: "transfer", p_quantity: qty, p_notes: "Transfer from " + (STATE.branches.find(b => b.id === fromId)?.name || "branch") + (notes ? ": " + notes : ""), p_created_by: STATE.appUser.id });
+          if (!usedRpc) {
+            await supabase.rpc("upsert_product_stock", { p_product_id: productId, p_branch_id: fromId, p_quantity: fromStockQty - qty });
+            await supabase.rpc("upsert_product_stock", { p_product_id: productId, p_branch_id: toId, p_quantity: toStockQty + qty });
+            await supabase.rpc("insert_stock_movement", { p_business_id: STATE.business.id, p_branch_id: fromId, p_product_id: productId, p_type: "transfer", p_quantity: -qty, p_notes: "Transfer to " + (STATE.branches.find(b => b.id === toId)?.name || "branch") + (notes ? ": " + notes : ""), p_created_by: STATE.appUser.id });
+            await supabase.rpc("insert_stock_movement", { p_business_id: STATE.business.id, p_branch_id: toId, p_product_id: productId, p_type: "transfer", p_quantity: qty, p_notes: "Transfer from " + (STATE.branches.find(b => b.id === fromId)?.name || "branch") + (notes ? ": " + notes : ""), p_created_by: STATE.appUser.id });
+          }
 
           toast("Stock transferred", "success");
           logAuditAction({
             action: "transfer",
             entityType: "stock_transfer",
-            entityName: `${productName} × ${qty}`,
-            newValue: {
-              from: fromId,
-              to: toId,
-              product: productName,
-              quantity: qty,
-            },
+            entityName: productName + " x " + qty,
+            newValue: { from: fromId, to: toId, product: productName, quantity: qty, notes },
           });
           closeModal();
           await refreshProducts();
@@ -1780,15 +1787,14 @@ async function loadPOList() {
 
   qsa("[data-receive-po]", listEl).forEach((btn) => {
     btn.addEventListener("click", async () => {
-      const { error } = await supabase
-        .from("purchase_orders")
-        .update({ status: "received" })
-        .eq("id", btn.dataset.receivePo);
+      if (!confirm("Mark this purchase order as received? Stock will be added to the branch.")) return;
+      const { error } = await supabase.rpc("receive_purchase_order", { p_po_id: btn.dataset.receivePo });
       if (error) {
         toast("Failed: " + error.message, "error");
         return;
       }
-      toast("Purchase order received", "success");
+      toast("Purchase order received — stock added", "success");
+      await refreshProducts();
       loadPOList();
     });
   });
